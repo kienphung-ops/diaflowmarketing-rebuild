@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model EmailCapture {
+  id        Int      @id @default(autoincrement())
+  email     String
+  source    String
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id               String               @id @default(cuid())
+  email            String               @unique
+  emailVerified    DateTime?
+  ipAddress        String?
+  referralCode     String               @unique
+  referredByCode   String?
+  referredBy       User?                @relation("UserReferrals", fields: [referredByCode], references: [referralCode])
+  referrals        User[]               @relation("UserReferrals")
+  totalInvites     Int                  @default(0)
+  currentFloor     Int                  @default(1)
+  teamName         String?
+  teamPurpose      String?
+  authTokens       AuthToken[]
+  unlockedItems    UnlockedItem[]
+  inviteEvents     InviteEvent[]        @relation("InviterEvents")
+  recruitedTeams   RecruitedTeammate[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([referralCode])
+}
+
+model AuthToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TokenType
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, type])
+}
+
+enum TokenType {
+  MAGIC_LINK
+  OTP
+}
+
+model InviteEvent {
+  id            String   @id @default(cuid())
+  inviterUserId String
+  inviter       User     @relation("InviterEvents", fields: [inviterUserId], references: [id], onDelete: Cascade)
+  invitedEmail  String
+  invitedUserId String?
+  ipAddress     String?
+  userAgent     String?
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([inviterUserId])
+  @@index([invitedEmail])
+}
+
+model UnlockedItem {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemKey    String
+  floor      Int
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, itemKey])
+}
+
+model RecruitedTeammate {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  role      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
