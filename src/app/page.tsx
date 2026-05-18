@@ -31,7 +31,7 @@ export default async function Home() {
       currentFloor = u.currentFloor
       referralCode = u.referralCode
       totalInvites = u.totalInvites
-      unlockedItemKeys = u.unlockedItems.map(i => i.itemKey)
+      unlockedItemKeys = u.unlockedItems.map((i: { itemKey: string }) => i.itemKey)
       if (unlockedItemKeys.length === 0) unlockedItemKeys = ['company_picture_frame']
       serverRecruits = u.recruitedTeams
       serverTeamName = u.teamName
