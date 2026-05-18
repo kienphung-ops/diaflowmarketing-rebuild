@@ -12,7 +12,6 @@ interface ServerRecruit {
 interface Props {
   open: boolean
   onClose: () => void
-  signedIn: boolean
   teamName: string | null
   onTeamNameChange?: (next: string) => void
   referralCode: string | null
@@ -35,7 +34,6 @@ function buildInviteUrl(code: string | null): string {
 export function MySquadDrawer({
   open,
   onClose,
-  signedIn,
   teamName,
   onTeamNameChange,
   referralCode,

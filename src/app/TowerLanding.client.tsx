@@ -320,7 +320,6 @@ export default function TowerLanding(props: Props) {
       <MySquadDrawer
         open={squadOpen}
         onClose={() => setSquadOpen(false)}
-        signedIn={props.signedIn}
         teamName={effective.teamName ?? null}
         onTeamNameChange={handleTeamNameChange}
         referralCode={props.referralCode}

@@ -203,7 +203,7 @@ export function OfficeScene({
     },
     [onboardingStep, onNpcClick, onTeammateClick]
   )
-  const handlePokeChar = useCallback((_slug: string) => {
+  const handlePokeChar = useCallback(() => {
     // Poke is purely visual feedback — animations already wired inside Character.
   }, [])
 
