@@ -21,3 +21,8 @@ canvas {
   display: block;
   touch-action: none;
 }
+
+/* iOS Safari safe area padding for bottom-fixed UI */
+.safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}

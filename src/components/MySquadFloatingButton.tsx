@@ -12,7 +12,7 @@ export function MySquadFloatingButton({ onClick, visible }: Props) {
     <button
       onClick={onClick}
       aria-label="Open My Squad"
-      className="fixed right-0 top-1/2 -translate-y-1/2 z-20 group"
+      className="hidden md:block fixed right-0 top-1/2 -translate-y-1/2 z-20 group"
     >
       <div className="flex flex-col items-center gap-2 px-2 py-4 rounded-l-xl bg-night-mid/90 border border-tower-gold/40 border-r-0 backdrop-blur-sm shadow-lg group-hover:bg-night-mid transition">
         {/* Vertical "My Squad" label */}

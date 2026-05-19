@@ -57,16 +57,9 @@ async function processReferralIfAny(userId: string, email: string): Promise<void
         })
       }
     }
-    // Each verified invite mints a new RecruitedTeammate for the inviter,
-    // so total teammates = manual recruits + verified invites.
-    const teammateCount = await tx.recruitedTeammate.count({ where: { userId: inviter.id } })
-    await tx.recruitedTeammate.create({
-      data: {
-        userId: inviter.id,
-        name: `Teammate #${teammateCount + 1}`,
-        role: 'Operations Assistant',
-      },
-    })
+    // Teammates are user-managed via the bulk-add modal — no auto-recruit
+    // row on invite verify. Slots open up automatically based on
+    // FLOOR_MAX_TEAMMATES; the user chooses who to fill them with.
   })
 }
 

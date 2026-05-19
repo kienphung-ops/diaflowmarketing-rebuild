@@ -1,68 +1,39 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type Stage = 'email' | 'code' | 'verifying'
-
 export default function LoginPage() {
   const router = useRouter()
-  const [stage, setStage] = useState<Stage>('email')
   const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function submitEmail(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setBusy(true)
-    try {
-      const ref =
-        typeof window !== 'undefined'
-          ? window.localStorage.getItem('diaflow_pending_ref') ?? undefined
-          : undefined
-      const res = await fetch('/api/auth/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), ref }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error ?? 'Failed to send code')
-      }
-      setStage('code')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setBusy(false)
+    if (!email.includes('@')) {
+      setError('Enter a valid email')
+      return
     }
-  }
-
-  async function submitCode(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
     setBusy(true)
-    setStage('verifying')
     try {
-      const res = await fetch('/api/auth/verify-otp', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), code: code.trim() }),
+        body: JSON.stringify({ email: email.trim(), password }),
       })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error ?? 'Invalid code')
-      }
-      try {
-        window.localStorage.removeItem('diaflow_pending_ref')
-      } catch {
-        // ignore
-      }
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? 'Sign in failed')
       router.replace('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
-      setStage('code')
     } finally {
       setBusy(false)
     }
@@ -74,70 +45,55 @@ export default function LoginPage() {
         <div className="flex items-center gap-2 mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md" />
-          <h1 className="text-lg font-semibold tracking-wide">Diaflow Tower</h1>
+          <h1 className="text-lg font-semibold tracking-wide">Welcome back</h1>
         </div>
 
-        {stage === 'email' && (
-          <form onSubmit={submitEmail} className="space-y-3">
-            <p className="text-sm text-tower-cream/70">
-              Sign in with your email — we&apos;ll send a link and a 6-digit code.
-            </p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <p className="text-sm text-tower-cream/70">
+            Sign in to keep climbing your tower.
+          </p>
+          <label className="block space-y-1">
+            <span className="text-xs uppercase tracking-wider text-tower-cream/50">Email</span>
             <input
               type="email"
               required
               autoFocus
+              autoComplete="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
             />
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
-            >
-              {busy ? 'Sending…' : 'Send sign-in link'}
-            </button>
-          </form>
-        )}
-
-        {(stage === 'code' || stage === 'verifying') && (
-          <form onSubmit={submitCode} className="space-y-3">
-            <p className="text-sm text-tower-cream/70">
-              We sent a 6-digit code to <span className="text-tower-gold">{email}</span>.
-            </p>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs uppercase tracking-wider text-tower-cream/50">Password</span>
             <input
-              inputMode="numeric"
-              pattern="\d{6}"
+              type="password"
               required
-              autoFocus
-              value={code}
-              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="123456"
-              className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-center text-lg font-mono tracking-[0.4em]"
+              minLength={6}
+              autoComplete="current-password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="your password"
+              className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
             />
-            <button
-              type="submit"
-              disabled={busy || code.length !== 6}
-              className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
-            >
-              {busy ? 'Verifying…' : 'Sign in'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setStage('email')
-                setCode('')
-                setError(null)
-              }}
-              className="w-full text-xs text-tower-cream/50 hover:text-tower-cream/80"
-            >
-              Use a different email
-            </button>
-          </form>
-        )}
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
+          >
+            {busy ? 'Signing in…' : 'Sign in'}
+          </button>
+          {error && <p className="text-xs text-red-300">{error}</p>}
+        </form>
 
-        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+        <p className="mt-4 text-xs text-tower-cream/60 text-center">
+          Don&apos;t have an account?{' '}
+          <Link href="/" className="text-tower-gold hover:underline">
+            Start your tower →
+          </Link>
+        </p>
       </div>
     </main>
   )

@@ -1,210 +1,214 @@
 'use client'
 
-import { useMemo } from 'react'
+import { memo, Suspense } from 'react'
 import * as THREE from 'three'
-import { Text } from '@react-three/drei'
+import { Text, useTexture } from '@react-three/drei'
 
-function Stars() {
-  const positions = useMemo(() => {
-    const pts: number[] = []
-    for (let i = 0; i < 60; i++) {
-      pts.push(
-        (Math.random() - 0.5) * 4 + 3.5,
-        (Math.random()) * 1.8 + 1.4,
-        -5.25
-      )
-    }
-    return new Float32Array(pts)
-  }, [])
-
+// Memoize so re-renders of the parent (camera target changes, scene reflows)
+// don't force the SDF text atlas to rebuild — which manifested as flicker.
+const CompanyFrame = memo(function CompanyFrame({ companyName }: { companyName?: string }) {
   return (
-    <points>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" array={positions} count={60} itemSize={3} />
-      </bufferGeometry>
-      <pointsMaterial color="#ffffff" size={0.03} sizeAttenuation />
-    </points>
-  )
-}
-
-function Bookshelf() {
-  const bookColors = ['#c0392b', '#2980b9', '#27ae60', '#e67e22', '#8e44ad', '#2c3e50', '#d35400', '#16a085']
-  return (
-    <group position={[-4.5, 0.6, -5.3]}>
-      {/* Shelf unit back panel */}
-      <mesh castShadow>
-        <boxGeometry args={[2.4, 3.2, 0.15]} />
-        <meshLambertMaterial color="#5a3a1a" />
-      </mesh>
-      {/* Three shelves */}
-      {[0.8, 0, -0.8].map((y, si) => (
-        <mesh key={si} position={[0, y, 0.08]} castShadow>
-          <boxGeometry args={[2.4, 0.06, 0.3]} />
-          <meshLambertMaterial color="#7a5a2a" />
-        </mesh>
-      ))}
-      {/* Side panels */}
-      {[-1.17, 1.17].map((x, i) => (
-        <mesh key={i} position={[x, 0, 0.08]}>
-          <boxGeometry args={[0.06, 3.2, 0.3]} />
-          <meshLambertMaterial color="#5a3a1a" />
-        </mesh>
-      ))}
-      {/* Books on shelves */}
-      {[0.8, 0, -0.8].map((shelfY, si) =>
-        bookColors.slice(si * 2, si * 2 + 5).map((color, bi) => (
-          <mesh key={`b${si}-${bi}`} position={[-0.85 + bi * 0.22, shelfY + 0.12, 0.13]} castShadow>
-            <boxGeometry args={[0.17, 0.22, 0.18]} />
-            <meshLambertMaterial color={color} />
-          </mesh>
-        ))
-      )}
-    </group>
-  )
-}
-
-function PlantPot() {
-  return (
-    <group position={[-6.1, -0.3, -2.5]}>
-      {/* Pot */}
-      <mesh castShadow>
-        <cylinderGeometry args={[0.16, 0.12, 0.28, 8]} />
-        <meshLambertMaterial color="#8B4513" />
-      </mesh>
-      {/* Soil */}
-      <mesh position={[0, 0.15, 0]}>
-        <cylinderGeometry args={[0.155, 0.155, 0.04, 8]} />
-        <meshLambertMaterial color="#3d2b1a" />
-      </mesh>
-      {/* Stems and leaves */}
-      {[
-        { pos: [0, 0.18, 0] as [number, number, number], rot: [0, 0, 0] as [number, number, number] },
-        { pos: [0.12, 0.18, 0] as [number, number, number], rot: [0, 0, 0.4] as [number, number, number] },
-        { pos: [-0.1, 0.18, 0.08] as [number, number, number], rot: [0, 0, -0.3] as [number, number, number] },
-      ].map((s, i) => (
-        <group key={i} position={s.pos} rotation={s.rot}>
-          {/* Stem */}
-          <mesh castShadow>
-            <cylinderGeometry args={[0.015, 0.015, 0.4, 5]} />
-            <meshLambertMaterial color="#2d5a1b" />
-          </mesh>
-          {/* Leaf — use planeGeometry scaled to leaf shape */}
-          <mesh position={[0, 0.22, 0]} rotation={[0.3, i * 0.8, 0]}>
-            <planeGeometry args={[0.28, 0.16]} />
-            <meshLambertMaterial color="#3a7a22" side={THREE.DoubleSide} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  )
-}
-
-function CompanyFrame({ companyName }: { companyName?: string }) {
-  return (
-    <group position={[-2.4, 2.2, -5.38]}>
-      {/* Outer frame — dark wood */}
+    <group position={[-2.4, 2.2, -5.4]}>
       <mesh castShadow>
         <boxGeometry args={[1.08, 1.08, 0.04]} />
         <meshLambertMaterial color="#5a3a10" />
       </mesh>
-      {/* Inner frame lip */}
-      <mesh position={[0, 0, 0.022]}>
+      <mesh position={[0, 0, 0.024]}>
         <boxGeometry args={[0.96, 0.96, 0.02]} />
         <meshLambertMaterial color="#7a5520" />
       </mesh>
-      {/* White mat backing */}
-      <mesh position={[0, 0, 0.032]}>
+      <mesh position={[0, 0, 0.034]}>
         <planeGeometry args={[0.94, 0.94]} />
         <meshLambertMaterial color="#f5f0e8" />
       </mesh>
-      {/* Company name text — shown after user enters it */}
       {companyName && (
         <Text
-          position={[0, 0, 0.036]}
-          fontSize={0.09}
-          maxWidth={0.76}
+          position={[0, 0, 0.07]}
+          fontSize={0.1}
+          maxWidth={0.82}
           textAlign="center"
           color="#1a1a2e"
           anchorX="center"
           anchorY="middle"
+          renderOrder={1}
+          overflowWrap="break-word"
+          whiteSpace="overflowWrap"
         >
-          {companyName}
+          {companyName.slice(0, 30)}
         </Text>
       )}
     </group>
+  )
+})
+
+/**
+ * Map a floor number to one of 6 reusable scenery images, so the client
+ * only downloads up to 6 PNGs instead of 20.
+ *
+ *   Floor 1         → 1.png
+ *   Floor 2 – 5     → 2.png
+ *   Floor 6 – 10    → 3.png
+ *   Floor 11 – 15   → 4.png
+ *   Floor 16 – 19   → 5.png
+ *   Floor 20        → 6.png  (handled separately via FloorTwentyPanorama)
+ */
+function floorToImageNumber(floor: number): number {
+  if (floor <= 1) return 1
+  if (floor <= 5) return 2
+  if (floor <= 10) return 3
+  if (floor <= 15) return 4
+  if (floor <= 19) return 5
+  return 6
+}
+
+/** Loads /window_images/<N>.png. Suspends until ready. */
+function FloorSceneryTexture({ floor }: { floor: number }) {
+  const url = `/window_images/${floorToImageNumber(floor)}.png`
+  const texture = useTexture(url) as THREE.Texture
+  texture.colorSpace = THREE.SRGBColorSpace
+
+  // Standard cut-out window — texture fills the planeGeometry inside the
+  // back-wall opening. Floor 1-19 use this; Floor 20 uses the glass-wall
+  // panorama (see FloorTwentyPanorama).
+  return (
+    <mesh position={[3.5, 2.4, -5.32]}>
+      <planeGeometry args={[3, 2.2]} />
+      <meshBasicMaterial map={texture} toneMapped={false} />
+    </mesh>
+  )
+}
+
+/** Floor 20: the 3 walls turn into glass + a wraparound panorama plays
+ *  on a large background plane outside each wall. The texture (6.png)
+ *  is repeated/sampled so it reads as the same skyline from any angle. */
+function FloorTwentyPanorama() {
+  const url = '/window_images/6.png'
+  const texture = useTexture(url) as THREE.Texture
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.ClampToEdgeWrapping
+
+  return (
+    <group>
+      {/* Back panorama — behind the (now glass) back wall */}
+      <mesh position={[0, 2.5, -8.5]}>
+        <planeGeometry args={[24, 10]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+      {/* Left panorama — behind the left glass wall, rotated to face inward */}
+      <mesh position={[-11, 2.5, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[16, 10]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+      {/* Right panorama */}
+      <mesh position={[11, 2.5, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <planeGeometry args={[16, 10]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Window frame mullions overlaid on top of the floor-scenery texture
+ *  (a + cross + outer rim). */
+function WindowFrame() {
+  return (
+    <>
+      {[
+        { pos: [3.5, 3.6, -5.26] as [number, number, number], size: [3.3, 0.14, 0.12] as [number, number, number] },
+        { pos: [3.5, 1.3, -5.26] as [number, number, number], size: [3.3, 0.14, 0.12] as [number, number, number] },
+        { pos: [2.0, 2.45, -5.26] as [number, number, number], size: [0.14, 2.5, 0.12] as [number, number, number] },
+        { pos: [5.0, 2.45, -5.26] as [number, number, number], size: [0.14, 2.5, 0.12] as [number, number, number] },
+      ].map((f, i) => (
+        <mesh key={i} position={f.pos}>
+          <boxGeometry args={f.size} />
+          <meshLambertMaterial color="#3a2a1a" />
+        </mesh>
+      ))}
+      <mesh position={[3.5, 2.45, -5.26]}>
+        <boxGeometry args={[0.08, 2.5, 0.08]} />
+        <meshLambertMaterial color="#3a2a1a" />
+      </mesh>
+      <mesh position={[3.5, 2.45, -5.26]}>
+        <boxGeometry args={[3.3, 0.08, 0.08]} />
+        <meshLambertMaterial color="#3a2a1a" />
+      </mesh>
+    </>
   )
 }
 
 interface WallsProps {
   companyName?: string
-  showBookshelf?: boolean
-  showPlant?: boolean
+  currentFloor: number
+  /** When false, suppresses the cut-out window entirely (legacy demos). */
   showWindow?: boolean
 }
 
-export function Walls({
-  companyName,
-  showBookshelf = true,
-  showPlant = true,
-  showWindow = true,
-}: WallsProps) {
+export function Walls({ companyName, currentFloor, showWindow = true }: WallsProps) {
+  const isPenthouse = currentFloor >= 20
+  // Walls become almost-transparent glass on Floor 20 so the panorama
+  // shows through from all 3 sides. Earlier floors keep solid plaster.
+  const wallMaterial = isPenthouse ? (
+    <meshLambertMaterial color="#e8f1ff" transparent opacity={0.18} />
+  ) : (
+    <meshLambertMaterial color="#e8dfd0" />
+  )
+  const sideWallMaterial = isPenthouse ? (
+    <meshLambertMaterial color="#e8f1ff" transparent opacity={0.18} />
+  ) : (
+    <meshLambertMaterial color="#dccfb8" />
+  )
+
   return (
     <group>
       {/* Back wall */}
       <mesh position={[0, 1.8, -5.5]} receiveShadow>
         <boxGeometry args={[16, 7, 0.18]} />
-        <meshLambertMaterial color="#e8dfd0" />
+        {wallMaterial}
       </mesh>
 
-      {showWindow && (
-        <>
-          {/* Sky backdrop */}
-          <mesh position={[3.5, 2.4, -5.32]}>
-            <planeGeometry args={[3, 2.2]} />
-            <meshBasicMaterial color="#050a1a" />
-          </mesh>
-          {/* Moon */}
-          <mesh position={[4.6, 3.1, -5.3]}>
-            <circleGeometry args={[0.18, 16]} />
-            <meshBasicMaterial color="#e8e4c8" />
-          </mesh>
-          <mesh position={[4.6, 3.1, -5.31]}>
-            <circleGeometry args={[0.28, 16]} />
-            <meshBasicMaterial color="#c8c4a0" transparent opacity={0.15} />
-          </mesh>
-          <Stars />
-          <mesh position={[3.5, 2.4, -5.28]}>
-            <planeGeometry args={[2.8, 2.0]} />
-            <meshBasicMaterial color="#1a2a4a" transparent opacity={0.2} />
-          </mesh>
-          {[
-            { pos: [3.5, 3.6, -5.26] as [number, number, number], size: [3.3, 0.14, 0.12] as [number, number, number] },
-            { pos: [3.5, 1.3, -5.26] as [number, number, number], size: [3.3, 0.14, 0.12] as [number, number, number] },
-            { pos: [2.0, 2.45, -5.26] as [number, number, number], size: [0.14, 2.5, 0.12] as [number, number, number] },
-            { pos: [5.0, 2.45, -5.26] as [number, number, number], size: [0.14, 2.5, 0.12] as [number, number, number] },
-          ].map((f, i) => (
-            <mesh key={i} position={f.pos}>
-              <boxGeometry args={f.size} />
-              <meshLambertMaterial color="#3a2a1a" />
-            </mesh>
-          ))}
-          <mesh position={[3.5, 2.45, -5.26]}>
-            <boxGeometry args={[0.08, 2.5, 0.08]} />
-            <meshLambertMaterial color="#3a2a1a" />
-          </mesh>
-          <mesh position={[3.5, 2.45, -5.26]}>
-            <boxGeometry args={[3.3, 0.08, 0.08]} />
-            <meshLambertMaterial color="#3a2a1a" />
-          </mesh>
-        </>
-      )}
+      {/* Left wall */}
+      <mesh position={[-8, 1.8, 0]} receiveShadow>
+        <boxGeometry args={[0.18, 7, 11]} />
+        {sideWallMaterial}
+      </mesh>
 
-      {showBookshelf && <Bookshelf />}
-      {showPlant && <PlantPot />}
+      {/* Right wall */}
+      <mesh position={[8, 1.8, 0]} receiveShadow>
+        <boxGeometry args={[0.18, 7, 11]} />
+        {sideWallMaterial}
+      </mesh>
+
+      {/* Side baseboards — kept even on Floor 20 to anchor the room */}
+      <mesh position={[-7.92, -0.52, 0]}>
+        <boxGeometry args={[0.1, 0.12, 11]} />
+        <meshLambertMaterial color="#2a1a0a" />
+      </mesh>
+      <mesh position={[7.92, -0.52, 0]}>
+        <boxGeometry args={[0.1, 0.12, 11]} />
+        <meshLambertMaterial color="#2a1a0a" />
+      </mesh>
+
+      {isPenthouse ? (
+        // Glass-wall panorama — no cut-out window, the whole back+sides become
+        // floor-to-ceiling glass with 20.png as the surrounding skyline.
+        <Suspense fallback={null}>
+          <FloorTwentyPanorama />
+        </Suspense>
+      ) : (
+        showWindow && (
+          <>
+            <Suspense fallback={null}>
+              <FloorSceneryTexture floor={currentFloor} />
+            </Suspense>
+            <WindowFrame />
+          </>
+        )
+      )}
 
       <CompanyFrame companyName={companyName} />
 
-      {/* Baseboard */}
+      {/* Baseboard along back wall */}
       <mesh position={[0, -0.52, -5.42]}>
         <boxGeometry args={[16, 0.12, 0.1]} />
         <meshLambertMaterial color="#2a1a0a" />

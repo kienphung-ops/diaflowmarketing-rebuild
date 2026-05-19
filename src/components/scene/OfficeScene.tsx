@@ -5,9 +5,11 @@ import * as THREE from 'three'
 import { Html } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
 import { CinematicCamera } from './camera/CinematicCamera'
+import { StaticCamera } from './camera/StaticCamera'
 import { TowerScene, TOWER_CAM_POSITION, TOWER_CAM_LOOKAT, TOWER_CAM_ZOOM } from './tower/TowerScene'
 import { Floor } from './environment/Floor'
 import { Walls } from './environment/Walls'
+import { FloorItems } from './environment/FloorItems'
 import { Lighting } from './environment/Lighting'
 import { Desk } from './furniture/Desk'
 import { Character } from './characters/Character'
@@ -115,10 +117,7 @@ export function OfficeScene({
   onNpcPosition,
 }: Props) {
   const unlockedSet = new Set(unlockedItemKeys)
-  const showBookshelf = unlockedSet.has('bookshelf')
-  const showPlant = unlockedSet.has('potted_plant')
   const showDesks = unlockedSet.has('basic_chair_desk')
-  const [cameraTarget, setCameraTarget] = useState<THREE.Vector3 | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
   const [pokeSignals, setPokeSignals] = useState<Record<string, number>>({})
   const [positions, setPositions] = useState<Record<string, [number, number, number]>>(() => {
@@ -141,25 +140,8 @@ export function OfficeScene({
     })
   }, [positions, onNpcPosition])
 
-  // Camera: point at the active onboarding NPC.
-  useEffect(() => {
-    const slug = onboardingStep === 'iris' || onboardingStep === 'mia' || onboardingStep === 'leo'
-      ? onboardingStep
-      : recruitedCharacters.length > 0 ? null : 'iris'
-    if (!slug) {
-      if (recruitedCharacters.length > 0) {
-        const i = Math.min(recruitedCharacters.length - 1, RECRUIT_POSITIONS.length - 1)
-        const p = RECRUIT_POSITIONS[i]
-        setCameraTarget(new THREE.Vector3(p[0] + 1.5, p[1] + 3.5, p[2] + 3.5))
-      } else {
-        const iris = CHARACTERS.find(c => c.slug === 'iris')!.position
-        setCameraTarget(new THREE.Vector3(iris[0] + 1.5, iris[1] + 3.5, iris[2] + 3.5))
-      }
-      return
-    }
-    const pos = positions[slug] ?? CHARACTERS.find(c => c.slug === slug)!.position
-    setCameraTarget(new THREE.Vector3(pos[0] + 1.5, pos[1] + 3.5, pos[2] + 3.5))
-  }, [onboardingStep, recruitedCharacters.length, positions])
+  // Camera target removed — office view uses StaticCamera (locked front
+  // view). Only tower view still uses CinematicCamera with its own target.
 
   // Drag handlers.
   const handleDragStart = useCallback((slug: string) => {
@@ -242,6 +224,10 @@ export function OfficeScene({
     [recruitedCharacters]
   )
 
+  // No anonymous background figures: the office only shows the 3 default
+  // NPCs (Iris/Mia/Leo) plus user-recruited teammates. Empty slots stay
+  // visually empty so the user can see exactly who they've added.
+
   useEffect(() => {
     setPositions(prev => {
       const next = { ...prev }
@@ -261,12 +247,19 @@ export function OfficeScene({
 
   return (
     <>
-      <CinematicCamera
-        target={showTower ? TOWER_CAM_POSITION : cameraTarget}
-        lookAt={showTower ? TOWER_CAM_LOOKAT : undefined}
-        targetZoom={showTower ? TOWER_CAM_ZOOM : undefined}
-        panY={0}
-      />
+      {showTower ? (
+        <CinematicCamera
+          target={TOWER_CAM_POSITION}
+          lookAt={TOWER_CAM_LOOKAT}
+          targetZoom={TOWER_CAM_ZOOM}
+          panY={0}
+        />
+      ) : (
+        // Office view: locked front-facing camera. No follow, no animation,
+        // so the room never appears to swing while a teammate is being
+        // dragged.
+        <StaticCamera />
+      )}
       <Lighting
         characters={CHARACTERS}
         positions={positions}
@@ -285,11 +278,8 @@ export function OfficeScene({
         {!showTower && (
           <group>
             <Floor />
-            <Walls
-              companyName={companyName ?? undefined}
-              showBookshelf={showBookshelf}
-              showPlant={showPlant}
-            />
+            <Walls companyName={companyName ?? undefined} currentFloor={currentFloor} />
+            <FloorItems currentFloor={currentFloor} />
 
             {!isOnboarding && showDesks && <Desk position={EMPTY_DESK_POSITION} chairColor="#1a1a2e" />}
 
@@ -352,6 +342,7 @@ export function OfficeScene({
                 />
               )
             })}
+
           </group>
         )}
 

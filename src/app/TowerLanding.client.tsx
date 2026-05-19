@@ -11,8 +11,11 @@ import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { MiaInfoCard } from '@/components/MiaInfoCard'
 import { LeoEmailDrawer } from '@/components/LeoEmailDrawer'
 import { TeammateEditModal } from '@/components/TeammateEditModal'
+import { BulkAddTeammatesModal } from '@/components/BulkAddTeammatesModal'
+import { MobileBottomBar } from '@/components/MobileBottomBar'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
-import { useFloorPolling } from '@/hooks/useFloorPolling'
+import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
+import { getMaxTeammates, getRecruitSlotsAvailable, DEFAULT_NPC_COUNT } from '@/lib/floors'
 import {
   advanceTrialInvites,
   defaultTrialState,
@@ -22,9 +25,11 @@ import {
   type TrialState,
 } from '@/lib/trial'
 
+import { SceneSkeleton } from '@/components/fallback/SceneSkeleton'
+
 const SceneCanvas = dynamic(
   () => import('@/components/scene/SceneCanvas').then(m => ({ default: m.SceneCanvas })),
-  { ssr: false }
+  { ssr: false, loading: () => <SceneSkeleton /> }
 )
 
 interface ServerRecruit {
@@ -65,11 +70,13 @@ export default function TowerLanding(props: Props) {
 
   const [recruits, setRecruits] = useState<ServerRecruit[]>(props.serverRecruits)
   const [celebrationFloor, setCelebrationFloor] = useState<number | null>(null)
+  const [celebrationFloorsClimbed, setCelebrationFloorsClimbed] = useState(0)
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [showTower, setShowTower] = useState(false)
   const [activeNpcModal, setActiveNpcModal] = useState<'iris' | 'mia' | 'leo' | null>(null)
   const [squadOpen, setSquadOpen] = useState(false)
   const [editingTeammate, setEditingTeammate] = useState<ServerRecruit | null>(null)
+  const [bulkAddOpen, setBulkAddOpen] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const prevTrialFloorRef = useRef(trial.currentFloor)
 
@@ -111,37 +118,54 @@ export default function TowerLanding(props: Props) {
   // Celebration on trial floor increase.
   useEffect(() => {
     if (trial.currentFloor > prevTrialFloorRef.current) {
+      setCelebrationFloorsClimbed(trial.currentFloor - prevTrialFloorRef.current)
       setCelebrationFloor(trial.currentFloor)
     }
     prevTrialFloorRef.current = trial.currentFloor
   }, [trial.currentFloor])
 
-  // Live polling: signed-in users get notifications when invites verify in the background.
-  useFloorPolling({
+  // Show the current-floor popup once on initial page load (mỗi lần reload).
+  useEffect(() => {
+    const initialFloor = isTrial ? trial.currentFloor : serverState.currentFloor
+    setCelebrationFloorsClimbed(0)
+    setCelebrationFloor(initialFloor)
+    // Run only on mount — subsequent floor changes are handled by the
+    // increase-detection effects above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Real-time updates via SSE: signed-in users get notifications pushed
+  // from the server when invites verify in the background.
+  useRealtimeFloor({
     enabled: !isTrial,
-    onFloorUp: data => {
+    onSnapshot: data => {
       setServerState(prev => ({
         ...prev,
         currentFloor: data.currentFloor,
         totalInvites: data.totalInvites,
         unlockedItemKeys: data.unlockedItemKeys,
       }))
+    },
+    onFloorUp: data => {
+      setServerState(prev => {
+        const climbed = Math.max(1, data.currentFloor - prev.currentFloor)
+        setCelebrationFloorsClimbed(climbed)
+        return {
+          ...prev,
+          currentFloor: data.currentFloor,
+          totalInvites: data.totalInvites,
+          unlockedItemKeys: data.unlockedItemKeys,
+        }
+      })
       setCelebrationFloor(data.currentFloor)
     },
     onInviteAccepted: data => {
       setServerState(prev => ({ ...prev, totalInvites: data.totalInvites }))
       pushToast({
         title: data.delta === 1 ? '+1 invite accepted' : `+${data.delta} invites accepted`,
-        body: 'A new teammate just joined your squad.',
+        body: 'A new teammate slot is waiting — add them to your squad.',
         tone: 'success',
       })
-      // Refresh recruits list (invite verify auto-creates a RecruitedTeammate row).
-      fetch('/api/recruit')
-        .then(r => (r.ok ? r.json() : null))
-        .then(j => {
-          if (j?.teammates) setRecruits(j.teammates)
-        })
-        .catch(() => {})
     },
   })
 
@@ -238,6 +262,46 @@ export default function TowerLanding(props: Props) {
     }
   }
 
+  function handleBulkAdd(drafts: { name: string; role: string }[]) {
+    if (drafts.length === 0) return
+    if (isTrial) {
+      setRecruits(prev => [
+        ...prev,
+        ...drafts.map((d, i) => ({
+          id: `trial-bulk-${Date.now()}-${i}`,
+          name: d.name,
+          role: d.role,
+        })),
+      ])
+      pushToast({
+        title: `Added ${drafts.length} teammate${drafts.length === 1 ? '' : 's'}`,
+        tone: 'success',
+      })
+      return
+    }
+    // Signed-in: POST each in parallel.
+    Promise.all(
+      drafts.map(d =>
+        fetch('/api/recruit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(d),
+        })
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null)
+      )
+    ).then(results => {
+      const added = results.map(r => r?.teammate).filter(Boolean) as ServerRecruit[]
+      if (added.length > 0) {
+        setRecruits(prev => [...prev, ...added])
+        pushToast({
+          title: `Added ${added.length} teammate${added.length === 1 ? '' : 's'}`,
+          tone: 'success',
+        })
+      }
+    })
+  }
+
   function handleTeamNameChange(next: string) {
     if (isTrial) {
       persist({ ...trial, teamName: next })
@@ -268,6 +332,8 @@ export default function TowerLanding(props: Props) {
   const activeStep = isTrial ? trial.onboardingStep : 'done'
   const onboardingComplete = activeStep === 'done'
   const emailCaptured = !!(isTrial ? trial.email : null)
+  const slotsAvailable = getRecruitSlotsAvailable(effective.currentFloor, recruits.length)
+  const maxTeammates = getMaxTeammates(effective.currentFloor)
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -280,7 +346,10 @@ export default function TowerLanding(props: Props) {
         onOpenSignup={isTrial ? () => setShowSignupModal(true) : undefined}
         showTower={showTower}
         onToggleTower={onboardingComplete ? () => setShowTower(s => !s) : undefined}
-        teammateCount={recruits.length}
+        teammateCount={DEFAULT_NPC_COUNT + recruits.length}
+        maxTeammates={maxTeammates}
+        slotsAvailable={slotsAvailable}
+        onAddTeammates={onboardingComplete && slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
       />
 
       <SceneCanvas
@@ -304,6 +373,17 @@ export default function TowerLanding(props: Props) {
       />
 
       <MySquadFloatingButton visible={onboardingComplete && !showTower} onClick={() => setSquadOpen(true)} />
+
+      {onboardingComplete && (
+        <MobileBottomBar
+          slotsAvailable={slotsAvailable}
+          showTower={showTower}
+          onOpenSquad={() => setSquadOpen(true)}
+          onAddTeammates={slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
+          onToggleTower={() => setShowTower(s => !s)}
+          onSimulateInvite={isTrial ? handleSimulateInvite : undefined}
+        />
+      )}
 
       {isTrial && activeStep !== 'done' && (
         <div className="fixed inset-0 z-20 flex items-end justify-center pb-20 pointer-events-none">
@@ -358,10 +438,28 @@ export default function TowerLanding(props: Props) {
           floor={celebrationFloor}
           totalInvites={effective.totalInvites}
           trialMode={isTrial}
-          onClose={() => setCelebrationFloor(null)}
+          floorsClimbed={celebrationFloorsClimbed}
+          onClose={() => {
+            setCelebrationFloor(null)
+            // After celebrating an actual level-up (not the initial-load
+            // recap), prompt to fill any new teammate slots.
+            if (celebrationFloorsClimbed > 0) {
+              const nextSlots = getRecruitSlotsAvailable(effective.currentFloor, recruits.length)
+              if (nextSlots > 0) setBulkAddOpen(true)
+            }
+          }}
           onOpenSignup={isTrial ? () => setShowSignupModal(true) : undefined}
+          onOpenSquad={onboardingComplete ? () => setSquadOpen(true) : undefined}
         />
       )}
+
+      <BulkAddTeammatesModal
+        open={bulkAddOpen}
+        slotsAvailable={slotsAvailable}
+        currentFloor={effective.currentFloor}
+        onClose={() => setBulkAddOpen(false)}
+        onAdd={handleBulkAdd}
+      />
       {showSignupModal && <SignupModal onClose={() => setShowSignupModal(false)} />}
     </main>
   )
