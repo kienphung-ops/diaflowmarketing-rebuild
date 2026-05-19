@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { FLOOR_CONFIG, getFloorConfig } from '@/lib/floors'
+import { DISCORD_URL } from '@/lib/links'
+import { HowItWorksModal } from './HowItWorksModal'
 
 interface ServerRecruit {
   id: string
@@ -50,6 +52,7 @@ export function MySquadDrawer({
   const [copied, setCopied] = useState(false)
   const [editingTeammate, setEditingTeammate] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<{ name: string; role: string }>({ name: '', role: '' })
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false)
 
   useEffect(() => {
     setRenameValue(teamName ?? '')
@@ -295,21 +298,31 @@ export function MySquadDrawer({
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs">
+        <button
+          onClick={() => setHowItWorksOpen(true)}
+          className="flex items-center justify-between w-full text-xs hover:bg-night-deep/40 rounded-md px-1 py-0.5 -mx-1 transition"
+        >
           <span className="flex items-center gap-1 text-tower-cream/50">ⓘ How it works</span>
-          <button className="text-purple-300 hover:text-purple-200">Open →</button>
-        </div>
+          <span className="text-purple-300 hover:text-purple-200 font-semibold">Open →</span>
+        </button>
       </div>
 
-      <div className="border-t border-white/5 p-4">
+      <HowItWorksModal
+        open={howItWorksOpen}
+        onClose={() => setHowItWorksOpen(false)}
+        inviteUrl={inviteUrl || null}
+      />
+
+      <div className="border-t border-white/5 p-4 mt-auto">
         <a
-          href="https://discord.gg/"
+          href={DISCORD_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-semibold transition"
+          className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold transition"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/discord.png" alt="" width={20} height={20} className="opacity-95" />
+          <svg width="18" height="14" viewBox="0 0 71 55" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+            <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.44077 45.4204 0.52529C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.52529C25.5141 0.44336 25.4218 0.40110 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C7.41596 50.7066 14.2196 53.9330 20.8952 56.0834C20.9876 56.1127 21.0857 56.0806 21.1445 56.0074C22.7586 53.8321 24.2017 51.5327 25.4414 49.1156C25.5026 48.9988 25.4442 48.8594 25.3183 48.8143C23.0568 47.9498 20.9009 46.9023 18.8254 45.7017C18.6864 45.6195 18.6752 45.4225 18.8030 45.3260C19.2317 45.0054 19.6605 44.6733 20.0701 44.3383C20.1347 44.2844 20.2243 44.2731 20.2998 44.3073C32.3202 49.7978 45.4020 49.7978 57.2796 44.3073C57.3551 44.2703 57.4447 44.2816 57.5121 44.3355C57.9217 44.6705 58.3505 45.0054 58.7820 45.3260C58.9098 45.4225 58.9014 45.6195 58.7624 45.7017C56.6869 46.9247 54.5310 47.9498 52.2667 48.8115C52.1408 48.8566 52.0852 48.9988 52.1464 49.1156C53.4085 51.5299 54.8516 53.8265 56.4349 56.0046C56.4937 56.0806 56.5946 56.1127 56.6870 56.0834C63.3933 53.9330 70.1970 50.7066 77.2272 45.5576C77.2804 45.5182 77.3140 45.4590 77.3196 45.3942C78.8187 30.0731 74.8719 16.7700 67.0575 4.9823C67.0380 4.9429 67.0044 4.9147 66.9624 4.8978ZM25.7628 37.2926C22.2211 37.2926 19.3038 34.0454 19.3038 30.0645C19.3038 26.0836 22.1648 22.8364 25.7628 22.8364C29.3889 22.8364 32.2779 26.1120 32.2218 30.0645C32.2218 34.0454 29.3608 37.2926 25.7628 37.2926ZM45.3311 37.2926C41.7895 37.2926 38.8721 34.0454 38.8721 30.0645C38.8721 26.0836 41.7331 22.8364 45.3311 22.8364C48.9573 22.8364 51.8462 26.1120 51.7901 30.0645C51.7901 34.0454 48.9573 37.2926 45.3311 37.2926Z" />
+          </svg>
           Join us on Discord
         </a>
       </div>

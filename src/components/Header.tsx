@@ -9,10 +9,13 @@ interface Props {
   totalInvites: number
   referralCode: string | null
   teammateCount: number
+  maxTeammates: number
+  slotsAvailable: number
   showTower: boolean
   onSimulateInvite?: () => void
   onOpenSignup?: () => void
   onToggleTower?: () => void
+  onAddTeammates?: () => void
 }
 
 export function Header({
@@ -21,10 +24,13 @@ export function Header({
   totalInvites,
   referralCode,
   teammateCount,
+  maxTeammates,
+  slotsAvailable,
   showTower,
   onSimulateInvite,
   onOpenSignup,
   onToggleTower,
+  onAddTeammates,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 pointer-events-none">
@@ -41,10 +47,21 @@ export function Header({
           <span className="text-tower-gold font-semibold">{totalInvites}</span>{' '}
           {totalInvites === 1 ? 'invite' : 'invites'}
           <span className="mx-2 opacity-40">·</span>
-          <span className="text-tower-gold font-semibold">{teammateCount}</span>{' '}
-          {teammateCount === 1 ? 'teammate' : 'teammates'}
+          <span className="text-tower-gold font-semibold">
+            {teammateCount}/{maxTeammates}
+          </span>{' '}
+          teammates
           {!signedIn && <span className="ml-2 opacity-60">(trial)</span>}
         </div>
+
+        {onAddTeammates && (
+          <button
+            onClick={onAddTeammates}
+            className="px-3 py-1.5 rounded-md bg-tower-gold text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold/90 transition animate-pulse"
+          >
+            + Add {slotsAvailable} {slotsAvailable === 1 ? 'teammate' : 'teammates'}
+          </button>
+        )}
 
         {onToggleTower && (
           <button

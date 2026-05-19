@@ -16,8 +16,11 @@ model EmailCapture {
 model User {
   id               String               @id @default(cuid())
   email            String               @unique
+  first_email      String
+  passwordHash     String?
   emailVerified    DateTime?
   ipAddress        String?
+  country          String?
   referralCode     String               @unique
   referredByCode   String?
   referredBy       User?                @relation("UserReferrals", fields: [referredByCode], references: [referralCode])
@@ -82,12 +85,13 @@ model UnlockedItem {
 }
 
 model RecruitedTeammate {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  role      String
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  role       String
+  pokes Int      @default(0)
+  createdAt  DateTime @default(now())
 
   @@index([userId])
 }

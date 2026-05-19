@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       user = await prisma.user.create({
         data: {
           email,
+          first_email: email,
           referralCode,
           referredByCode: inviter && inviter.referralCode !== referralCode ? inviter.referralCode : null,
           ipAddress: ip,

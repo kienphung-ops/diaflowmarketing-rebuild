@@ -1,28 +1,20 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { clearTrialState, readTrialState } from '@/lib/trial'
-
-type Stage = 'email' | 'code' | 'verifying'
 
 interface Props {
   onClose: () => void
 }
 
-interface DevHint {
-  magicLinkUrl: string
-  otp: string
-}
-
 export function SignupModal({ onClose }: Props) {
   const router = useRouter()
-  const [stage, setStage] = useState<Stage>('email')
   const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [devHint, setDevHint] = useState<DevHint | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -32,9 +24,17 @@ export function SignupModal({ onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  async function submitEmail(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!email.includes('@')) {
+      setError('Enter a valid email')
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
     setBusy(true)
     try {
       const ref =
@@ -42,11 +42,12 @@ export function SignupModal({ onClose }: Props) {
           ? window.localStorage.getItem('diaflow_pending_ref') ?? undefined
           : undefined
       const trial = readTrialState()
-      const res = await fetch('/api/auth/request', {
+      const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
+          password,
           ref,
           trialTeamName: trial?.teamName ?? undefined,
           trialTeamPurpose: trial?.teamPurpose ?? undefined,
@@ -54,46 +55,18 @@ export function SignupModal({ onClose }: Props) {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(j.error ?? 'Failed to send code')
+        throw new Error(j.error ?? 'Sign up failed')
       }
-      if (j?.devMagicLinkUrl && j?.devOtp) {
-        setDevHint({ magicLinkUrl: j.devMagicLinkUrl, otp: j.devOtp })
-      }
-      setStage('code')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function submitCode(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setBusy(true)
-    setStage('verifying')
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), code: code.trim() }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error ?? 'Invalid code')
-      }
-      // Trial was an educational preview — discard now that we have a real account.
       clearTrialState()
       try {
         window.localStorage.removeItem('diaflow_pending_ref')
       } catch {
-        // ignore
+        /* ignore */
       }
       router.refresh()
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
-      setStage('code')
     } finally {
       setBusy(false)
     }
@@ -114,97 +87,59 @@ export function SignupModal({ onClose }: Props) {
           <div className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md" />
-            <h2 className="text-lg font-semibold tracking-wide">Sign up to keep climbing</h2>
+            <h2 className="text-lg font-semibold tracking-wide">Create your account</h2>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="text-tower-cream/50 hover:text-tower-cream"
-          >
+          <button onClick={onClose} aria-label="Close" className="text-tower-cream/50 hover:text-tower-cream text-xl">
             ×
           </button>
         </div>
 
-        {stage === 'email' && (
-          <form onSubmit={submitEmail} className="space-y-3">
-            <p className="text-sm text-tower-cream/70">
-              You&apos;re trying the tower. Sign up and the invites you actually send will unlock real floors.
-            </p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <p className="text-sm text-tower-cream/70">
+            We&apos;ll save your team name and progress against this email.
+          </p>
+          <label className="block space-y-1">
+            <span className="text-xs uppercase tracking-wider text-tower-cream/50">Email</span>
             <input
               type="email"
               required
               autoFocus
+              autoComplete="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
             />
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
-            >
-              {busy ? 'Sending…' : 'Send sign-in code'}
-            </button>
-          </form>
-        )}
-
-        {(stage === 'code' || stage === 'verifying') && (
-          <form onSubmit={submitCode} className="space-y-3">
-            <p className="text-sm text-tower-cream/70">
-              We sent a 6-digit code to <span className="text-tower-gold">{email}</span>.
-            </p>
-
-            {devHint && (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-2">
-                <div className="font-semibold text-amber-300">Dev helper (email not delivered)</div>
-                <div>
-                  <div className="opacity-60 mb-0.5">OTP</div>
-                  <div className="font-mono text-base text-amber-200 tracking-[0.4em]">{devHint.otp}</div>
-                </div>
-                <div>
-                  <div className="opacity-60 mb-0.5">Magic link</div>
-                  <a
-                    href={devHint.magicLinkUrl}
-                    className="font-mono text-amber-200 underline break-all"
-                  >
-                    {devHint.magicLinkUrl}
-                  </a>
-                </div>
-              </div>
-            )}
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs uppercase tracking-wider text-tower-cream/50">Password</span>
             <input
-              inputMode="numeric"
-              pattern="\d{6}"
+              type="password"
               required
-              autoFocus
-              value={code}
-              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="123456"
-              className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-center text-lg font-mono tracking-[0.4em]"
+              minLength={6}
+              autoComplete="new-password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="at least 6 characters"
+              className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
             />
-            <button
-              type="submit"
-              disabled={busy || code.length !== 6}
-              className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
-            >
-              {busy ? 'Verifying…' : 'Sign in'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setStage('email')
-                setCode('')
-                setError(null)
-              }}
-              className="w-full text-xs text-tower-cream/50 hover:text-tower-cream/80"
-            >
-              Use a different email
-            </button>
-          </form>
-        )}
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
+          >
+            {busy ? 'Creating account…' : 'Create account'}
+          </button>
+          {error && <p className="text-xs text-red-300">{error}</p>}
+        </form>
 
-        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+        <p className="mt-4 text-xs text-tower-cream/60 text-center">
+          Already have an account?{' '}
+          <Link href="/login" className="text-tower-gold hover:underline">
+            Sign in →
+          </Link>
+        </p>
       </div>
     </div>
   )
