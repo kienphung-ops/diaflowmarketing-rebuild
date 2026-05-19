@@ -117,7 +117,7 @@ export function MySquadDrawer({
 
   return (
     <div
-      className={`fixed inset-y-0 right-0 z-30 w-[440px] max-w-full bg-night-mid/95 border-l border-white/10 backdrop-blur-md shadow-2xl flex flex-col text-tower-cream transition-transform duration-300 ${
+      className={`fixed inset-y-0 right-0 z-30 w-full md:w-[440px] max-w-full bg-night-mid/95 border-l border-white/10 backdrop-blur-md shadow-2xl flex flex-col text-tower-cream transition-transform duration-300 ${
         open ? 'translate-x-0' : 'translate-x-full'
       }`}
     >

@@ -12,6 +12,7 @@ import { MiaInfoCard } from '@/components/MiaInfoCard'
 import { LeoEmailDrawer } from '@/components/LeoEmailDrawer'
 import { TeammateEditModal } from '@/components/TeammateEditModal'
 import { BulkAddTeammatesModal } from '@/components/BulkAddTeammatesModal'
+import { MobileBottomBar } from '@/components/MobileBottomBar'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
 import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
 import { getMaxTeammates, getRecruitSlotsAvailable, DEFAULT_NPC_COUNT } from '@/lib/floors'
@@ -372,6 +373,17 @@ export default function TowerLanding(props: Props) {
       />
 
       <MySquadFloatingButton visible={onboardingComplete && !showTower} onClick={() => setSquadOpen(true)} />
+
+      {onboardingComplete && (
+        <MobileBottomBar
+          slotsAvailable={slotsAvailable}
+          showTower={showTower}
+          onOpenSquad={() => setSquadOpen(true)}
+          onAddTeammates={slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
+          onToggleTower={() => setShowTower(s => !s)}
+          onSimulateInvite={isTrial ? handleSimulateInvite : undefined}
+        />
+      )}
 
       {isTrial && activeStep !== 'done' && (
         <div className="fixed inset-0 z-20 flex items-end justify-center pb-20 pointer-events-none">
