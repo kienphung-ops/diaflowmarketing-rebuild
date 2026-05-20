@@ -219,6 +219,9 @@ export function OfficeScene({
         skinColor: '#FDBCB4',
         idleAnimation: 'wave' as const,
         hasDeskAndChair: false,
+        // Face the camera (+Z) like Iris — default rotation Math.PI would
+        // put their back to the viewer since they have no desk to look at.
+        rotationY: 0,
         ...RECRUIT_APPEARANCES[i % RECRUIT_APPEARANCES.length],
       })),
     [recruitedCharacters]

@@ -205,14 +205,9 @@ export default function TowerLanding(props: Props) {
       saveTrialState(next)
       return next
     })
-    setRecruits(prev => [
-      ...prev,
-      {
-        id: `trial-inv-${Date.now()}`,
-        name: `Teammate #${prev.length + 1}`,
-        role: 'Operations Assistant',
-      },
-    ])
+    // No auto-recruit. Invite count goes up + floor unlocks new slot;
+    // user fills the slot manually via BulkAddTeammatesModal (auto-opens
+    // when celebration modal closes if slotsAvailable > 0).
   }
 
   function handleTeammateUpdate(id: string, patch: { name?: string; role?: string }) {
