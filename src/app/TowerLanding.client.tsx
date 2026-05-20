@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { CelebrationModal } from '@/components/CelebrationModal'
 import { SignupModal } from '@/components/SignupModal'
@@ -13,6 +14,7 @@ import { LeoEmailDrawer } from '@/components/LeoEmailDrawer'
 import { TeammateEditModal } from '@/components/TeammateEditModal'
 import { BulkAddTeammatesModal } from '@/components/BulkAddTeammatesModal'
 import { MobileBottomBar } from '@/components/MobileBottomBar'
+import { EmailVerifyModal } from '@/components/EmailVerifyModal'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
 import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
 import { getMaxTeammates, getRecruitSlotsAvailable, DEFAULT_NPC_COUNT } from '@/lib/floors'
@@ -32,10 +34,15 @@ const SceneCanvas = dynamic(
   { ssr: false, loading: () => <SceneSkeleton /> }
 )
 
+import type { InviterInfo } from '@/lib/inviter'
+
 interface ServerRecruit {
   id: string
   name: string
   role: string
+  slug?: string | null
+  isDefault?: boolean
+  pokes?: number
 }
 
 interface Props {
@@ -47,10 +54,15 @@ interface Props {
   serverRecruits: ServerRecruit[]
   serverTeamName: string | null
   serverTeamPurpose: string | null
+  inviter: InviterInfo | null
+  emailVerified: boolean
+  userEmail: string | null
+  publicVisible: boolean
 }
 
 export default function TowerLanding(props: Props) {
   const isTrial = !props.signedIn
+  const router = useRouter()
 
   const [trial, setTrial] = useState<TrialState>(() => ({
     ...defaultTrialState(),
@@ -72,12 +84,24 @@ export default function TowerLanding(props: Props) {
   const [celebrationFloor, setCelebrationFloor] = useState<number | null>(null)
   const [celebrationFloorsClimbed, setCelebrationFloorsClimbed] = useState(0)
   const [showSignupModal, setShowSignupModal] = useState(false)
-  const [showTower, setShowTower] = useState(false)
   const [activeNpcModal, setActiveNpcModal] = useState<'iris' | 'mia' | 'leo' | null>(null)
   const [squadOpen, setSquadOpen] = useState(false)
   const [editingTeammate, setEditingTeammate] = useState<ServerRecruit | null>(null)
   const [bulkAddOpen, setBulkAddOpen] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  // Reset-position signal — bumped by MySquadDrawer / TeammateEditModal
+  // and consumed by OfficeScene's `resetSignal` effect.
+  const [resetSignal, setResetSignal] = useState<{ slug: string | 'all' | null; counter: number } | null>(null)
+  // Leaderboard rank — fetched from /api/leaderboard. `null` for
+  // anonymous, `51` = "outside top 50" (renders as "50+").
+  const [rank, setRank] = useState<number | null>(null)
+  // Email verification state — initial value from server, flipped to
+  // true after the user completes the EmailVerifyModal flow.
+  const [emailVerified, setEmailVerified] = useState(props.emailVerified)
+  const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
+  // Public/private floor share state — initial from server, mutated
+  // via the toggle which PATCHes /api/user/visibility.
+  const [publicVisible, setPublicVisible] = useState(props.publicVisible)
   const prevTrialFloorRef = useRef(trial.currentFloor)
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
@@ -87,6 +111,55 @@ export default function TowerLanding(props: Props) {
   const dismissToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
+
+  const handleResetTeammatePosition = useCallback((id: string) => {
+    // `id` is a recruited teammate id; map index → "recruited-N" slug
+    // using the same custom-only filter the scene uses so positions
+    // line up. Defaults aren't draggable so they're never in here.
+    const idx = recruits.filter(r => !r.isDefault).findIndex(r => r.id === id)
+    if (idx === -1) return
+    setResetSignal(prev => ({ slug: `recruited-${idx}`, counter: (prev?.counter ?? 0) + 1 }))
+    pushToast({ title: 'Teammate sent back to default spot', tone: 'success' })
+  }, [recruits, pushToast])
+
+  const handleResetAllPositions = useCallback(() => {
+    setResetSignal(prev => ({ slug: 'all', counter: (prev?.counter ?? 0) + 1 }))
+    pushToast({ title: 'All teammates reset', tone: 'success' })
+  }, [pushToast])
+
+  const handleLogout = useCallback(async () => {
+    // POST /api/auth/logout clears the session cookie server-side.
+    // Hard-reload the home page so the server component re-renders
+    // with `signedIn=false` and the anonymous onboarding state loads
+    // fresh — softer router.refresh() leaves stale client state.
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // Even if the request fails, fall through to the redirect —
+      // the user's intent was to sign out.
+    }
+    window.location.href = '/'
+  }, [])
+
+  const handleTogglePublic = useCallback(async (next: boolean) => {
+    // Optimistic UI — flip locally then PATCH; revert on failure.
+    setPublicVisible(next)
+    try {
+      const r = await fetch('/api/user/visibility', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ publicVisible: next }),
+      })
+      if (!r.ok) throw new Error('Failed')
+      pushToast({
+        title: next ? 'Floor is public 🌐' : 'Floor is private 🔒',
+        tone: 'success',
+      })
+    } catch {
+      setPublicVisible(!next)
+      pushToast({ title: 'Couldn\'t update sharing', tone: 'warn' })
+    }
+  }, [pushToast])
 
   // Stash ?ref=CODE from URL.
   useEffect(() => {
@@ -169,6 +242,29 @@ export default function TowerLanding(props: Props) {
     },
   })
 
+  // Fetch leaderboard rank for signed-in users. Re-fetch when totalInvites
+  // changes so the rank stays roughly in sync after invite events.
+  // AbortController so re-renders / unmounts cancel the in-flight fetch
+  // instead of resolving setState on a stale closure.
+  useEffect(() => {
+    if (isTrial) {
+      setRank(null)
+      return
+    }
+    const ac = new AbortController()
+    fetch('/api/leaderboard', { cache: 'no-store', signal: ac.signal })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (ac.signal.aborted || !data) return
+        setRank(typeof data.currentUserRank === 'number' ? data.currentUserRank : null)
+      })
+      .catch(err => {
+        if ((err as Error).name === 'AbortError') return
+        /* swallow other errors */
+      })
+    return () => ac.abort()
+  }, [isTrial, serverState.totalInvites])
+
   function persist(next: TrialState) {
     setTrial(next)
     saveTrialState(next)
@@ -205,14 +301,9 @@ export default function TowerLanding(props: Props) {
       saveTrialState(next)
       return next
     })
-    setRecruits(prev => [
-      ...prev,
-      {
-        id: `trial-inv-${Date.now()}`,
-        name: `Teammate #${prev.length + 1}`,
-        role: 'Operations Assistant',
-      },
-    ])
+    // No auto-recruit. Invite count goes up + floor unlocks new slot;
+    // user fills the slot manually via BulkAddTeammatesModal (auto-opens
+    // when celebration modal closes if slotsAvailable > 0).
   }
 
   function handleTeammateUpdate(id: string, patch: { name?: string; role?: string }) {
@@ -240,7 +331,7 @@ export default function TowerLanding(props: Props) {
     if (isTrial) {
       const draft = {
         id,
-        name: `Teammate #${recruits.length + 1}`,
+        name: `Teammate #${recruits.filter(r => !r.isDefault).length + 1}`,
         role: 'Operations Assistant',
       }
       setRecruits(prev => [...prev, draft])
@@ -249,7 +340,7 @@ export default function TowerLanding(props: Props) {
       fetch('/api/recruit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `Teammate #${recruits.length + 1}`, role: 'Operations Assistant' }),
+        body: JSON.stringify({ name: `Teammate #${recruits.filter(r => !r.isDefault).length + 1}`, role: 'Operations Assistant' }),
       })
         .then(r => (r.ok ? r.json() : null))
         .then(j => {
@@ -332,7 +423,13 @@ export default function TowerLanding(props: Props) {
   const activeStep = isTrial ? trial.onboardingStep : 'done'
   const onboardingComplete = activeStep === 'done'
   const emailCaptured = !!(isTrial ? trial.email : null)
-  const slotsAvailable = getRecruitSlotsAvailable(effective.currentFloor, recruits.length)
+  // The 3 default NPCs (Iris/Mia/Leo) now live in the same recruits
+  // array as user-added teammates (DB-backed, with pokes). Split them
+  // so the OfficeScene + slot math only treat user-recruited rows as
+  // "recruited" — defaults are still rendered via characters.config
+  // visuals.
+  const customRecruits = recruits.filter(r => !r.isDefault)
+  const slotsAvailable = getRecruitSlotsAvailable(effective.currentFloor, customRecruits.length)
   const maxTeammates = getMaxTeammates(effective.currentFloor)
 
   return (
@@ -344,9 +441,11 @@ export default function TowerLanding(props: Props) {
         referralCode={props.referralCode}
         onSimulateInvite={isTrial && onboardingComplete ? handleSimulateInvite : undefined}
         onOpenSignup={isTrial ? () => setShowSignupModal(true) : undefined}
-        showTower={showTower}
-        onToggleTower={onboardingComplete ? () => setShowTower(s => !s) : undefined}
-        teammateCount={DEFAULT_NPC_COUNT + recruits.length}
+        // Tower view is now a dedicated route — see /tower. Button navigates
+        // there instead of toggling an overlay.
+        showTower={false}
+        onToggleTower={onboardingComplete ? () => router.push('/tower') : undefined}
+        teammateCount={DEFAULT_NPC_COUNT + customRecruits.length}
         maxTeammates={maxTeammates}
         slotsAvailable={slotsAvailable}
         onAddTeammates={onboardingComplete && slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
@@ -355,32 +454,30 @@ export default function TowerLanding(props: Props) {
       <SceneCanvas
         onboardingStep={activeStep}
         companyName={effective.teamName ?? null}
-        recruitedCharacters={recruits.map(r => ({ name: r.name, role: r.role }))}
-        showTower={showTower}
+        recruitedCharacters={customRecruits.map(r => ({ name: r.name, role: r.role }))}
         currentFloor={effective.currentFloor}
         unlockedItemKeys={effective.unlockedItemKeys}
-        onFloorClick={n => {
-          if (n === effective.currentFloor) setShowTower(false)
-        }}
+        onFloorClick={() => {}}
         onNpcClick={slug => {
           if (slug === 'iris') setSquadOpen(true)
           else setActiveNpcModal(slug)
         }}
         onTeammateClick={idx => {
-          const t = recruits[idx]
+          const t = customRecruits[idx]
           if (t) setEditingTeammate(t)
         }}
+        resetSignal={resetSignal}
       />
 
-      <MySquadFloatingButton visible={onboardingComplete && !showTower} onClick={() => setSquadOpen(true)} />
+      <MySquadFloatingButton visible={onboardingComplete} onClick={() => setSquadOpen(true)} />
 
       {onboardingComplete && (
         <MobileBottomBar
           slotsAvailable={slotsAvailable}
-          showTower={showTower}
+          showTower={false}
           onOpenSquad={() => setSquadOpen(true)}
           onAddTeammates={slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
-          onToggleTower={() => setShowTower(s => !s)}
+          onToggleTower={() => router.push('/tower')}
           onSimulateInvite={isTrial ? handleSimulateInvite : undefined}
         />
       )}
@@ -410,6 +507,15 @@ export default function TowerLanding(props: Props) {
         onTeammateUpdate={handleTeammateUpdate}
         onAddTeammate={handleAddTeammate}
         onOpenSignup={() => setShowSignupModal(true)}
+        inviter={props.inviter}
+        onResetAllPositions={handleResetAllPositions}
+        rank={rank}
+        emailVerified={props.signedIn ? emailVerified : undefined}
+        userEmail={props.userEmail}
+        onVerifyEmail={props.signedIn && !emailVerified ? () => setEmailVerifyOpen(true) : undefined}
+        publicVisible={publicVisible}
+        onTogglePublic={props.signedIn ? handleTogglePublic : undefined}
+        onLogout={props.signedIn ? handleLogout : undefined}
       />
 
       <TeammateEditModal
@@ -418,6 +524,7 @@ export default function TowerLanding(props: Props) {
         onClose={() => setEditingTeammate(null)}
         onSave={handleTeammateUpdate}
         onDelete={handleTeammateDelete}
+        onResetPosition={handleResetTeammatePosition}
       />
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
@@ -461,6 +568,16 @@ export default function TowerLanding(props: Props) {
         onAdd={handleBulkAdd}
       />
       {showSignupModal && <SignupModal onClose={() => setShowSignupModal(false)} />}
+
+      <EmailVerifyModal
+        open={emailVerifyOpen}
+        onClose={() => setEmailVerifyOpen(false)}
+        email={props.userEmail}
+        onVerified={() => {
+          setEmailVerified(true)
+          pushToast({ title: 'Email verified ✓', tone: 'success' })
+        }}
+      />
     </main>
   )
 }

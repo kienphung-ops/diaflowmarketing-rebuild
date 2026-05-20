@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ForgotPasswordModal } from '@/components/ForgotPasswordModal'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [forgotOpen, setForgotOpen] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -86,6 +88,15 @@ export default function LoginPage() {
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
           {error && <p className="text-xs text-red-300">{error}</p>}
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={() => setForgotOpen(true)}
+              className="text-[11px] text-tower-cream/60 hover:text-tower-gold underline-offset-2 hover:underline"
+            >
+              Forgot password?
+            </button>
+          </div>
         </form>
 
         <p className="mt-4 text-xs text-tower-cream/60 text-center">
@@ -95,6 +106,12 @@ export default function LoginPage() {
           </Link>
         </p>
       </div>
+
+      <ForgotPasswordModal
+        open={forgotOpen}
+        defaultEmail={email}
+        onClose={() => setForgotOpen(false)}
+      />
     </main>
   )
 }

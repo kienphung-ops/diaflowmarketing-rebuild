@@ -17,13 +17,21 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
     }
 
-    // Verify ownership.
+    // Verify ownership + reject mutations on the 3 seeded NPCs
+    // (Iris/Mia/Leo) — defaults are immutable so the share-floor
+    // experience is consistent across users.
     const existing = await prisma.recruitedTeammate.findUnique({
       where: { id },
-      select: { userId: true },
+      select: { userId: true, isDefault: true },
     })
     if (!existing || existing.userId !== session.userId) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    if (existing.isDefault) {
+      return NextResponse.json(
+        { error: 'Default teammates can\'t be renamed' },
+        { status: 403 }
+      )
     }
 
     const updated = await prisma.recruitedTeammate.update({
@@ -45,10 +53,16 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
   try {
     const existing = await prisma.recruitedTeammate.findUnique({
       where: { id },
-      select: { userId: true },
+      select: { userId: true, isDefault: true },
     })
     if (!existing || existing.userId !== session.userId) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    if (existing.isDefault) {
+      return NextResponse.json(
+        { error: 'Default teammates can\'t be removed' },
+        { status: 403 }
+      )
     }
     await prisma.recruitedTeammate.delete({ where: { id } })
     return NextResponse.json({ success: true })

@@ -4,9 +4,10 @@ import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'rea
 import * as THREE from 'three'
 import { Html } from '@react-three/drei'
 import { useThree } from '@react-three/fiber'
-import { CinematicCamera } from './camera/CinematicCamera'
 import { StaticCamera } from './camera/StaticCamera'
-import { TowerScene, TOWER_CAM_POSITION, TOWER_CAM_LOOKAT, TOWER_CAM_ZOOM } from './tower/TowerScene'
+// Tower view is no longer 3D — see <TowerView /> DOM overlay rendered at
+// the TowerLanding level. The 3D TowerScene + CinematicCamera modules are
+// kept on disk for reference but no longer imported here.
 import { Floor } from './environment/Floor'
 import { Walls } from './environment/Walls'
 import { FloorItems } from './environment/FloorItems'
@@ -27,7 +28,9 @@ interface Props {
   onboardingStep: OnboardingStep
   companyName: string | null
   recruitedCharacters: RecruitedCharacter[]
-  showTower: boolean
+  /** No-op — kept so SceneCanvas's pass-through types align. Tower view is
+   *  now a DOM overlay rendered at the TowerLanding level. */
+  showTower?: boolean
   currentFloor: number
   unlockedItemKeys: string[]
   onFloorClick: (n: number) => void
@@ -37,9 +40,31 @@ interface Props {
   onTeammateClick?: (index: number) => void
   /** Reports each NPC's world-space position so the overlay can anchor bubbles. */
   onNpcPosition?: (slug: 'iris' | 'mia' | 'leo', pos: [number, number, number]) => void
+  /** Reset-position trigger from parent. Bump `counter` to fire; `slug`
+   *  is either a specific character slug, `'all'`, or `null` (no-op).
+   *  Mutating positions inside OfficeScene from the outside is awkward
+   *  because the state lives here, so we use a signal-counter pattern
+   *  rather than imperative refs. */
+  resetSignal?: { slug: string | 'all' | null; counter: number } | null
+  /** Read-only mode (used by /tower-view/[floor] floor previews):
+   *  disables drag, NPC/teammate clicks, and hover cursor changes so the
+   *  scene is purely a marketing snapshot of what the floor looks like. */
+  readonly?: boolean
+  /** Fired when a teammate is drag-dropped with meaningful movement
+   *  (> 0.2 world units). Used by /floor/[code] to record a poke on
+   *  the server when a visitor (not the floor owner) drags one of the
+   *  owner's teammates around. `slug` is `'iris'|'mia'|'leo'` for
+   *  default NPCs or `'recruited-N'` for user-added teammates. */
+  onTeammatePoke?: (slug: string) => void
 }
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+
+/** Back wall z-position (Walls.tsx). When a teammate is dragged past this
+ *  plane they're geometrically hidden by the wall — NameBadge.tsx detects
+ *  this and pops the name badge up above the wall so the user can still
+ *  see where the teammate is and reset their position from the UI. */
+export const BACK_WALL_Z = -5.5
 
 function DragSystem({
   dragging,
@@ -63,6 +88,13 @@ function DragSystem({
       const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
       if (raycaster.ray.intersectPlane(FLOOR_PLANE, target)) {
+        // No clamp at all — drag is fully free. Lost teammates surface
+        // via NameBadge's beacon mode (see Character.tsx): once the
+        // character leaves the floor planks or goes behind the wall,
+        // their name badge pops to a guaranteed-visible spot above the
+        // wall with the lateral X clamped into the camera frustum, so
+        // the user can always click it and Reset position from the
+        // edit modal.
         onMove([target.x, 0, target.z])
       }
       document.body.style.cursor = 'grabbing'
@@ -108,13 +140,14 @@ export function OfficeScene({
   onboardingStep,
   companyName,
   recruitedCharacters,
-  showTower,
   currentFloor,
   unlockedItemKeys,
-  onFloorClick,
   onNpcClick,
   onTeammateClick,
   onNpcPosition,
+  resetSignal,
+  readonly = false,
+  onTeammatePoke,
 }: Props) {
   const unlockedSet = new Set(unlockedItemKeys)
   const showDesks = unlockedSet.has('basic_chair_desk')
@@ -163,13 +196,17 @@ export function OfficeScene({
         const dist = Math.sqrt((cur[0] - ox) ** 2 + (cur[2] - oz) ** 2)
         if (dist > 0.2) {
           setPokeSignals(prev => ({ ...prev, [slug]: (prev[slug] ?? 0) + 1 }))
+          // Notify the parent (currently /floor/[code] visitor view)
+          // that a meaningful drag happened. The visitor uses this to
+          // record a server-side poke on the floor owner's teammate.
+          onTeammatePoke?.(slug)
         }
       }
     }
     dragStartPositionRef.current = null
     dragSlugRef.current = null
     setDragging(null)
-  }, [])
+  }, [onTeammatePoke])
 
   const handleSelect = useCallback(
     (slug: string) => {
@@ -219,6 +256,9 @@ export function OfficeScene({
         skinColor: '#FDBCB4',
         idleAnimation: 'wave' as const,
         hasDeskAndChair: false,
+        // Face the camera (+Z) like Iris — default rotation Math.PI would
+        // put their back to the viewer since they have no desk to look at.
+        rotationY: 0,
         ...RECRUIT_APPEARANCES[i % RECRUIT_APPEARANCES.length],
       })),
     [recruitedCharacters]
@@ -243,30 +283,51 @@ export function OfficeScene({
     })
   }, [recruitedCharacters])
 
+  // Reset-position handler — triggered by parent bumping `resetSignal.counter`.
+  // `slug = 'all'` resets everyone; a specific slug resets just that one.
+  const lastResetCounter = useRef(0)
+  useEffect(() => {
+    if (!resetSignal) return
+    if (resetSignal.counter === lastResetCounter.current) return
+    lastResetCounter.current = resetSignal.counter
+    const target = resetSignal.slug
+    if (!target) return
+    setPositions(prev => {
+      const next = { ...prev }
+      if (target === 'all') {
+        CHARACTERS.forEach(c => { next[c.slug] = c.position })
+        recruitedCharacters.forEach((_, i) => {
+          next[`recruited-${i}`] = RECRUIT_POSITIONS[i % RECRUIT_POSITIONS.length]
+        })
+      } else if (target.startsWith('recruited-')) {
+        const idx = parseInt(target.slice('recruited-'.length), 10)
+        if (!Number.isNaN(idx)) {
+          next[target] = RECRUIT_POSITIONS[idx % RECRUIT_POSITIONS.length]
+        }
+      } else {
+        const cfg = CHARACTERS.find(c => c.slug === target)
+        if (cfg) next[target] = cfg.position
+      }
+      return next
+    })
+  }, [resetSignal, recruitedCharacters])
+
   const isOnboarding = onboardingStep !== 'done'
 
   return (
     <>
-      {showTower ? (
-        <CinematicCamera
-          target={TOWER_CAM_POSITION}
-          lookAt={TOWER_CAM_LOOKAT}
-          targetZoom={TOWER_CAM_ZOOM}
-          panY={0}
-        />
-      ) : (
-        // Office view: locked front-facing camera. No follow, no animation,
-        // so the room never appears to swing while a teammate is being
-        // dragged.
-        <StaticCamera />
-      )}
+      {/* Office view: locked front-facing camera. No follow, no animation,
+          so the room never appears to swing while a teammate is being
+          dragged. (Tower-wide view is a DOM overlay — see TowerView.tsx.) */}
+      <StaticCamera />
       <Lighting
         characters={CHARACTERS}
         positions={positions}
         onboardingStep={isOnboarding ? onboardingStep : undefined}
-        showTower={showTower}
       />
-      <DragSystem dragging={dragging} onMove={handleDragMove} onDrop={handleDrop} />
+      {!readonly && (
+        <DragSystem dragging={dragging} onMove={handleDragMove} onDrop={handleDrop} />
+      )}
 
       <Suspense
         fallback={
@@ -275,8 +336,7 @@ export function OfficeScene({
           </Html>
         }
       >
-        {!showTower && (
-          <group>
+        <group>
             <Floor />
             <Walls companyName={companyName ?? undefined} currentFloor={currentFloor} />
             <FloorItems currentFloor={currentFloor} />
@@ -293,7 +353,7 @@ export function OfficeScene({
                   onSelect={handleSelect}
                   isSelected={false}
                   positionOverride={positions[char.slug]}
-                  onDragStart={handleDragStart}
+                  onDragStart={readonly ? undefined : handleDragStart}
                   draggingSlugRef={dragSlugRef}
                   onPoke={handlePokeChar}
                   pokeSignal={pokeSignals[char.slug] ?? 0}
@@ -306,7 +366,7 @@ export function OfficeScene({
               onSelect={handleSelect}
               isSelected={false}
               positionOverride={positions['iris']}
-              onDragStart={handleDragStart}
+              onDragStart={readonly ? undefined : handleDragStart}
               draggingSlugRef={dragSlugRef}
               onPoke={handlePokeChar}
               pokeSignal={pokeSignals['iris'] ?? 0}
@@ -318,7 +378,7 @@ export function OfficeScene({
                 onSelect={handleSelect}
                 isSelected={false}
                 positionOverride={positions['leo']}
-                onDragStart={handleDragStart}
+                onDragStart={readonly ? undefined : handleDragStart}
                 draggingSlugRef={dragSlugRef}
                 onPoke={handlePokeChar}
                 pokeSignal={pokeSignals['leo'] ?? 0}
@@ -335,7 +395,7 @@ export function OfficeScene({
                   onSelect={handleSelect}
                   isSelected={false}
                   positionOverride={charPos}
-                  onDragStart={handleDragStart}
+                  onDragStart={readonly ? undefined : handleDragStart}
                   draggingSlugRef={dragSlugRef}
                   onPoke={handlePokeChar}
                   pokeSignal={pokeSignals[slug] ?? 0}
@@ -343,10 +403,7 @@ export function OfficeScene({
               )
             })}
 
-          </group>
-        )}
-
-        {showTower && <TowerScene currentFloor={currentFloor} onFloorClick={onFloorClick} />}
+        </group>
       </Suspense>
 
       {/* Suppress unused-var warning for mia (referenced only via CHARACTERS list). */}

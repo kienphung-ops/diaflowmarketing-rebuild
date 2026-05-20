@@ -5,7 +5,10 @@ import { AuthVerifyError, consumeAuthToken } from '@/lib/authVerify'
 export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const token = url.searchParams.get('token')
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? url.origin
+  // The email link was built using the visitor's browser origin (see
+  // /api/auth/request → getBrowserOrigin) so url.origin here is already
+  // the public-facing domain. No NEXT_PUBLIC_APP_URL needed.
+  const appUrl = url.origin
 
   if (!token) {
     return NextResponse.redirect(`${appUrl}/?auth=missing`)

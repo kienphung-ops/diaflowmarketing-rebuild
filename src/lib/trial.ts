@@ -44,17 +44,21 @@ export function readTrialState(): TrialState | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<TrialState>
     if (typeof parsed.totalInvites !== 'number') return null
-    if (typeof parsed.currentFloor !== 'number') return null
-    if (!Array.isArray(parsed.unlockedItemKeys)) return null
-    // Fill missing onboarding fields for older saves.
+    // Always re-derive currentFloor + unlockedItemKeys from totalInvites
+    // so the saved blob can never go stale relative to FLOOR_CONFIG (e.g.
+    // when invite thresholds change between deploys, or when an older
+    // saved state was capped at a lower floor by a bug).
+    const totalInvites = parsed.totalInvites
+    const currentFloor = computeFloorForInvites(totalInvites)
+    const unlockedItemKeys = getUnlockedItemKeysForFloor(currentFloor).map(u => u.itemKey)
     return {
       onboardingStep: (parsed.onboardingStep as OnboardingStep) ?? 'iris',
       teamName: parsed.teamName ?? null,
       teamPurpose: parsed.teamPurpose ?? null,
       email: parsed.email ?? null,
-      totalInvites: parsed.totalInvites,
-      currentFloor: parsed.currentFloor,
-      unlockedItemKeys: parsed.unlockedItemKeys,
+      totalInvites,
+      currentFloor,
+      unlockedItemKeys,
     }
   } catch {
     return null

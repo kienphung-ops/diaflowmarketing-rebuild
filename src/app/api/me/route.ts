@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/auth'
+import { maskEmail } from '@/lib/inviter'
 
 export async function GET() {
   const session = await readSession()
@@ -14,9 +15,21 @@ export async function GET() {
       email: true,
       emailVerified: true,
       referralCode: true,
+      referredByCode: true,
+      referredAt: true,
       totalInvites: true,
       currentFloor: true,
       unlockedItems: { select: { itemKey: true, floor: true, unlockedAt: true } },
+      // Inviter info via self-relation. `referredBy` is null when the user
+      // signed up without a referral link.
+      referredBy: {
+        select: {
+          referralCode: true,
+          teamName: true,
+          country: true,
+          email: true,
+        },
+      },
     },
   })
 
@@ -24,5 +37,21 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  return NextResponse.json(user)
+  // Sanitize inviter for client — never expose the full email address,
+  // only a masked preview so the recipient knows roughly who invited them.
+  const inviter = user.referredBy
+    ? {
+        referralCode: user.referredBy.referralCode,
+        teamName: user.referredBy.teamName,
+        country: user.referredBy.country,
+        emailMasked: maskEmail(user.referredBy.email),
+        invitedAt: user.referredAt,
+      }
+    : null
+
+  // Drop the raw `referredBy` blob from the response so the inviter's
+  // full email never leaks to the client.
+  const { referredBy: _drop, ...safe } = user
+  void _drop
+  return NextResponse.json({ ...safe, inviter })
 }

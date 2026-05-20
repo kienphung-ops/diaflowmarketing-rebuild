@@ -7,13 +7,21 @@ interface Props {
   onboardingStep: OnboardingStep
   companyName: string | null
   recruitedCharacters: RecruitedCharacter[]
-  showTower: boolean
+  /** Kept for callers (TowerLanding still passes false) — TowerView overlay
+   *  now handles whole-building view as a DOM layer; office canvas only
+   *  ever renders the interior. */
+  showTower?: boolean
   currentFloor: number
   unlockedItemKeys: string[]
   onFloorClick: (n: number) => void
   onNpcClick?: (slug: 'iris' | 'mia' | 'leo') => void
   onTeammateClick?: (index: number) => void
   onNpcPosition?: (slug: 'iris' | 'mia' | 'leo', pos: [number, number, number]) => void
+  resetSignal?: { slug: string | 'all' | null; counter: number } | null
+  /** Read-only mode for floor previews. Drag + select are disabled. */
+  readonly?: boolean
+  /** Drag-drop poke callback — see OfficeScene Props. */
+  onTeammatePoke?: (slug: string) => void
 }
 
 export function SceneCanvas(props: Props) {
@@ -31,7 +39,7 @@ export function SceneCanvas(props: Props) {
       }}
     >
       <Canvas shadows gl={{ antialias: true, powerPreference: 'high-performance' }}>
-        <OfficeScene {...props} />
+        <OfficeScene {...props} resetSignal={props.resetSignal} />
       </Canvas>
     </div>
   )

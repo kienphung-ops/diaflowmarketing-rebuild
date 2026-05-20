@@ -14,6 +14,9 @@ export const CHARACTERS: CharacterConfig[] = [
     clothesColor: '#4A90D9',
     glowColor: '#a855f7',
     idleAnimation: 'typing',
+    // Face the camera so eyes/smile are visible (her desk now sits behind
+    // her — she's "turning to greet" the visitor).
+    rotationY: 0,
   },
   {
     slug: 'iris',
@@ -42,5 +45,6 @@ export const CHARACTERS: CharacterConfig[] = [
     clothesColor: '#6C5CE7',
     glowColor: '#f59e0b',
     idleAnimation: 'wave',
+    rotationY: 0,
   },
 ]

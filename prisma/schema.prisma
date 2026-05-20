@@ -22,13 +22,25 @@ model User {
   ipAddress        String?
   country          String?
   referralCode     String               @unique
+  // Inviter lock — once `referredByCode` is set on signup, neither it nor
+  // `referredAt` may ever be overwritten by another invite link. Both are
+  // assigned exactly once, when the user record is first created. Login,
+  // re-request of a magic link, and follow-on POSTs with a different `?ref=`
+  // all leave these fields untouched. See guards in:
+  //   src/app/api/auth/signup/route.ts
+  //   src/app/api/auth/request/route.ts
   referredByCode   String?
+  referredAt       DateTime?
   referredBy       User?                @relation("UserReferrals", fields: [referredByCode], references: [referralCode])
   referrals        User[]               @relation("UserReferrals")
   totalInvites     Int                  @default(0)
   currentFloor     Int                  @default(1)
   teamName         String?
   teamPurpose      String?
+  // Floor sharing — when true, anyone hitting /floor/<referralCode>
+  // can view this user's floor and interact (poke teammates). Default
+  // false so floors are private until the user opts in.
+  publicVisible    Boolean              @default(false)
   authTokens       AuthToken[]
   unlockedItems    UnlockedItem[]
   inviteEvents     InviteEvent[]        @relation("InviterEvents")
@@ -56,6 +68,8 @@ model AuthToken {
 enum TokenType {
   MAGIC_LINK
   OTP
+  EMAIL_VERIFY
+  PASSWORD_RESET
 }
 
 model InviteEvent {
@@ -88,10 +102,22 @@ model RecruitedTeammate {
   id         String   @id @default(cuid())
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // `slug` is set for the 3 default NPCs (`iris`, `mia`, `leo`) so the
+  // frontend can look up their visual config (animations, colors,
+  // position) from characters.config.ts. Null for user-recruited
+  // teammates which use generic appearance.
+  slug       String?
   name       String
   role       String
-  pokes Int      @default(0)
+  pokes      Int      @default(0)
+  // True for the 3 seeded default NPCs — these rows can't be renamed
+  // or deleted via /api/recruit/[id]. Enforced in the route handlers.
+  isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
 
+  // One slug per user (defaults are unique per user; nullable slug
+  // allows many custom teammates to coexist since Postgres treats
+  // NULLs as distinct in a unique index).
+  @@unique([userId, slug])
   @@index([userId])
 }
