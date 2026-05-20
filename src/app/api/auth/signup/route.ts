@@ -7,6 +7,8 @@ import {
   generateReferralCode,
 } from '@/lib/auth'
 import { computeFloorForInvites, getFloorConfig } from '@/lib/floors'
+import { invalidateLeaderboard } from '@/lib/leaderboard'
+import { seedDefaultTeammates } from '@/lib/defaultTeammates'
 
 const BCRYPT_ROUNDS = 10
 const MIN_PASSWORD_LEN = 6
@@ -62,6 +64,10 @@ export async function POST(req: NextRequest) {
     const referralCode = await ensureUniqueReferralCode()
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
+    // Resolve inviter from the ?ref= code, if any. The 409 guard above
+    // already ensures we never reach this branch for an existing user, so
+    // `referredByCode` + `referredAt` are sealed exactly once — at create
+    // time — and can never be overwritten by a later sign-up attempt.
     let inviterId: string | null = null
     let inviterCode: string | null = null
     if (ref) {
@@ -84,6 +90,7 @@ export async function POST(req: NextRequest) {
         country: country ?? null,
         referralCode,
         referredByCode: inviterCode,
+        referredAt: inviterCode ? new Date() : null,
         teamName: trialTeamName || null,
         teamPurpose: trialTeamPurpose || null,
         emailVerified: null,
@@ -99,6 +106,11 @@ export async function POST(req: NextRequest) {
         update: {},
       })
     }
+
+    // Seed the 3 default NPCs (Iris/Mia/Leo) as DB-backed teammates
+    // so their poke counters persist and the share-floor view shows
+    // a consistent line-up for every user.
+    await seedDefaultTeammates(user.id)
 
     // Credit inviter for this signup.
     if (inviterId && inviterId !== user.id) {
@@ -138,7 +150,14 @@ export async function POST(req: NextRequest) {
           // Note: inviter must add teammates manually via bulk-add modal —
           // no auto-recruit row here.
         })
+        // Leaderboard ranking changed for inviter — bust the cache so
+        // the next /api/leaderboard call returns the updated row.
+        await invalidateLeaderboard(inviter.id, user.id)
       }
+    } else {
+      // Fresh signup with no referral — still drop top50 (a new bottom
+      // entry might matter when the leaderboard is sparse).
+      await invalidateLeaderboard(user.id)
     }
 
     const jwt = await createSessionJwt(user.id)

@@ -19,9 +19,18 @@ export function ReferralCopyButton({ code }: { code: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition"
+      aria-label={copied ? 'Copied' : 'Copy your invite link'}
+      className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[10px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
     >
-      {copied ? 'Copied!' : 'Copy your invite link'}
+      {copied ? (
+        'Copied!'
+      ) : (
+        <>
+          {/* Compact label on mobile, full label on desktop. */}
+          <span className="md:hidden">⧉ Invite link</span>
+          <span className="hidden md:inline">Copy your invite link</span>
+        </>
+      )}
     </button>
   )
 }

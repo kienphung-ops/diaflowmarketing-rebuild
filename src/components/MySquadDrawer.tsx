@@ -4,11 +4,17 @@ import { useEffect, useState } from 'react'
 import { FLOOR_CONFIG, getFloorConfig } from '@/lib/floors'
 import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
+import { useFloorPresence } from '@/hooks/useFloorPresence'
+import { useOrigin } from '@/hooks/useOrigin'
+import type { InviterInfo } from '@/lib/inviter'
 
 interface ServerRecruit {
   id: string
   name: string
   role: string
+  slug?: string | null
+  isDefault?: boolean
+  pokes?: number
 }
 
 interface Props {
@@ -24,13 +30,44 @@ interface Props {
   onTeammateUpdate?: (id: string, patch: { name?: string; role?: string }) => void
   onAddTeammate?: () => void
   onOpenSignup?: () => void
+  /** Who invited the current user — server-sealed at signup time. `null`
+   *  when the user signed up without a referral link or is anonymous. */
+  inviter?: InviterInfo | null
+  /** Resets every character (NPCs + recruited) back to their default
+   *  positions. Useful when a teammate has been dragged behind the wall
+   *  or off-screen and the user wants a clean reset. */
+  onResetAllPositions?: () => void
+  /** Server-computed leaderboard rank. `null` while loading or
+   *  for anonymous users; `51` represents "outside top 50" (rendered
+   *  as "50+"). See /api/leaderboard. */
+  rank?: number | null
+  /** True when the current user's email is verified (User.emailVerified
+   *  set). When false, the drawer renders a "Verify your email" CTA. */
+  emailVerified?: boolean
+  /** Current user's email — shown next to the verification CTA so they
+   *  know which inbox to check. */
+  userEmail?: string | null
+  /** Opens the EmailVerifyModal — handled by the parent so any
+   *  post-verify state updates (re-fetch /api/me, toast, etc.) are
+   *  centralised. */
+  onVerifyEmail?: () => void
+  /** True when the user's floor is publicly shareable. Drives the
+   *  Public/Private toggle in the drawer header. */
+  publicVisible?: boolean
+  /** Toggle handler — receives the new boolean to PATCH. */
+  onTogglePublic?: (next: boolean) => void
 }
 
-const PUBLIC_BASE = typeof window !== 'undefined' ? window.location.origin : 'https://diaflow.io'
-
-function buildInviteUrl(code: string | null): string {
+// NOTE: We used to hard-code `PUBLIC_BASE` at module load time using
+// `typeof window !== 'undefined' ? window.location.origin : 'https://diaflow.io'`.
+// That produced a hydration mismatch — the server-rendered HTML said
+// `https://diaflow.io/?ref=...` while the first client paint said
+// `http://localhost:3000/?ref=...`. The fix is the `useOrigin()` hook
+// (see imports), which starts empty on both server + first paint and
+// upgrades only after mount.
+function buildInviteUrl(origin: string, code: string | null): string {
   if (!code) return ''
-  return `${PUBLIC_BASE}/?ref=${code}`
+  return `${origin}/?ref=${code}`
 }
 
 export function MySquadDrawer({
@@ -46,6 +83,14 @@ export function MySquadDrawer({
   onTeammateUpdate,
   onAddTeammate,
   onOpenSignup,
+  inviter,
+  onResetAllPositions,
+  rank,
+  emailVerified,
+  userEmail,
+  onVerifyEmail,
+  publicVisible,
+  onTogglePublic,
 }: Props) {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(teamName ?? '')
@@ -66,7 +111,9 @@ export function MySquadDrawer({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const inviteUrl = buildInviteUrl(referralCode)
+  const origin = useOrigin()
+  const inviteUrl = buildInviteUrl(origin, referralCode)
+  const totalPokes = teammates.reduce((sum, t) => sum + (t.pokes ?? 0), 0)
   const nextFloor = getFloorConfig(currentFloor + 1)
   const currentFloorCfg = getFloorConfig(currentFloor)
   const invitesToNext = nextFloor ? Math.max(0, nextFloor.invitesRequired - totalInvites) : 0
@@ -135,6 +182,37 @@ export function MySquadDrawer({
           </div>
         )}
 
+        {/* Unverified-email CTA — signed-in user, emailVerified is false
+            in the DB. Hidden once verification completes (parent
+            re-fetches /api/me to flip `emailVerified` to true). */}
+        {onVerifyEmail && emailVerified === false && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-amber-300 text-base leading-none mt-0.5" aria-hidden>⚠</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-amber-200 font-semibold mb-0.5">
+                  Verify your email
+                </div>
+                {userEmail && (
+                  <div className="text-[11px] text-amber-100/70 truncate">
+                    {userEmail}
+                  </div>
+                )}
+                <div className="text-[11px] text-tower-cream/60 mt-1">
+                  Confirms we can reach you with floor-up notifications and
+                  invite credits.
+                </div>
+              </div>
+              <button
+                onClick={onVerifyEmail}
+                className="shrink-0 px-3 py-1.5 rounded-md bg-amber-300 text-night-deep font-semibold text-xs hover:bg-amber-200 transition"
+              >
+                Verify
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Team name */}
         <div>
           <div className="text-[11px] uppercase tracking-widest text-tower-cream/40 mb-2">Your squad</div>
@@ -192,12 +270,23 @@ export function MySquadDrawer({
           )}
         </div>
 
+        {/* Invited-by card — only when the server has a sealed inviter row. */}
+        {inviter && <InvitedByCard inviter={inviter} />}
+
         {/* Current floor card */}
         <div className="rounded-xl p-4 bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-500/30">
           <div className="flex items-baseline justify-between">
             <div className="text-[11px] uppercase tracking-widest text-tower-cream/50">Current floor</div>
             <div className="text-right">
-              <div className="text-sm font-semibold">Rank #{Math.max(1, 500 - totalInvites * 7)}</div>
+              <div className="text-sm font-semibold">
+                {rank == null ? (
+                  <span className="text-tower-cream/40">Rank —</span>
+                ) : rank >= 51 ? (
+                  <span title="Outside top 50 — keep inviting!">Rank 50+</span>
+                ) : (
+                  <>Rank #{rank}</>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-baseline gap-2 mt-1">
@@ -217,20 +306,46 @@ export function MySquadDrawer({
           </div>
         </div>
 
+        {/* Share-floor toggle — only shown when the parent wired up the
+            handler (signed-in users only). */}
+        {onTogglePublic && (
+          <ShareFloorToggle
+            publicVisible={!!publicVisible}
+            referralCode={referralCode}
+            onToggle={onTogglePublic}
+          />
+        )}
+
         {/* Recruited teammate list */}
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
             <div className="text-[11px] uppercase tracking-widest text-tower-cream/40">
               Your teammates ({teammates.length})
+              {totalPokes > 0 && (
+                <span className="ml-2 text-amber-300/80 normal-case tracking-normal">
+                  ★ {totalPokes} pokes
+                </span>
+              )}
             </div>
-            {onAddTeammate && (
-              <button
-                onClick={onAddTeammate}
-                className="text-xs px-2 py-1 rounded bg-tower-gold/15 text-tower-gold hover:bg-tower-gold/25 font-semibold"
-              >
-                + Add
-              </button>
-            )}
+            <div className="flex items-center gap-1.5">
+              {onResetAllPositions && (
+                <button
+                  onClick={onResetAllPositions}
+                  className="text-[10px] px-2 py-1 rounded bg-night-deep/60 border border-white/10 text-tower-cream/70 hover:border-tower-gold/40 hover:text-tower-gold font-medium"
+                  title="Send everyone back to their default spots (recover teammates dragged off-screen or behind walls)"
+                >
+                  ↺ Reset positions
+                </button>
+              )}
+              {onAddTeammate && (
+                <button
+                  onClick={onAddTeammate}
+                  className="text-xs px-2 py-1 rounded bg-tower-gold/15 text-tower-gold hover:bg-tower-gold/25 font-semibold"
+                >
+                  + Add
+                </button>
+              )}
+            </div>
           </div>
           {teammates.length > 0 && (
           <div>
@@ -262,16 +377,35 @@ export function MySquadDrawer({
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate">{t.name}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-semibold truncate">{t.name}</span>
+                          {t.isDefault && (
+                            <span className="shrink-0 text-[8px] uppercase tracking-wider px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">
+                              NPC
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-tower-cream/50 truncate">{t.role}</div>
                       </div>
-                      <button
-                        onClick={() => startEditing(t)}
-                        className="shrink-0 px-2 py-1 rounded text-xs text-tower-cream/70 hover:text-tower-gold hover:bg-night-mid/60 transition"
+                      {/* Pokes count — visible for every teammate (defaults
+                          + custom). Tooltip shows the full label. */}
+                      <div
+                        className="shrink-0 text-[11px] text-amber-300 font-semibold"
+                        title={`${t.pokes ?? 0} poke${(t.pokes ?? 0) === 1 ? '' : 's'}`}
                       >
-                        ✎ Edit
-                      </button>
+                        ★ {t.pokes ?? 0}
+                      </div>
+                      {/* Edit only for user-recruited teammates — NPC
+                          defaults are immutable (rejected server-side). */}
+                      {!t.isDefault && (
+                        <button
+                          onClick={() => startEditing(t)}
+                          className="shrink-0 px-2 py-1 rounded text-xs text-tower-cream/70 hover:text-tower-gold hover:bg-night-mid/60 transition"
+                        >
+                          ✎ Edit
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -327,5 +461,198 @@ export function MySquadDrawer({
         </a>
       </div>
     </div>
+  )
+}
+
+// ─── Invited-by card ────────────────────────────────────────────────────
+/**
+ * Shows who invited the currently signed-in user. Sealed server-side at
+ * signup (User.referredByCode + User.referredAt) — once set, never
+ * overwritten, so this is the definitive answer the user can rely on.
+ *
+ * Identity priority: inviter's team name (most personal) → masked email
+ * (most trustworthy when no team name) → referral code (fallback).
+ */
+function InvitedByCard({ inviter }: { inviter: InviterInfo }) {
+  const displayName = inviter.teamName?.trim() || inviter.emailMasked
+  const invitedAtLabel = formatInvitedAt(inviter.invitedAt)
+  return (
+    <div className="rounded-xl p-4 bg-gradient-to-br from-amber-900/20 to-amber-800/5 border border-amber-500/25">
+      <div className="text-[11px] uppercase tracking-widest text-amber-200/70 mb-2">
+        Invited by
+      </div>
+      <div className="flex items-start gap-3">
+        {/* Avatar — initial of team name or first letter of email */}
+        <div className="shrink-0 w-10 h-10 rounded-full bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-base font-bold text-amber-200">
+          {(displayName[0] ?? '?').toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-lg font-semibold text-tower-cream truncate">
+            {displayName}
+          </div>
+          <div className="text-xs text-tower-cream/55 flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="font-mono">{inviter.referralCode}</span>
+            {inviter.country && (
+              <>
+                <span className="opacity-40">·</span>
+                <span>{inviter.country}</span>
+              </>
+            )}
+            {invitedAtLabel && (
+              <>
+                <span className="opacity-40">·</span>
+                <span>{invitedAtLabel}</span>
+              </>
+            )}
+          </div>
+          <div className="text-[10px] text-tower-cream/40 mt-1.5">
+            🔒 Your inviter is sealed and cannot be reassigned
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** "2 days ago" / "just now" — null when there's no timestamp. */
+function formatInvitedAt(iso: string | null): string | null {
+  if (!iso) return null
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 0 || Number.isNaN(ms)) return null
+  const min = Math.floor(ms / 60_000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const day = Math.floor(hr / 24)
+  if (day < 30) return `${day}d ago`
+  const mo = Math.floor(day / 30)
+  if (mo < 12) return `${mo}mo ago`
+  return `${Math.floor(mo / 12)}y ago`
+}
+
+// ─── Share-floor toggle ─────────────────────────────────────────────────
+/**
+ * Public/Private switch + the resulting `/floor/<code>` share URL.
+ * When public, anyone hitting the URL can poke teammates and their
+ * counters increment in real time (polling-driven).
+ */
+function ShareFloorToggle({
+  publicVisible,
+  referralCode,
+  onToggle,
+}: {
+  publicVisible: boolean
+  referralCode: string | null
+  onToggle: (next: boolean) => void
+}) {
+  const [copied, setCopied] = useState(false)
+  // Same hydration-safe origin lookup as the parent drawer — see
+  // useOrigin docs for why we can't read window.location.origin
+  // synchronously here.
+  const origin = useOrigin()
+  const shareUrl = origin && referralCode ? `${origin}/floor/${referralCode}` : ''
+  // Owner observes their own floor's visitor count without registering
+  // as a visitor (mode='observe'). Polled at a relaxed 10s — the
+  // home page isn't the place anyone needs sub-5s freshness.
+  const visitorCount = useFloorPresence({
+    code: publicVisible ? referralCode : null,
+    mode: 'observe',
+    intervalMs: 10_000,
+  })
+
+  async function handleCopy() {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-night-deep/40 px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] uppercase tracking-widest text-tower-cream/40 mb-1">
+            Share floor
+          </div>
+          <div className="text-sm font-semibold">
+            {publicVisible ? 'Public — anyone can visit' : 'Private — only you'}
+          </div>
+          <div className="text-[11px] text-tower-cream/50 mt-0.5">
+            Visitors can poke your teammates in real time.
+          </div>
+        </div>
+        {/* Toggle switch */}
+        <button
+          onClick={() => onToggle(!publicVisible)}
+          role="switch"
+          aria-checked={publicVisible}
+          className={`shrink-0 relative w-11 h-6 rounded-full transition ${
+            publicVisible ? 'bg-tower-gold' : 'bg-night-mid border border-white/10'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 w-5 h-5 rounded-full bg-night-deep shadow transition-transform ${
+              publicVisible ? 'translate-x-[22px]' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
+      </div>
+
+      {publicVisible && shareUrl && (
+        <>
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-md bg-night-deep border border-white/10">
+            <span className="flex-1 text-[11px] font-mono text-tower-cream/80 truncate">
+              {shareUrl}
+            </span>
+            <button
+              onClick={handleCopy}
+              aria-label="Copy floor share link"
+              className="text-tower-cream/60 hover:text-tower-gold text-sm"
+            >
+              {copied ? '✓' : '⧉'}
+            </button>
+          </div>
+          {/* Live visitor count — eye icon shows real-time presence
+              from Redis ZSET. 0 = nobody right now; 1+ = someone
+              currently on /floor/<code>. */}
+          <div
+            className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-tower-gold/90"
+            title={`${visitorCount} ${visitorCount === 1 ? 'visitor' : 'visitors'} on your floor right now`}
+          >
+            <EyeIcon />
+            <span className="font-semibold tabular-nums">{visitorCount}</span>
+            <span className="text-tower-cream/55">
+              {visitorCount === 1 ? 'viewer' : 'viewers'} on your floor
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Same eye glyph the visitor page uses — kept inline so the drawer
+ *  module doesn't grow a shared icons dependency for one symbol. */
+function EyeIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   )
 }

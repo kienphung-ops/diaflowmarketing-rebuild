@@ -275,7 +275,45 @@ export const Character = memo(function Character({
       }}
     >
       {model ?? <CharacterBody config={config} hovered={hovered || isSelected} />}
-      <NameBadge name={config.name} role={config.role} />
+      {(() => {
+        // ── Beacon trigger ──────────────────────────────────────────
+        // The badge switches from a head-floating label to a wall-top
+        // beacon when the teammate would otherwise be unfindable:
+        //   - behind back wall  (z < -5.5)             → "behind the wall"
+        //   - off the floor planks (|x| > 7.15 or
+        //     z > 7 or z < -7)                         → "off the floor"
+        // The beacon's lateral X is clamped to ±6 so it stays inside the
+        // camera frustum no matter how far sideways the user dragged.
+        const cx = pos[0], cz = pos[2]
+        const behindWall = cz < -5.5
+        const offFloor = Math.abs(cx) > 7.15 || cz > 7 || cz < -7
+        const reason: 'behind-wall' | 'off-floor' | null = behindWall
+          ? 'behind-wall'
+          : offFloor
+          ? 'off-floor'
+          : null
+        if (!reason) {
+          return <NameBadge name={config.name} role={config.role} />
+        }
+        // Target world position for the beacon — above wall (y=5.9),
+        // just in front of the wall (z=-5), and laterally clamped so it
+        // stays in the camera's horizontal frustum.
+        const beaconWorldX = Math.max(-6, Math.min(6, cx))
+        const beaconWorldY = 5.9
+        const beaconWorldZ = -5
+        // Convert to local-space offsets (badge lives inside the
+        // character group, so we subtract the character's world pos).
+        return (
+          <NameBadge
+            name={config.name}
+            role={config.role}
+            beaconReason={reason}
+            beaconOffsetX={beaconWorldX - cx}
+            beaconOffsetY={beaconWorldY - pos[1]}
+            beaconOffsetZ={beaconWorldZ - cz}
+          />
+        )
+      })()}
 
       {/* +1 float */}
       {plus1Id > 0 && (

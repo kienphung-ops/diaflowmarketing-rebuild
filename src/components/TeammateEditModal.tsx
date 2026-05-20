@@ -14,9 +14,12 @@ interface Props {
   onClose: () => void
   onSave: (id: string, patch: { name: string; role: string }) => void
   onDelete?: (id: string) => void
+  /** Resets just this teammate back to their default position — handy
+   *  when the user has dragged them off-screen / behind the back wall. */
+  onResetPosition?: (id: string) => void
 }
 
-export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete }: Props) {
+export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, onResetPosition }: Props) {
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
 
@@ -106,6 +109,24 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete }:
             Cancel
           </button>
         </div>
+
+        {/* Reset position — secondary action, prominent enough to find but
+            visually subordinate to Save/Remove. */}
+        {onResetPosition && (
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                onResetPosition(teammate.id)
+                onClose()
+              }}
+              className="w-full px-3 py-2 rounded-md text-xs bg-night-deep/60 border border-white/10 text-tower-cream/80 hover:border-tower-gold/40 hover:text-tower-gold transition flex items-center justify-center gap-2"
+              title="Send this teammate back to their default spot"
+            >
+              ↺ Reset position
+            </button>
+          </div>
+        )}
       </form>
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, Suspense, useMemo } from 'react'
+import { memo, Suspense } from 'react'
 import * as THREE from 'three'
 import { Text, useTexture } from '@react-three/drei'
 
@@ -50,7 +50,7 @@ const CompanyFrame = memo(function CompanyFrame({ companyName }: { companyName?:
  *   Floor 6 – 10    → 3.png
  *   Floor 11 – 15   → 4.png
  *   Floor 16 – 19   → 5.png
- *   Floor 20        → 6.png  (handled separately via FloorTwentyPanorama)
+ *   Floor 20        → 6.png  (penthouse night-sky panorama)
  */
 function floorToImageNumber(floor: number): number {
   if (floor <= 1) return 1
@@ -68,244 +68,13 @@ function FloorSceneryTexture({ floor }: { floor: number }) {
   texture.colorSpace = THREE.SRGBColorSpace
 
   // Standard cut-out window — texture fills the planeGeometry inside the
-  // back-wall opening. Floor 1-19 use this; Floor 20 uses the glass-wall
-  // panorama (see FloorTwentyPanorama).
+  // back-wall opening. Same treatment for all 20 floors; Floor 20 just maps
+  // to 6.png (penthouse night-sky panorama).
   return (
     <mesh position={[3.5, 2.4, -5.32]}>
       <planeGeometry args={[3, 2.2]} />
       <meshBasicMaterial map={texture} toneMapped={false} />
     </mesh>
-  )
-}
-
-/** Procedural 3D night-sky panorama for Floor 20. Deep navy sky with
- *  stars, a crescent moon, a milky-way streak, drifting clouds at the
- *  horizon, a hot-air balloon and an airship. Renders behind the glass
- *  walls so the penthouse has a tranquil "above the clouds" feel. */
-
-function seededRand(seed: number): number {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
-}
-
-function CrescentMoon() {
-  return (
-    <group position={[-9, 12, -20]}>
-      {/* Bright moon body */}
-      <mesh>
-        <sphereGeometry args={[1.3, 32, 24]} />
-        <meshBasicMaterial color="#f4ecd8" />
-      </mesh>
-      {/* Dark overlapping sphere carves the crescent shape */}
-      <mesh position={[0.55, 0.18, 0.1]}>
-        <sphereGeometry args={[1.25, 32, 24]} />
-        <meshBasicMaterial color="#070a1c" />
-      </mesh>
-      {/* Soft halo */}
-      <mesh position={[-0.1, 0, -0.05]}>
-        <sphereGeometry args={[2.1, 24, 18]} />
-        <meshBasicMaterial color="#fbe9a8" transparent opacity={0.1} />
-      </mesh>
-    </group>
-  )
-}
-
-function MilkyWayStreak() {
-  // Soft purple-blue gradient streak suggesting the galactic plane.
-  return (
-    <group>
-      <mesh position={[3, 11, -23]} rotation={[0, 0, -0.55]}>
-        <planeGeometry args={[10, 1.4]} />
-        <meshBasicMaterial color="#5a4dad" transparent opacity={0.32} />
-      </mesh>
-      <mesh position={[3, 11, -23.02]} rotation={[0, 0, -0.55]}>
-        <planeGeometry args={[7, 0.7]} />
-        <meshBasicMaterial color="#8b6fce" transparent opacity={0.32} />
-      </mesh>
-    </group>
-  )
-}
-
-function ShootingStar() {
-  return (
-    <mesh position={[-3, 9.5, -21]} rotation={[0, 0, -0.6]}>
-      <planeGeometry args={[2.6, 0.05]} />
-      <meshBasicMaterial color="#ffffff" />
-    </mesh>
-  )
-}
-
-interface HotAirBalloonProps {
-  position: [number, number, number]
-}
-
-function HotAirBalloon({ position }: HotAirBalloonProps) {
-  return (
-    <group position={position}>
-      {/* Balloon dome — slightly elongated sphere */}
-      <mesh position={[0, 0.2, 0]} scale={[1, 1.25, 1]}>
-        <sphereGeometry args={[0.7, 18, 14]} />
-        <meshLambertMaterial color="#a82838" emissive="#3a0a14" emissiveIntensity={0.2} />
-      </mesh>
-      {/* Vertical stripes — thin tall planes around the equator */}
-      {Array.from({ length: 6 }, (_, i) => {
-        const angle = (i / 6) * Math.PI * 2
-        return (
-          <mesh
-            key={i}
-            position={[Math.cos(angle) * 0.55, 0.2, Math.sin(angle) * 0.55]}
-            rotation={[0, -angle, 0]}
-            scale={[1, 1.25, 1]}
-          >
-            <planeGeometry args={[0.18, 1.3]} />
-            <meshLambertMaterial color="#f4e8d2" side={THREE.DoubleSide} />
-          </mesh>
-        )
-      })}
-      {/* Burner glow */}
-      <mesh position={[0, -0.65, 0]}>
-        <sphereGeometry args={[0.18, 10, 8]} />
-        <meshBasicMaterial color="#fcd34d" />
-      </mesh>
-      {/* Basket */}
-      <mesh position={[0, -0.95, 0]}>
-        <boxGeometry args={[0.4, 0.3, 0.4]} />
-        <meshLambertMaterial color="#7a4a1a" />
-      </mesh>
-      {/* Ropes connecting basket to balloon */}
-      {[[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]].map(([rx, rz], i) => (
-        <mesh key={i} position={[rx, -0.45, rz]}>
-          <cylinderGeometry args={[0.012, 0.012, 0.65, 4]} />
-          <meshBasicMaterial color="#3a2a1a" />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-function Airship() {
-  return (
-    <group position={[2, 7, -16]}>
-      {/* Elongated zeppelin body */}
-      <mesh rotation={[0, 0, Math.PI / 2]} scale={[1, 2.6, 1]}>
-        <sphereGeometry args={[0.42, 20, 12]} />
-        <meshLambertMaterial color="#e6e6ec" />
-      </mesh>
-      {/* Lower gondola */}
-      <mesh position={[0, -0.32, 0]}>
-        <boxGeometry args={[0.7, 0.14, 0.22]} />
-        <meshLambertMaterial color="#3a3f55" />
-      </mesh>
-      {/* Tail fins */}
-      <mesh position={[-1.0, 0.18, 0]}>
-        <boxGeometry args={[0.18, 0.4, 0.05]} />
-        <meshLambertMaterial color="#e6e6ec" />
-      </mesh>
-      <mesh position={[-1.0, 0, 0.18]} rotation={[Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[0.18, 0.4, 0.05]} />
-        <meshLambertMaterial color="#e6e6ec" />
-      </mesh>
-      {/* Tiny warm cabin lights */}
-      {[-0.2, 0, 0.2].map((dx, i) => (
-        <mesh key={i} position={[dx, -0.32, 0.12]}>
-          <planeGeometry args={[0.05, 0.05]} />
-          <meshBasicMaterial color="#fde68a" />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-interface CloudProps {
-  position: [number, number, number]
-  scale?: number
-}
-
-function Cloud({ position, scale = 1 }: CloudProps) {
-  // Stacked spheres form a fluffy stylised cloud silhouette.
-  const puffs: Array<[number, number, number, number]> = [
-    [0, 0, 0, 1.4],
-    [1.4, -0.1, 0, 1.05],
-    [-1.4, -0.1, 0, 1.15],
-    [0.6, 0.55, 0, 0.95],
-    [-0.6, 0.45, 0, 0.9],
-    [2.2, -0.25, 0, 0.8],
-    [-2.2, -0.25, 0, 0.75],
-    [1.0, -0.45, 0, 0.7],
-  ]
-  return (
-    <group position={position} scale={scale}>
-      {puffs.map(([x, y, z, s], i) => (
-        <mesh key={i} position={[x, y, z]} scale={s}>
-          <sphereGeometry args={[0.55, 14, 10]} />
-          <meshLambertMaterial color="#d6dded" />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-function FloorTwentyNightSky() {
-  // Star scatter — varied sizes + occasional warm-yellow accent star.
-  const stars = useMemo(() => {
-    const arr: Array<{ pos: [number, number, number]; size: number; warm: boolean }> = []
-    for (let i = 0; i < 180; i++) {
-      const s = i * 7919 + 11
-      const x = (seededRand(s) - 0.5) * 60
-      const y = 6 + seededRand(s * 3) * 14
-      const z = -18 - seededRand(s * 5) * 10
-      const size = 0.05 + seededRand(s * 7) * 0.09
-      arr.push({ pos: [x, y, z], size, warm: seededRand(s * 11) < 0.08 })
-    }
-    return arr
-  }, [])
-
-  return (
-    <group>
-      {/* Deep navy sky — gradient via two stacked planes (dark top, mid below) */}
-      <mesh position={[0, 14, -27]}>
-        <planeGeometry args={[80, 22]} />
-        <meshBasicMaterial color="#070b22" />
-      </mesh>
-      <mesh position={[0, 1, -26.98]}>
-        <planeGeometry args={[80, 12]} />
-        <meshBasicMaterial color="#0d1238" />
-      </mesh>
-      {/* Side sky panels */}
-      <mesh position={[-22, 8, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[40, 30]} />
-        <meshBasicMaterial color="#080b22" />
-      </mesh>
-      <mesh position={[22, 8, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[40, 30]} />
-        <meshBasicMaterial color="#080b22" />
-      </mesh>
-
-      {/* Stars */}
-      {stars.map((s, i) => (
-        <mesh key={i} position={s.pos}>
-          <sphereGeometry args={[s.size, 6, 5]} />
-          <meshBasicMaterial color={s.warm ? '#fde68a' : '#f5f0e6'} />
-        </mesh>
-      ))}
-
-      <MilkyWayStreak />
-      <ShootingStar />
-      <CrescentMoon />
-
-      {/* Aircraft */}
-      <HotAirBalloon position={[8, 9, -18]} />
-      <Airship />
-
-      {/* Clouds along the horizon — back + sides */}
-      <Cloud position={[-9, 0.4, -16]} scale={1.4} />
-      <Cloud position={[7, -0.2, -17]} scale={1.6} />
-      <Cloud position={[-2, -0.5, -14]} scale={1} />
-      <Cloud position={[-15, 1.2, -8]} scale={1.2} />
-      <Cloud position={[15, 0.8, -10]} scale={1.3} />
-      <Cloud position={[-18, -0.3, 4]} scale={1.1} />
-      <Cloud position={[18, 0.2, 2]} scale={1.2} />
-    </group>
   )
 }
 
@@ -345,63 +114,98 @@ interface WallsProps {
 }
 
 export function Walls({ companyName, currentFloor, showWindow = true }: WallsProps) {
+  // Floor 20 is the penthouse — all three sides become floor-to-ceiling
+  // glass so the user feels like they're standing in an open sky lounge.
+  // F1-19 only render the back wall (side walls were removed earlier
+  // because the static camera doesn't need them to bound the view).
   const isPenthouse = currentFloor >= 20
-  // Walls become almost-transparent glass on Floor 20 so the panorama
-  // shows through from all 3 sides. Earlier floors keep solid plaster.
-  const wallMaterial = isPenthouse ? (
-    <meshLambertMaterial color="#e8f1ff" transparent opacity={0.18} />
-  ) : (
-    <meshLambertMaterial color="#e8dfd0" />
-  )
-  const sideWallMaterial = isPenthouse ? (
-    <meshLambertMaterial color="#e8f1ff" transparent opacity={0.18} />
-  ) : (
-    <meshLambertMaterial color="#dccfb8" />
-  )
+
+  // Shared glass material props — light blue tint, low opacity so the
+  // sky outside shows through clearly. `depthWrite: false` keeps it
+  // from occluding objects directly behind it (e.g. furniture inside).
+  const glassColor = '#e8f1ff'
+  const glassOpacity = 0.18
 
   return (
     <group>
-      {/* Back wall */}
+      {/* Back wall — solid plaster on F1-19, transparent glass on F20. */}
       <mesh position={[0, 1.8, -5.5]} receiveShadow>
         <boxGeometry args={[16, 7, 0.18]} />
-        {wallMaterial}
+        {isPenthouse ? (
+          <meshLambertMaterial
+            color={glassColor}
+            transparent
+            opacity={glassOpacity}
+            depthWrite={false}
+          />
+        ) : (
+          <meshLambertMaterial color="#e8dfd0" />
+        )}
       </mesh>
 
-      {/* Left wall */}
-      <mesh position={[-8, 1.8, 0]} receiveShadow>
-        <boxGeometry args={[0.18, 7, 11]} />
-        {sideWallMaterial}
-      </mesh>
+      {/* Side walls — only on penthouse, both glass. The room is 11
+          deep along Z (front edge ≈ 5.5, back at -5.5), so left/right
+          walls are 11 long centered at z = 0. */}
+      {isPenthouse && (
+        <>
+          <mesh position={[-8, 1.8, 0]} receiveShadow>
+            <boxGeometry args={[0.18, 7, 11]} />
+            <meshLambertMaterial
+              color={glassColor}
+              transparent
+              opacity={glassOpacity}
+              depthWrite={false}
+            />
+          </mesh>
+          <mesh position={[8, 1.8, 0]} receiveShadow>
+            <boxGeometry args={[0.18, 7, 11]} />
+            <meshLambertMaterial
+              color={glassColor}
+              transparent
+              opacity={glassOpacity}
+              depthWrite={false}
+            />
+          </mesh>
+          {/* Thin gold frame strips on each glass edge so the walls
+              read as architecture rather than vanishing entirely. */}
+          {[
+            // Vertical mullions at the four building corners
+            { p: [-7.9, 1.8, -5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
+            { p: [7.9, 1.8, -5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
+            { p: [-7.9, 1.8, 5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
+            { p: [7.9, 1.8, 5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
+            // Top + bottom rails on the side panels
+            { p: [-7.92, 5.18, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
+            { p: [7.92, 5.18, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
+            { p: [-7.92, -1.58, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
+            { p: [7.92, -1.58, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
+          ].map((m, i) => (
+            <mesh key={i} position={m.p}>
+              <boxGeometry args={m.s} />
+              <meshLambertMaterial color="#3a2a1a" />
+            </mesh>
+          ))}
+        </>
+      )}
 
-      {/* Right wall */}
-      <mesh position={[8, 1.8, 0]} receiveShadow>
-        <boxGeometry args={[0.18, 7, 11]} />
-        {sideWallMaterial}
-      </mesh>
-
-      {/* Side baseboards — kept even on Floor 20 to anchor the room */}
-      <mesh position={[-7.92, -0.52, 0]}>
-        <boxGeometry args={[0.1, 0.12, 11]} />
-        <meshLambertMaterial color="#2a1a0a" />
-      </mesh>
-      <mesh position={[7.92, -0.52, 0]}>
-        <boxGeometry args={[0.1, 0.12, 11]} />
-        <meshLambertMaterial color="#2a1a0a" />
-      </mesh>
-
-      {isPenthouse ? (
-        // Glass-wall panorama — no cut-out window, the whole back+sides become
-        // floor-to-ceiling glass with 20.png as the surrounding skyline.
-        <FloorTwentyNightSky />
-      ) : (
-        showWindow && (
-          <>
+      {showWindow && (
+        <>
+          {isPenthouse ? (
+            // Penthouse: full-wall glass panorama with 6.png as the
+            // background. No cut-out window frame — the entire back is
+            // glass so the scenery fills it edge-to-edge.
             <Suspense fallback={null}>
-              <FloorSceneryTexture floor={currentFloor} />
+              <FloorPanoramaTexture />
             </Suspense>
-            <WindowFrame />
-          </>
-        )
+          ) : (
+            <>
+              <Suspense fallback={null}>
+                <FloorSceneryTexture floor={currentFloor} />
+              </Suspense>
+              <WindowFrame />
+            </>
+          )}
+        </>
       )}
 
       <CompanyFrame companyName={companyName} />
@@ -412,5 +216,39 @@ export function Walls({ companyName, currentFloor, showWindow = true }: WallsPro
         <meshLambertMaterial color="#2a1a0a" />
       </mesh>
     </group>
+  )
+}
+
+/** Floor-to-ceiling night-sky panorama for the penthouse (Floor 20).
+ *
+ * Renders 6.png on three separate planes — one behind each of the
+ * glass walls (back + both sides). The user, looking through any
+ * direction, sees a continuous night sky outside the building. We
+ * share a single Texture reference across the three meshes (drei's
+ * useTexture deduplicates by URL) so memory cost is the same as the
+ * old single-plane setup. */
+function FloorPanoramaTexture() {
+  const texture = useTexture('/window_images/6.png') as THREE.Texture
+  texture.colorSpace = THREE.SRGBColorSpace
+  return (
+    <>
+      {/* Back wall panorama — z = -5.6 is just behind the back wall at z = -5.5 */}
+      <mesh position={[0, 1.8, -5.6]}>
+        <planeGeometry args={[16, 7]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+      {/* Left side panorama — sits just outside the left glass wall
+          (x = -8) facing inward (+X). Plane is the depth of the
+          room (11 along Z) rotated 90° around Y. */}
+      <mesh position={[-8.1, 1.8, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[11, 7]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+      {/* Right side panorama — mirror of the left, facing -X. */}
+      <mesh position={[8.1, 1.8, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <planeGeometry args={[11, 7]} />
+        <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+    </>
   )
 }

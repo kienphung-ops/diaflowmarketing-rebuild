@@ -15,6 +15,27 @@ function getClientIp(req: NextRequest): string | undefined {
   return req.headers.get('x-real-ip') ?? undefined
 }
 
+/**
+ * Derive the public URL the browser is currently on. We prefer the
+ * `Origin` header (browsers set it automatically on POST per the Fetch
+ * spec) so the magic link always points back to the same domain the user
+ * is visiting — `diaflow.io`, a preview deploy, or `localhost:3000` —
+ * without needing a `NEXT_PUBLIC_APP_URL` env variable to be kept in sync.
+ *
+ * Falls back to `x-forwarded-proto` + `host` (works behind reverse
+ * proxies) and finally to the request URL itself.
+ */
+function getBrowserOrigin(req: NextRequest): string {
+  const origin = req.headers.get('origin')
+  if (origin) return origin
+  const host = req.headers.get('host')
+  if (host) {
+    const proto = req.headers.get('x-forwarded-proto') ?? 'https'
+    return `${proto}://${host}`
+  }
+  return new URL(req.url).origin
+}
+
 async function ensureUniqueReferralCode(): Promise<string> {
   for (let i = 0; i < 8; i++) {
     const code = generateReferralCode()
@@ -54,12 +75,18 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       const referralCode = await ensureUniqueReferralCode()
+      const inviterCode = inviter && inviter.referralCode !== referralCode ? inviter.referralCode : null
       user = await prisma.user.create({
         data: {
           email,
           first_email: email,
           referralCode,
-          referredByCode: inviter && inviter.referralCode !== referralCode ? inviter.referralCode : null,
+          // Inviter lock — referredByCode + referredAt are sealed exactly
+          // once, here at user-creation time. Below, we deliberately skip
+          // setting them on the existing-user branch so a later invite
+          // link can never overwrite the original inviter.
+          referredByCode: inviterCode,
+          referredAt: inviterCode ? new Date() : null,
           ipAddress: ip,
           teamName: trialTeamName || null,
           teamPurpose: trialTeamPurpose || null,
@@ -68,6 +95,10 @@ export async function POST(req: NextRequest) {
       isNew = true
     }
 
+    // Defensive guard — for an existing user, never create a fresh
+    // InviteEvent under a new inviter. The user's `referredByCode` is the
+    // source of truth; once set it is immutable. Also skip event creation
+    // when the visitor is trying to invite themselves.
     if (isNew && inviter && inviter.id !== user.id) {
       await prisma.inviteEvent.create({
         data: {
@@ -93,7 +124,7 @@ export async function POST(req: NextRequest) {
       ],
     })
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin
+    const appUrl = getBrowserOrigin(req)
     const magicLinkUrl = `${appUrl}/api/auth/verify?token=${encodeURIComponent(magic.raw)}`
 
     await sendAuthEmail({ to: email, magicLinkUrl, otp: otpCode })

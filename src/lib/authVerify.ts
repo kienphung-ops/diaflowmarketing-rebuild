@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { computeFloorForInvites, getFloorConfig } from '@/lib/floors'
 import { hashOtpForEmail, hashToken } from '@/lib/auth'
+import { invalidateLeaderboard } from '@/lib/leaderboard'
 import type { TokenType } from '@prisma/client'
 
 export interface VerifyResult {
@@ -61,6 +62,10 @@ async function processReferralIfAny(userId: string, email: string): Promise<void
     // row on invite verify. Slots open up automatically based on
     // FLOOR_MAX_TEAMMATES; the user chooses who to fill them with.
   })
+
+  // Inviter's totalInvites just went up — invalidate cached top50 +
+  // their rank so /api/leaderboard reflects the change immediately.
+  await invalidateLeaderboard(inviter.id, userId)
 }
 
 export async function consumeAuthToken(rawToken: string, type: TokenType, emailHint?: string): Promise<VerifyResult> {

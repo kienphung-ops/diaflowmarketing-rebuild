@@ -72,11 +72,13 @@ export function Header({
           </button>
         )}
 
-        {/* Tower toggle — desktop only; mobile uses bottom bar */}
+        {/* Tower toggle — visible on both desktop and mobile (was
+            previously desktop-only, but on /tower the user needs a way
+            back to / and the mobile bottom bar isn't rendered there). */}
         {onToggleTower && (
           <button
             onClick={onToggleTower}
-            className="hidden md:inline-flex px-3 py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-xs tracking-wide hover:bg-night-mid transition"
+            className="inline-flex px-2 md:px-3 py-1 md:py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-[10px] md:text-xs tracking-wide hover:bg-night-mid transition whitespace-nowrap"
           >
             {showTower ? 'Office view' : 'Tower view'}
           </button>
