@@ -127,6 +127,20 @@ export default function TowerLanding(props: Props) {
     pushToast({ title: 'All teammates reset', tone: 'success' })
   }, [pushToast])
 
+  const handleLogout = useCallback(async () => {
+    // POST /api/auth/logout clears the session cookie server-side.
+    // Hard-reload the home page so the server component re-renders
+    // with `signedIn=false` and the anonymous onboarding state loads
+    // fresh — softer router.refresh() leaves stale client state.
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // Even if the request fails, fall through to the redirect —
+      // the user's intent was to sign out.
+    }
+    window.location.href = '/'
+  }, [])
+
   const handleTogglePublic = useCallback(async (next: boolean) => {
     // Optimistic UI — flip locally then PATCH; revert on failure.
     setPublicVisible(next)
@@ -501,6 +515,7 @@ export default function TowerLanding(props: Props) {
         onVerifyEmail={props.signedIn && !emailVerified ? () => setEmailVerifyOpen(true) : undefined}
         publicVisible={publicVisible}
         onTogglePublic={props.signedIn ? handleTogglePublic : undefined}
+        onLogout={props.signedIn ? handleLogout : undefined}
       />
 
       <TeammateEditModal

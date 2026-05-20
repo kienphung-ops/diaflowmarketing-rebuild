@@ -35,6 +35,15 @@ export default function TowerPageClient(props: Props) {
   const [signupOpen, setSignupOpen] = useState(false)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
 
+  async function handleLogout() {
+    // Clear session server-side, then hard-reload home so the server
+    // component re-renders without a session.
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {/* fall through */}
+    window.location.href = '/'
+  }
+
   // Anonymous visitors hydrate from localStorage so My Squad still shows
   // their trial team name + invite count. Trial state never grants a YOU
   // marker — that's strictly server-session gated inside TowerView.
@@ -115,6 +124,7 @@ export default function TowerPageClient(props: Props) {
         teammates={effective.teammates}
         inviter={props.inviter}
         onOpenSignup={!props.signedIn ? () => setSignupOpen(true) : undefined}
+        onLogout={props.signedIn ? handleLogout : undefined}
       />
 
       <LeaderboardModal

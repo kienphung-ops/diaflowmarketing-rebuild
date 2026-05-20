@@ -56,6 +56,9 @@ interface Props {
   publicVisible?: boolean
   /** Toggle handler — receives the new boolean to PATCH. */
   onTogglePublic?: (next: boolean) => void
+  /** Sign-out handler — POSTs /api/auth/logout, clears session cookie,
+   *  reloads to the home page. Only wired up for signed-in users. */
+  onLogout?: () => void
 }
 
 // NOTE: We used to hard-code `PUBLIC_BASE` at module load time using
@@ -91,6 +94,7 @@ export function MySquadDrawer({
   onVerifyEmail,
   publicVisible,
   onTogglePublic,
+  onLogout,
 }: Props) {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(teamName ?? '')
@@ -447,7 +451,24 @@ export function MySquadDrawer({
         inviteUrl={inviteUrl || null}
       />
 
-      <div className="border-t border-white/5 p-4 mt-auto">
+      <div className="border-t border-white/5 p-4 mt-auto space-y-2">
+        {/* Sign out — only for signed-in users (anonymous trial has no
+            session to clear). Posted via the parent handler so any
+            client-side cleanup (cache busts, toast, redirect) is
+            centralised in TowerLanding. */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-md bg-night-deep/60 border border-white/10 text-tower-cream/80 hover:border-red-400/40 hover:text-red-300 hover:bg-red-500/5 font-semibold text-sm transition"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign out
+          </button>
+        )}
         <a
           href={DISCORD_URL}
           target="_blank"
