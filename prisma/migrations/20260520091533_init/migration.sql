@@ -1,16 +1,33 @@
 -- CreateEnum
-CREATE TYPE "TokenType" AS ENUM ('MAGIC_LINK', 'OTP');
+CREATE TYPE "TokenType" AS ENUM ('MAGIC_LINK', 'OTP', 'EMAIL_VERIFY', 'PASSWORD_RESET');
+
+-- CreateTable
+CREATE TABLE "EmailCapture" (
+    "id" SERIAL NOT NULL,
+    "email" TEXT NOT NULL,
+    "source" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "EmailCapture_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "first_email" TEXT,
+    "passwordHash" TEXT,
     "emailVerified" TIMESTAMP(3),
     "ipAddress" TEXT,
+    "country" TEXT,
     "referralCode" TEXT NOT NULL,
     "referredByCode" TEXT,
+    "referredAt" TIMESTAMP(3),
     "totalInvites" INTEGER NOT NULL DEFAULT 0,
     "currentFloor" INTEGER NOT NULL DEFAULT 1,
+    "teamName" TEXT,
+    "teamPurpose" TEXT,
+    "publicVisible" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -60,8 +77,11 @@ CREATE TABLE "UnlockedItem" (
 CREATE TABLE "RecruitedTeammate" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
+    "slug" TEXT,
     "name" TEXT NOT NULL,
     "role" TEXT NOT NULL,
+    "pokes" INTEGER NOT NULL DEFAULT 0,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "RecruitedTeammate_pkey" PRIMARY KEY ("id")
@@ -93,6 +113,9 @@ CREATE UNIQUE INDEX "UnlockedItem_userId_itemKey_key" ON "UnlockedItem"("userId"
 
 -- CreateIndex
 CREATE INDEX "RecruitedTeammate_userId_idx" ON "RecruitedTeammate"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecruitedTeammate_userId_slug_key" ON "RecruitedTeammate"("userId", "slug");
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_referredByCode_fkey" FOREIGN KEY ("referredByCode") REFERENCES "User"("referralCode") ON DELETE SET NULL ON UPDATE CASCADE;

@@ -9,6 +9,7 @@ import {
 import { computeFloorForInvites, getFloorConfig } from '@/lib/floors'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { seedDefaultTeammates } from '@/lib/defaultTeammates'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const BCRYPT_ROUNDS = 10
 const MIN_PASSWORD_LEN = 6
@@ -51,6 +52,20 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Rate-limit by IP: 5 signups / hour. Stops spammers from
+    // creating dozens of accounts from a single machine while still
+    // letting a small office (NAT'd behind one IP) sign up normally.
+    const ip = getClientIp(req)
+    if (ip) {
+      const rl = await checkRateLimit({ key: `signup-ip:${ip}`, limit: 5, windowSec: 3600 })
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { error: 'Too many signups from this connection. Try again later.' },
+          { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+        )
+      }
+    }
+
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } })
     if (existing) {
       return NextResponse.json(
@@ -59,7 +74,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const ip = getClientIp(req)
     const country = getCountry(req)
     const referralCode = await ensureUniqueReferralCode()
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
