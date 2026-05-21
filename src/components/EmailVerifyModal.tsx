@@ -168,7 +168,7 @@ export function EmailVerifyModal({ open, onClose, email, onVerified }: Props) {
         </label>
 
         {devOtp && (
-          <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+          <div className="mt-3 rounded-md border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-[11px] text-purple-200">
             <div className="font-semibold mb-0.5">Dev preview</div>
             Code: <span className="font-mono tracking-widest">{devOtp}</span>
           </div>

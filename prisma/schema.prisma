@@ -11,6 +11,7 @@ model EmailCapture {
   email     String
   source    String
   createdAt DateTime @default(now())
+  @@map("email_captures")
 }
 
 model User {
@@ -19,6 +20,8 @@ model User {
   first_email      String?
   passwordHash     String?
   emailVerified    DateTime?
+  recommendedRole  String?
+  reason           String?
   ipAddress        String?
   country          String?
   referralCode     String               @unique
@@ -34,7 +37,12 @@ model User {
   referredBy       User?                @relation("UserReferrals", fields: [referredByCode], references: [referralCode])
   referrals        User[]               @relation("UserReferrals")
   totalInvites     Int                  @default(0)
+  // Current floor — FK into Floor.id. Column kept as `currentFloor` to
+  // avoid renaming ~50 references across the codebase. The `floor`
+  // relation gives access to invitesRequired / label / maxTeammates
+  // / item list via DB join instead of hardcoded constants.
   currentFloor     Int                  @default(1)
+  floor            Floor                @relation(fields: [currentFloor], references: [id])
   teamName         String?
   teamPurpose      String?
   // Floor sharing — when true, anyone hitting /floor/<referralCode>
@@ -42,13 +50,13 @@ model User {
   // false so floors are private until the user opts in.
   publicVisible    Boolean              @default(false)
   authTokens       AuthToken[]
-  unlockedItems    UnlockedItem[]
   inviteEvents     InviteEvent[]        @relation("InviterEvents")
   recruitedTeams   RecruitedTeammate[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
   @@index([referralCode])
+  @@map("users")
 }
 
 model AuthToken {
@@ -63,6 +71,7 @@ model AuthToken {
   createdAt DateTime  @default(now())
 
   @@index([userId, type])
+  @@map("auth_tokens")
 }
 
 enum TokenType {
@@ -85,17 +94,55 @@ model InviteEvent {
 
   @@index([inviterUserId])
   @@index([invitedEmail])
+  @@map("invite_events")
 }
 
-model UnlockedItem {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  itemKey    String
-  floor      Int
-  unlockedAt DateTime @default(now())
+// Floor — admin-editable config row. One per tower floor (id 1..20 in
+// the seed, but new floors can be added without schema changes).
+//
+// `invitesRequired` is the cumulative invite count needed to reach this
+// floor. `maxTeammates` is the cap shown in MySquadDrawer (includes the
+// 3 default NPCs). `items` is the set of items unlocked AT this floor;
+// a user on floor N has all items from floors 1..N (handled in the
+// query side, not stored per-user).
+model Floor {
+  id              Int          @id
+  invitesRequired Int
+  label           String
+  maxTeammates    Int
+  product_reward  String?
+  unlock_items   String?
+  items           FloorItem[]
+  users           User[]
+  @@map("floor")
+}
 
-  @@unique([userId, itemKey])
+// Item — the catalogue of decor items that can be placed on floors.
+// Keys (`company_picture_frame`, `floor_lamp`, ...) match the scene
+// renderer in src/components/scene/environment/FloorItems.tsx — do not
+// change them without updating the renderer.
+model Item {
+  id     Int         @id @default(autoincrement())
+  key    String      @unique
+  label  String
+  floors FloorItem[]
+  @@map("items")
+}
+
+// FloorItem — many-to-many between Floor and Item. A single floor can
+// have multiple items configured (admin tunable). When the user is on
+// floor N, the unlocked-item set is `FloorItem WHERE floorId <= N`.
+model FloorItem {
+  id       Int   @id @default(autoincrement())
+  floorId  Int
+  itemId   Int
+  quantity Int   @default(1)
+  floor    Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  item     Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([floorId, itemId])
+  @@index([floorId])
+  @@map("floor_items")
 }
 
 model RecruitedTeammate {
@@ -120,4 +167,5 @@ model RecruitedTeammate {
   // NULLs as distinct in a unique index).
   @@unique([userId, slug])
   @@index([userId])
+  @@map("recruited_teammates")
 }

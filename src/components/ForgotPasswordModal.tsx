@@ -138,9 +138,9 @@ export function ForgotPasswordModal({ open, defaultEmail, onClose }: Props) {
               we&apos;ve sent a reset link. Check your inbox.
             </div>
             {devUrl && (
-              <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+              <div className="mt-3 rounded-md border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-[11px] text-purple-200">
                 <div className="font-semibold mb-1">Dev preview link</div>
-                <a href={devUrl} className="underline break-all text-amber-100">
+                <a href={devUrl} className="underline break-all text-purple-100">
                   {devUrl}
                 </a>
               </div>

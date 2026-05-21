@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { FLOOR_CONFIG, getFloorConfig, getMaxTeammates } from '@/lib/floors'
+import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
 
 interface Props {
   floor: number
@@ -67,7 +67,7 @@ function ConfettiLayer() {
 function UnlockIcon() {
   return (
     <div className="mx-auto w-20 h-20 rounded-xl bg-gradient-to-br from-tower-gold/30 to-purple-500/20 flex items-center justify-center shadow-inner">
-      <div className="w-12 h-12 rounded-md bg-gradient-to-br from-amber-700 to-amber-900 shadow-lg" />
+      <div className="w-12 h-12 rounded-md bg-gradient-to-br from-purple-700 to-purple-900 shadow-lg" />
     </div>
   )
 }
@@ -81,11 +81,13 @@ export function CelebrationModal({
   onOpenSignup,
   onOpenSquad,
 }: Props) {
-  const current = getFloorConfig(floor)
-  const next = getFloorConfig(floor + 1)
+  // Live config from /api/floors. `useFloor` returns the static fallback
+  // until the API responds, so values render synchronously on first paint.
+  const current = useFloor(floor)
+  const next = useFloor(floor + 1)
   const invitesToNext = next ? Math.max(0, next.invitesRequired - totalInvites) : 0
-  const maxFloor = FLOOR_CONFIG.length
-  const teammateSlots = getMaxTeammates(floor)
+  const maxFloor = useFloorCount()
+  const teammateSlots = current?.maxTeammates ?? 4
   const rank = Math.max(1, 500 - totalInvites * 7)
 
   useEffect(() => {
@@ -156,7 +158,7 @@ export function CelebrationModal({
               <div className="text-2xl shrink-0">📦</div>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-wider text-tower-cream/50">
-                  Next up — Floor {next.floor}
+                  Next up — Floor {next.id}
                 </div>
                 <div className="text-sm truncate">
                   <span className="text-tower-gold font-semibold">{invitesToNext}</span> more{' '}
@@ -189,7 +191,7 @@ export function CelebrationModal({
                 }}
                 className="w-full px-4 py-3 rounded-md bg-tower-gold text-night-deep font-semibold text-sm hover:bg-tower-gold/90 transition"
               >
-                Share &amp; climb to floor {next.floor} →
+                Share &amp; climb to floor {next.id} →
               </button>
             ) : (
               <button

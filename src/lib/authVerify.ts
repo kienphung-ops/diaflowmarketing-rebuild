@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { computeFloorForInvites, getFloorConfig } from '@/lib/floors'
+import { computeFloorForInvites } from '@/lib/floors'
 import { hashOtpForEmail, hashToken } from '@/lib/auth'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import type { TokenType } from '@prisma/client'
@@ -47,20 +47,10 @@ async function processReferralIfAny(userId: string, email: string): Promise<void
       where: { id: inviter.id },
       data: { totalInvites: newTotal, currentFloor: newFloor },
     })
-    if (newFloor > inviter.currentFloor) {
-      for (let f = inviter.currentFloor + 1; f <= newFloor; f++) {
-        const cfg = getFloorConfig(f)
-        if (!cfg) continue
-        await tx.unlockedItem.upsert({
-          where: { userId_itemKey: { userId: inviter.id, itemKey: cfg.unlockKey } },
-          create: { userId: inviter.id, itemKey: cfg.unlockKey, floor: f },
-          update: {},
-        })
-      }
-    }
-    // Teammates are user-managed via the bulk-add modal — no auto-recruit
-    // row on invite verify. Slots open up automatically based on
-    // FLOOR_MAX_TEAMMATES; the user chooses who to fill them with.
+    // No per-user item rows anymore — items cascade from FloorItem
+    // automatically when `currentFloor` changes. Teammates are also
+    // user-managed via the bulk-add modal (slots open up based on
+    // Floor.maxTeammates).
   })
 
   // Inviter's totalInvites just went up — invalidate cached top50 +
@@ -98,20 +88,12 @@ export async function consumeAuthToken(rawToken: string, type: TokenType, emailH
       where: { id: token.user.id },
       data: { emailVerified: new Date() },
     })
-    await ensureBaseUnlock(token.user.id)
+    // Floor-1 base unlock used to seed an UnlockedItem row here. Items
+    // are now derived from FloorItem, so this is implicit — every user
+    // is on floor ≥ 1 by default and sees floor-1 items automatically.
   }
 
   await processReferralIfAny(token.user.id, token.user.email)
 
   return { userId: token.user.id, email: token.user.email }
-}
-
-async function ensureBaseUnlock(userId: string): Promise<void> {
-  const cfg = getFloorConfig(1)
-  if (!cfg) return
-  await prisma.unlockedItem.upsert({
-    where: { userId_itemKey: { userId, itemKey: cfg.unlockKey } },
-    create: { userId, itemKey: cfg.unlockKey, floor: 1 },
-    update: {},
-  })
 }

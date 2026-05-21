@@ -12,7 +12,6 @@ interface Props {
   maxTeammates: number
   slotsAvailable: number
   showTower: boolean
-  onSimulateInvite?: () => void
   onOpenSignup?: () => void
   onToggleTower?: () => void
   onAddTeammates?: () => void
@@ -27,7 +26,6 @@ export function Header({
   maxTeammates,
   slotsAvailable,
   showTower,
-  onSimulateInvite,
   onOpenSignup,
   onToggleTower,
   onAddTeammates,
@@ -84,32 +82,27 @@ export function Header({
           </button>
         )}
 
-        {/* Try inviting — desktop only; mobile uses bottom bar */}
-        {onSimulateInvite && (
-          <button
-            onClick={onSimulateInvite}
-            className="hidden md:inline-flex px-3 py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-xs tracking-wide hover:bg-night-mid transition"
-          >
-            + Try inviting
-          </button>
-        )}
-
-        {/* Auth CTA — always visible; primary action on mobile */}
+        {/* Auth CTA — always visible; primary action on mobile.
+            "Claim your team" frames the upsell as locking in the
+            trial progress under a real account. The same label is
+            used whether the click opens the inline signup modal
+            (anonymous home) or routes to /login (any other unlogged
+            page) — same intent, single message. */}
         {signedIn && referralCode ? (
           <ReferralCopyButton code={referralCode} />
         ) : onOpenSignup ? (
           <button
             onClick={onOpenSignup}
-            className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[11px] md:text-xs tracking-wide hover:bg-tower-gold transition"
+            className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[11px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
           >
-            Sign up
+            🔒 Claim your team
           </button>
         ) : (
           <Link
             href="/login"
-            className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[11px] md:text-xs tracking-wide hover:bg-tower-gold transition"
+            className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[11px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
           >
-            Sign in
+            🔒 Claim your team
           </Link>
         )}
       </div>

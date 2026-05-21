@@ -196,7 +196,7 @@ function LeaderboardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolea
         </div>
       </div>
       <div className="text-right shrink-0">
-        <div className="text-sm font-bold text-amber-300">
+        <div className="text-sm font-bold text-purple-300">
           {entry.totalInvites}
         </div>
         <div className="text-[9px] uppercase tracking-wider text-tower-cream/40">

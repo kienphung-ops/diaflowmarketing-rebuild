@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { CelebrationModal } from '@/components/CelebrationModal'
 import { SignupModal } from '@/components/SignupModal'
-import { IrisBubble, MiaBubble, LeoBubble } from '@/components/OnboardingBubble'
+import {
+  IrisBubble,
+  MiaBubble,
+  MiaInfoBubble,
+  LeoBubble,
+} from '@/components/OnboardingBubble'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
 import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { MiaInfoCard } from '@/components/MiaInfoCard'
@@ -17,9 +22,14 @@ import { MobileBottomBar } from '@/components/MobileBottomBar'
 import { EmailVerifyModal } from '@/components/EmailVerifyModal'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
 import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
-import { getMaxTeammates, getRecruitSlotsAvailable, DEFAULT_NPC_COUNT } from '@/lib/floors'
+import { useFloorPresence } from '@/hooks/useFloorPresence'
 import {
-  advanceTrialInvites,
+  computeTeammateCount,
+  filterCustomTeammates,
+  DEFAULT_NPC_COUNT,
+} from '@/lib/floors'
+import { useMaxTeammates } from '@/lib/floorsConfigClient'
+import {
   defaultTrialState,
   nextOnboardingStep,
   readTrialState,
@@ -58,6 +68,13 @@ interface Props {
   emailVerified: boolean
   userEmail: string | null
   publicVisible: boolean
+  /** Diaflow-derived role recommendation for `serverTeamPurpose`. Null
+   *  when the user pre-dates this feature OR signed up via a flow that
+   *  skipped the Mia step — the client backfills via /api/job-summary
+   *  in that case so MySquad / future onboarding shows the role. */
+  serverRecommendedRole: string | null
+  /** Reason string that pairs with `serverRecommendedRole`. */
+  serverReason: string | null
 }
 
 export default function TowerLanding(props: Props) {
@@ -188,36 +205,105 @@ export default function TowerLanding(props: Props) {
     }
   }, [isTrial])
 
-  // Celebration on trial floor increase.
+  // Signed-in backfill — when the user has a `teamPurpose` (job text)
+  // on file but no Diaflow-derived `recommendedRole` / `reason`, fire
+  // a single /api/job-summary call so subsequent loads have the
+  // personalised values. Covers legacy accounts that pre-date this
+  // feature and any signup path that skipped Mia onboarding.
+  // Fires once per page mount, gated on the signed-in flag.
   useEffect(() => {
+    if (!props.signedIn) return
+    if (!props.serverTeamPurpose) return
+    if (props.serverRecommendedRole && props.serverReason) return
+    const ac = new AbortController()
+    fetch('/api/job-summary', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ job: props.serverTeamPurpose }),
+      signal: ac.signal,
+    }).catch(err => {
+      // Silent — the backfill is best-effort. Next mount will retry.
+      if ((err as Error).name !== 'AbortError') {
+        /* swallow */
+      }
+    })
+    return () => ac.abort()
+  }, [props.signedIn, props.serverTeamPurpose, props.serverRecommendedRole, props.serverReason])
+
+  // Floor-up celebration — SIGNED-IN ONLY. Trial / anonymous users
+  // never see the upgrade modal; the bar to viewing the celebration is
+  // an authenticated session (the only way `props.signedIn` is true is
+  // a valid signed JWT cookie verified server-side in page.tsx via
+  // readSession). The internal trial counter still advances so the
+  // scene reflects their progress, but no modal fires.
+  useEffect(() => {
+    if (!props.signedIn) {
+      prevTrialFloorRef.current = trial.currentFloor
+      return
+    }
     if (trial.currentFloor > prevTrialFloorRef.current) {
       setCelebrationFloorsClimbed(trial.currentFloor - prevTrialFloorRef.current)
       setCelebrationFloor(trial.currentFloor)
     }
     prevTrialFloorRef.current = trial.currentFloor
-  }, [trial.currentFloor])
+  }, [trial.currentFloor, props.signedIn])
 
-  // Show the current-floor popup once on initial page load (mỗi lần reload).
+  // Initial-load celebration — also gated behind signed-in. Anonymous
+  // visitors land on the page with no modal flashing on top of the
+  // scene; they only see it after authenticating.
   useEffect(() => {
-    const initialFloor = isTrial ? trial.currentFloor : serverState.currentFloor
+    if (!props.signedIn) return
     setCelebrationFloorsClimbed(0)
-    setCelebrationFloor(initialFloor)
-    // Run only on mount — subsequent floor changes are handled by the
-    // increase-detection effects above.
+    setCelebrationFloor(serverState.currentFloor)
+    // Run only on mount (for signed-in users) — subsequent floor
+    // changes are handled by the increase-detection effects above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Real-time updates via SSE: signed-in users get notifications pushed
   // from the server when invites verify in the background.
+  //
+  // Vercel caps streaming responses at 25s on hobby/pro plans, so
+  // every ~25s the SSE function exits and EventSource auto-reconnects.
+  // The new connection's *snapshot* shows the current DB state — if
+  // the user's floor went up between disconnect and reconnect, the
+  // `floor-up` event was lost. We compensate by also diffing the
+  // snapshot against existing client state: any positive delta is
+  // treated as a floor-up / invite-accepted that we missed.
   useRealtimeFloor({
     enabled: !isTrial,
     onSnapshot: data => {
-      setServerState(prev => ({
-        ...prev,
-        currentFloor: data.currentFloor,
-        totalInvites: data.totalInvites,
-        unlockedItemKeys: data.unlockedItemKeys,
-      }))
+      setServerState(prev => {
+        const floorClimbed = data.currentFloor - prev.currentFloor
+        const invitesDelta = data.totalInvites - prev.totalInvites
+
+        // Floor went up while the client was reconnecting — fire the
+        // same celebration the live `floor-up` event would have.
+        if (floorClimbed > 0) {
+          setCelebrationFloorsClimbed(floorClimbed)
+          setCelebrationFloor(data.currentFloor)
+        }
+        // Invites bumped while reconnecting — fire the toast the live
+        // `invite-accepted` event would have. The `prev.totalInvites > 0
+        // || data.totalInvites > 0` gate is unnecessary; if the deltas
+        // is 0 we skip anyway.
+        if (invitesDelta > 0) {
+          pushToast({
+            title:
+              invitesDelta === 1
+                ? '+1 invite accepted'
+                : `+${invitesDelta} invites accepted`,
+            body: 'A new teammate slot is waiting — add them to your squad.',
+            tone: 'success',
+          })
+        }
+        return {
+          ...prev,
+          currentFloor: data.currentFloor,
+          totalInvites: data.totalInvites,
+          unlockedItemKeys: data.unlockedItemKeys,
+        }
+      })
     },
     onFloorUp: data => {
       setServerState(prev => {
@@ -276,13 +362,80 @@ export default function TowerLanding(props: Props) {
     },
     [trial]
   )
+  // X-close on Iris modal — advance without a team name. `trial.teamName`
+  // stays null and MiaBubble will fall back to "Your team".
+  const handleIrisSkip = useCallback(() => {
+    persist({ ...trial, onboardingStep: nextOnboardingStep('iris') })
+  }, [trial])
+
+  // True from the moment Mia's job submit fires until the Diaflow
+  // upstream returns (or fails). Drives the "Hang on…" hint inside
+  // MiaInfoBubble so the user knows we're personalising rather than
+  // serving the default copy.
+  const [jobSummaryLoading, setJobSummaryLoading] = useState(false)
 
   const handleMiaSubmit = useCallback(
-    (teamPurpose: string) => {
-      persist({ ...trial, teamPurpose, onboardingStep: nextOnboardingStep('mia') })
+    async (jobRole: string) => {
+      // Advance the onboarding step immediately so the mia-info modal
+      // can render — with the default copy at first, then re-render
+      // with the personalised role/reason as soon as the API returns.
+      const advanced: TrialState = {
+        ...trial,
+        teamPurpose: jobRole,
+        // Reset any prior recommendation — a new job means the old
+        // role+reason no longer applies. Re-fetched below.
+        recommendedRole: null,
+        reason: null,
+        onboardingStep: nextOnboardingStep('mia'),
+      }
+      persist(advanced)
+
+      // Kick off Diaflow process+poll API. The route handles the
+      // upstream (with a 25 s timeout) so this single fetch is the
+      // entire integration from the client's side. Signed-in users
+      // also get the result persisted into `User.recommendedRole` /
+      // `User.reason` by the route handler.
+      setJobSummaryLoading(true)
+      try {
+        const r = await fetch('/api/job-summary', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ job: jobRole }),
+        })
+        const data = (await r.json().catch(() => ({}))) as {
+          success?: boolean
+          recommendedRole?: string
+          reason?: string
+        }
+        if (data.success && data.recommendedRole && data.reason) {
+          // Merge into the latest trial state — read fresh from
+          // storage so we don't clobber state that changed during
+          // the API call (e.g. user advanced to leo / done).
+          const latest = readTrialState() ?? advanced
+          persist({
+            ...latest,
+            recommendedRole: data.recommendedRole,
+            reason: data.reason,
+          })
+        }
+      } catch {
+        // Network failure — modal falls back to default copy. The
+        // signed-in backfill effect below retries on next mount.
+      } finally {
+        setJobSummaryLoading(false)
+      }
     },
     [trial]
   )
+  const handleMiaSkip = useCallback(() => {
+    persist({ ...trial, onboardingStep: nextOnboardingStep('mia') })
+  }, [trial])
+
+  // Mia's intro card has no input — clicking "Meet your next teammate"
+  // (or the X close) advances to Leo. Same handler for both.
+  const handleMiaInfoNext = useCallback(() => {
+    persist({ ...trial, onboardingStep: nextOnboardingStep('mia-info') })
+  }, [trial])
 
   const handleLeoSubmit = useCallback(
     (email: string) => {
@@ -293,18 +446,6 @@ export default function TowerLanding(props: Props) {
   const handleLeoSkip = useCallback(() => {
     persist({ ...trial, onboardingStep: 'done' })
   }, [trial])
-
-  function handleSimulateInvite() {
-    if (!isTrial) return
-    setTrial(prev => {
-      const next = advanceTrialInvites(prev)
-      saveTrialState(next)
-      return next
-    })
-    // No auto-recruit. Invite count goes up + floor unlocks new slot;
-    // user fills the slot manually via BulkAddTeammatesModal (auto-opens
-    // when celebration modal closes if slotsAvailable > 0).
-  }
 
   function handleTeammateUpdate(id: string, patch: { name?: string; role?: string }) {
     setRecruits(prev =>
@@ -422,15 +563,58 @@ export default function TowerLanding(props: Props) {
 
   const activeStep = isTrial ? trial.onboardingStep : 'done'
   const onboardingComplete = activeStep === 'done'
+
+  // ─── Onboarding modal sequencing ─────────────────────────────────
+  // Each step transition reveals (or keeps) a character on the floor.
+  // We delay the modal so the character has time to land — without
+  // this, the modal pops up the same frame the character mounts and
+  // the "Hi, I'm Iris" anchor isn't visible yet.
+  //
+  //   iris        → new character (Iris)        → 1200 ms reveal
+  //   mia         → new character (Mia)         → 1200 ms reveal
+  //   mia-info    → SAME character (Mia)        →  200 ms reveal
+  //   leo         → new character (Leo)         → 1200 ms reveal
+  const [onboardingModalVisible, setOnboardingModalVisible] = useState(false)
+  useEffect(() => {
+    if (!isTrial || activeStep === 'done') {
+      setOnboardingModalVisible(false)
+      return
+    }
+    setOnboardingModalVisible(false)
+    const isSameCharacter = activeStep === 'mia-info'
+    const delay = isSameCharacter ? 200 : 1200
+    const t = setTimeout(() => setOnboardingModalVisible(true), delay)
+    return () => clearTimeout(t)
+  }, [activeStep, isTrial])
   const emailCaptured = !!(isTrial ? trial.email : null)
   // The 3 default NPCs (Iris/Mia/Leo) now live in the same recruits
   // array as user-added teammates (DB-backed, with pokes). Split them
   // so the OfficeScene + slot math only treat user-recruited rows as
   // "recruited" — defaults are still rendered via characters.config
   // visuals.
-  const customRecruits = recruits.filter(r => !r.isDefault)
-  const slotsAvailable = getRecruitSlotsAvailable(effective.currentFloor, customRecruits.length)
-  const maxTeammates = getMaxTeammates(effective.currentFloor)
+  // Shared helpers — see lib/floors.ts. `customRecruits` excludes the
+  // 3 default NPCs from the DB-backed list so OfficeScene doesn't
+  // double-render them (Iris/Mia/Leo are already drawn from
+  // CHARACTERS config visuals).
+  const customRecruits = filterCustomTeammates(recruits)
+  // Live max-teammates from /api/floors. The "slots available" math is
+  // inlined here (used to live in lib/floors → getRecruitSlotsAvailable)
+  // so we read straight off the API data without a sync fallback wrapper.
+  const maxTeammates = useMaxTeammates(effective.currentFloor)
+  const slotsAvailable = Math.max(0, maxTeammates - DEFAULT_NPC_COUNT - customRecruits.length)
+
+  // ─── Owner's own floor stats — feed the MySquad "Your floor" pill.
+  // `observe` mode polls /api/floor/[code]/visitors WITHOUT registering
+  // the owner as a visitor of themselves, so they get a clean count
+  // of guests currently on their floor. Total pokes is just a sum of
+  // pokes across teammates the server already includes in `recruits`.
+  // Anonymous / trial users have no referralCode → useFloorPresence
+  // returns 0; we suppress the pill entirely in that case.
+  const ownerViewerCount = useFloorPresence({
+    code: props.signedIn ? props.referralCode : null,
+    mode: 'observe',
+  })
+  const ownerTotalPokes = recruits.reduce((sum, t) => sum + (t.pokes ?? 0), 0)
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -439,13 +623,12 @@ export default function TowerLanding(props: Props) {
         currentFloor={effective.currentFloor}
         totalInvites={effective.totalInvites}
         referralCode={props.referralCode}
-        onSimulateInvite={isTrial && onboardingComplete ? handleSimulateInvite : undefined}
         onOpenSignup={isTrial ? () => setShowSignupModal(true) : undefined}
         // Tower view is now a dedicated route — see /tower. Button navigates
         // there instead of toggling an overlay.
         showTower={false}
         onToggleTower={onboardingComplete ? () => router.push('/tower') : undefined}
-        teammateCount={DEFAULT_NPC_COUNT + customRecruits.length}
+        teammateCount={computeTeammateCount(recruits)}
         maxTeammates={maxTeammates}
         slotsAvailable={slotsAvailable}
         onAddTeammates={onboardingComplete && slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
@@ -478,20 +661,31 @@ export default function TowerLanding(props: Props) {
           onOpenSquad={() => setSquadOpen(true)}
           onAddTeammates={slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
           onToggleTower={() => router.push('/tower')}
-          onSimulateInvite={isTrial ? handleSimulateInvite : undefined}
         />
       )}
 
-      {isTrial && activeStep !== 'done' && (
-        <div className="fixed inset-0 z-20 flex items-end justify-center pb-20 pointer-events-none">
-          <div className="pointer-events-auto">
-            {activeStep === 'iris' && <IrisBubble onSubmit={handleIrisSubmit} />}
-            {activeStep === 'mia' && (
-              <MiaBubble companyName={trial.teamName ?? 'Your team'} onSubmit={handleMiaSubmit} />
-            )}
-            {activeStep === 'leo' && <LeoBubble onSubmit={handleLeoSubmit} onSkip={handleLeoSkip} />}
-          </div>
-        </div>
+      {/* Onboarding modals — only render once the per-step delay has
+          elapsed (see `onboardingModalVisible` effect above) so the
+          newly-mounted character has a moment to land on the floor
+          before the modal anchors over it. The modals are full-screen
+          centered cards (ModalShell), NOT bottom-anchored bubbles, so
+          the previous `flex items-end` wrapper is gone. */}
+      {isTrial && onboardingModalVisible && activeStep === 'iris' && (
+        <IrisBubble onSubmit={handleIrisSubmit} onSkip={handleIrisSkip} />
+      )}
+      {isTrial && onboardingModalVisible && activeStep === 'mia' && (
+        <MiaBubble onSubmit={handleMiaSubmit} onSkip={handleMiaSkip} />
+      )}
+      {isTrial && onboardingModalVisible && activeStep === 'mia-info' && (
+        <MiaInfoBubble
+          recommendedRole={trial.recommendedRole}
+          reason={trial.reason}
+          loading={jobSummaryLoading}
+          onNext={handleMiaInfoNext}
+        />
+      )}
+      {isTrial && onboardingModalVisible && activeStep === 'leo' && (
+        <LeoBubble onSubmit={handleLeoSubmit} onSkip={handleLeoSkip} />
       )}
 
       <MySquadDrawer
@@ -509,6 +703,18 @@ export default function TowerLanding(props: Props) {
         onOpenSignup={() => setShowSignupModal(true)}
         inviter={props.inviter}
         onResetAllPositions={handleResetAllPositions}
+        // Owner-side floor stats — only meaningful once they have a
+        // referralCode (i.e., signed-in). `ownerName: null` triggers
+        // the drawer's "Your floor" header instead of "Visiting <x>".
+        visiting={
+          props.signedIn && props.referralCode
+            ? {
+                ownerName: null,
+                viewerCount: ownerViewerCount,
+                totalPokes: ownerTotalPokes,
+              }
+            : undefined
+        }
         rank={rank}
         emailVerified={props.signedIn ? emailVerified : undefined}
         userEmail={props.userEmail}
@@ -529,7 +735,19 @@ export default function TowerLanding(props: Props) {
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
-      <MiaInfoCard open={activeNpcModal === 'mia'} onClose={() => setActiveNpcModal(null)} />
+      {/* MiaInfoCard re-uses the Diaflow recommendation so clicking
+          Mia anywhere in the office surfaces the same assistant-match
+          copy collected during onboarding. Signed-in users read from
+          the server-fetched User columns; trial users read from the
+          live trial state (populated by /api/job-summary). */}
+      <MiaInfoCard
+        open={activeNpcModal === 'mia'}
+        onClose={() => setActiveNpcModal(null)}
+        recommendedRole={
+          props.signedIn ? props.serverRecommendedRole : trial.recommendedRole
+        }
+        reason={props.signedIn ? props.serverReason : trial.reason}
+      />
 
       <LeoEmailDrawer
         open={activeNpcModal === 'leo'}
@@ -540,7 +758,12 @@ export default function TowerLanding(props: Props) {
         }}
       />
 
-      {celebrationFloor != null && (
+      {/* Floor-upgrade celebration — never rendered for anonymous
+          visitors, regardless of any stale `celebrationFloor` state.
+          `props.signedIn` is true only when the server-side session
+          JWT validates inside page.tsx → readSession(), so this also
+          enforces the "valid token" gate the product requires. */}
+      {props.signedIn && celebrationFloor != null && (
         <CelebrationModal
           floor={celebrationFloor}
           totalInvites={effective.totalInvites}
@@ -551,7 +774,9 @@ export default function TowerLanding(props: Props) {
             // After celebrating an actual level-up (not the initial-load
             // recap), prompt to fill any new teammate slots.
             if (celebrationFloorsClimbed > 0) {
-              const nextSlots = getRecruitSlotsAvailable(effective.currentFloor, recruits.length)
+              // Same slot math as the per-render `slotsAvailable` above —
+              // post-climb we re-check against the new floor's cap.
+              const nextSlots = Math.max(0, maxTeammates - DEFAULT_NPC_COUNT - recruits.length)
               if (nextSlots > 0) setBulkAddOpen(true)
             }
           }}

@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { getFloorConfig } from '@/lib/floors'
+import { useFloor } from '@/lib/floorsConfigClient'
 
 interface TowerViewProps {
   /** Whether the visitor has a valid session. Drives YOU marker visibility. */
@@ -73,7 +73,9 @@ export function TowerView({
   onSignIn,
 }: TowerViewProps) {
   const marker = useMemo(() => floorToMarker(currentFloor), [currentFloor])
-  const cfg = getFloorConfig(currentFloor)
+  // Live floor config from /api/floors (cached). Falls back to static
+  // FLOOR_CONFIG until the API responds.
+  const cfg = useFloor(currentFloor)
   const floorLabel = cfg?.label ?? `Floor ${currentFloor}`
 
   // Lock body scroll while overlay is open.
@@ -179,7 +181,7 @@ export function TowerView({
               {teamName}
             </div>
           )}
-          <div className="text-xs md:text-xl font-bold text-amber-300 leading-tight">
+          <div className="text-xs md:text-xl font-bold text-purple-300 leading-tight">
             {floorLabel}
           </div>
           <div className="text-[10px] md:text-[11px] text-white/70 mt-0.5">
@@ -195,13 +197,13 @@ export function TowerView({
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
         >
           <div className="text-[11px] md:text-sm text-white/85 mb-1.5 md:mb-2">
-            Sign in to see your floor
+            🔒 Claim your team
           </div>
           <button
             onClick={onSignIn}
-            className="px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-amber-300 text-[#1a1a2e] font-semibold text-[11px] md:text-xs tracking-wide hover:bg-amber-200 transition"
+            className="px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-purple-300 text-[#1a1a2e] font-semibold text-[11px] md:text-xs tracking-wide hover:bg-purple-200 transition"
           >
-            Sign in
+            Go To Your Team
           </button>
         </div>
       )}
@@ -333,7 +335,7 @@ function FloorClickStrips() {
                 boxShadow: 'inset 0 0 0 1px rgba(251,191,36,0.4)',
               }}
             />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition px-2 py-0.5 rounded-md bg-amber-300 text-[#1a1a2e] text-[10px] font-bold tracking-wide pointer-events-none">
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition px-2 py-0.5 rounded-md bg-purple-300 text-[#1a1a2e] text-[10px] font-bold tracking-wide pointer-events-none">
               View F{floor} →
             </span>
           </button>

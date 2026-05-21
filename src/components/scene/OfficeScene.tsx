@@ -12,17 +12,24 @@ import { Floor } from './environment/Floor'
 import { Walls } from './environment/Walls'
 import { FloorItems } from './environment/FloorItems'
 import { Lighting } from './environment/Lighting'
-import { Desk } from './furniture/Desk'
 import { Character } from './characters/Character'
 import { CHARACTERS, EMPTY_DESK_POSITION } from './characters/characters.config'
 import type { CharacterConfig } from '@/types/scene'
+// `Desk` was the per-character desk renderer (3 hard-coded for Iris/
+// Mia/Leo + 1 empty). Desk count is now DB-driven via FloorItems'
+// `basic_chair_desk × quantity` rendering, so the per-character desk
+// system was retired to avoid double-rendering.
 
 export interface RecruitedCharacter {
   name: string
   role: string
 }
 
-export type OnboardingStep = 'iris' | 'mia' | 'leo' | 'done'
+// Keep in sync with `src/lib/trial.ts → OnboardingStep`. The two
+// modules can't share the same type without dragging trial.ts into
+// the scene chain, so both copies must include 'mia-info'. `showMia`
+// covers mia, mia-info, leo, done; `showLeo` only covers leo + done.
+export type OnboardingStep = 'iris' | 'mia' | 'mia-info' | 'leo' | 'done'
 
 interface Props {
   onboardingStep: OnboardingStep
@@ -149,8 +156,10 @@ export function OfficeScene({
   readonly = false,
   onTeammatePoke,
 }: Props) {
-  const unlockedSet = new Set(unlockedItemKeys)
-  const showDesks = unlockedSet.has('basic_chair_desk')
+  // `unlockedItemKeys` is no longer consumed here — FloorItems reads
+  // its config straight from /api/floors via useFloorItems. Kept on
+  // the Props interface so callers don't need touching.
+  void unlockedItemKeys
   const [dragging, setDragging] = useState<string | null>(null)
   const [pokeSignals, setPokeSignals] = useState<Record<string, number>>({})
   const [positions, setPositions] = useState<Record<string, [number, number, number]>>(() => {
@@ -341,13 +350,11 @@ export function OfficeScene({
             <Walls companyName={companyName ?? undefined} currentFloor={currentFloor} />
             <FloorItems currentFloor={currentFloor} />
 
-            {!isOnboarding && showDesks && <Desk position={EMPTY_DESK_POSITION} chairColor="#1a1a2e" />}
-
+            {/* Desks come from FloorItems' basic_chair_desk × quantity now —
+                no per-character Desk render here. Characters stand
+                independently at their `char.position`. */}
             {visibleDeskChars.map(char => (
               <group key={char.slug}>
-                {showDesks && (
-                  <Desk position={char.deskPosition} character={char.slug} chairColor="#1a1a2e" />
-                )}
                 <Character
                   config={char}
                   onSelect={handleSelect}

@@ -1,18 +1,15 @@
 /**
  * POST /api/poke/[id]
  *
- * Increment the poke counter for a teammate. Open to anonymous
- * callers — anyone visiting a shared public floor can poke. We just
- * gate by the teammate's owner being `publicVisible=true` (or the
- * poker being the owner themselves).
- *
- * Returns the new total so the client can echo it back immediately
- * without waiting for the next poll.
+ * Increment the poke counter for a teammate. Open to all callers —
+ * once invite + share URLs were unified, every /floor/<code> page is
+ * reachable, so the poke endpoint follows suit. Returns the new
+ * total so the client can echo it back immediately without waiting
+ * for the next poll.
  */
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { readSession } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
@@ -22,21 +19,13 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   const teammate = await prisma.recruitedTeammate.findUnique({
     where: { id },
-    select: {
-      id: true,
-      userId: true,
-      user: { select: { publicVisible: true } },
-    },
+    select: { id: true, userId: true },
   })
   if (!teammate) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Permission: either the floor owner is poking (their own scene) OR
-  // the floor is public.
-  const session = await readSession()
-  const isOwner = session?.userId === teammate.userId
-  if (!isOwner && !teammate.user.publicVisible) {
-    return NextResponse.json({ error: 'This floor is private' }, { status: 403 })
-  }
+  // Privacy gate dropped — every /floor/<code> URL is reachable now
+  // that invite + share are the same link. The owner can also poke
+  // their own teammates (just for the visual reaction).
 
   const updated = await prisma.recruitedTeammate.update({
     where: { id },

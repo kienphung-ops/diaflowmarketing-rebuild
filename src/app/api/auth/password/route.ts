@@ -6,7 +6,7 @@ import {
   createSessionJwt,
   generateReferralCode,
 } from '@/lib/auth'
-import { getFloorConfig, computeFloorForInvites } from '@/lib/floors'
+import { computeFloorForInvites } from '@/lib/floors'
 
 const BCRYPT_ROUNDS = 10
 const MIN_PASSWORD_LEN = 6
@@ -108,15 +108,9 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Seed Floor-1 base unlock.
-    const baseCfg = getFloorConfig(1)
-    if (baseCfg) {
-      await prisma.unlockedItem.upsert({
-        where: { userId_itemKey: { userId: user.id, itemKey: baseCfg.unlockKey } },
-        create: { userId: user.id, itemKey: baseCfg.unlockKey, floor: 1 },
-        update: {},
-      })
-    }
+    // Floor-1 items are implicit (every user defaults to currentFloor=1
+    // and items are derived from FloorItem at read time). No per-user
+    // row needed.
 
     // Credit the inviter for this new sign-up (mirrors authVerify.processReferralIfAny).
     if (inviterId && inviterId !== user.id) {
@@ -142,17 +136,8 @@ export async function POST(req: NextRequest) {
             where: { id: inviter.id },
             data: { totalInvites: newTotal, currentFloor: newFloor },
           })
-          if (newFloor > inviter.currentFloor) {
-            for (let f = inviter.currentFloor + 1; f <= newFloor; f++) {
-              const cfg = getFloorConfig(f)
-              if (!cfg) continue
-              await tx.unlockedItem.upsert({
-                where: { userId_itemKey: { userId: inviter.id, itemKey: cfg.unlockKey } },
-                create: { userId: inviter.id, itemKey: cfg.unlockKey, floor: f },
-                update: {},
-              })
-            }
-          }
+          // Items cascade automatically via FloorItem when currentFloor
+          // changes; nothing else to write here.
           const teammateCount = await tx.recruitedTeammate.count({ where: { userId: inviter.id } })
           await tx.recruitedTeammate.create({
             data: {

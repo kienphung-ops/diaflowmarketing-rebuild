@@ -7,13 +7,12 @@ interface Props {
   onOpenSquad: () => void
   onAddTeammates?: () => void
   onToggleTower?: () => void
-  onSimulateInvite?: () => void
 }
 
 /**
  * Mobile-only sticky bottom bar. Carries the actions that desktop puts
- * in the header (Try inviting, Tower toggle, Add teammates) + the
- * primary "My Squad" entry. Hidden on md+ screens.
+ * in the header (Tower toggle, Add teammates) + the primary "My Squad"
+ * entry. Hidden on md+ screens.
  */
 export function MobileBottomBar({
   slotsAvailable,
@@ -21,14 +20,10 @@ export function MobileBottomBar({
   onOpenSquad,
   onAddTeammates,
   onToggleTower,
-  onSimulateInvite,
 }: Props) {
   return (
     <div className="md:hidden fixed bottom-0 inset-x-0 z-20 pointer-events-none">
       <div className="pointer-events-auto bg-night-mid/95 border-t border-white/10 backdrop-blur-md px-3 py-2 flex items-stretch gap-1.5 safe-bottom">
-        {onSimulateInvite && (
-          <BarButton onClick={onSimulateInvite} label="Invite" icon="✉️" />
-        )}
         {onAddTeammates && slotsAvailable > 0 && (
           <BarButton onClick={onAddTeammates} label="Add" badge={slotsAvailable} pulse icon="＋" />
         )}

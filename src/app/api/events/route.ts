@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/auth'
+import { getUnlockedItemsForFloor } from '@/lib/floorsDb'
 
 // Edge runtime would have a longer max duration on Pro plans, but Prisma
 // data-proxy isn't required here — we keep node runtime for the existing
@@ -43,16 +44,16 @@ export async function GET(req: NextRequest) {
           select: {
             currentFloor: true,
             totalInvites: true,
-            unlockedItems: { select: { itemKey: true } },
           },
         })
         if (u) {
           lastFloor = u.currentFloor
           lastInvites = u.totalInvites
+          const unlocked = await getUnlockedItemsForFloor(u.currentFloor)
           send('snapshot', {
             currentFloor: u.currentFloor,
             totalInvites: u.totalInvites,
-            unlockedItemKeys: u.unlockedItems.map((i: { itemKey: string }) => i.itemKey),
+            unlockedItemKeys: unlocked.map(i => i.itemKey),
           })
         }
       } catch {
@@ -66,7 +67,6 @@ export async function GET(req: NextRequest) {
             select: {
               currentFloor: true,
               totalInvites: true,
-              unlockedItems: { select: { itemKey: true } },
             },
           })
           if (!u) return
@@ -74,10 +74,13 @@ export async function GET(req: NextRequest) {
           const invitesUp = u.totalInvites > lastInvites && lastInvites !== -1
 
           if (floorUp) {
+            // Only resolve the item list on actual floor-ups — keeps the
+            // hot path (heartbeat tick) at one round-trip.
+            const unlocked = await getUnlockedItemsForFloor(u.currentFloor)
             send('floor-up', {
               currentFloor: u.currentFloor,
               totalInvites: u.totalInvites,
-              unlockedItemKeys: u.unlockedItems.map((i: { itemKey: string }) => i.itemKey),
+              unlockedItemKeys: unlocked.map(i => i.itemKey),
             })
           }
           if (invitesUp) {

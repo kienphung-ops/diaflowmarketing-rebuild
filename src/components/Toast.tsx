@@ -40,7 +40,7 @@ function ToastItem({ toast, onDismiss }: { toast: ToastMessage; onDismiss: () =>
 
   const toneClasses =
     toast.tone === 'warn'
-      ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+      ? 'border-purple-500/40 bg-purple-500/10 text-purple-200'
       : toast.tone === 'info'
         ? 'border-sky-500/40 bg-sky-500/10 text-sky-200'
         : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'

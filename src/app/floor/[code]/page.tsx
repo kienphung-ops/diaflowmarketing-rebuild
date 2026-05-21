@@ -1,38 +1,109 @@
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { readSession } from '@/lib/auth'
+import { getUnlockedItemsForFloor } from '@/lib/floorsDb'
+import { maskEmail, type InviterInfo } from '@/lib/inviter'
 import FloorVisitorClient from './FloorVisitor.client'
 
 /**
- * /floor/[code] — public shared floor.
+ * /floor/[code] — unified invite + shared-floor URL.
  *
- * `code` is the owner's referral code (already a public identifier).
- * If the user isn't public the page 404s — matching the API behaviour
- * so existence isn't probeable.
+ * `code` is the owner's referral code (a public identifier). The
+ * route resolves any valid code now — the `publicVisible` privacy
+ * gate was removed when invite + share were unified, so a single
+ * link does both jobs:
+ *
+ *   - Signed-in visitors see the owner's scene and can poke. We ALSO
+ *     hydrate the visitor's own profile (their floor, invites,
+ *     teammates, inviter) so the standard Header + MySquadDrawer
+ *     render on top — same chrome they'd see on /office, just over
+ *     someone else's floor.
+ *   - Unlogged visitors see the same scene + a bottom-center CTA
+ *     that funnels them into the referral signup flow
+ *     (/?ref=<code>). Header still renders but in trial mode.
+ *
+ * Only 404 when the code doesn't exist at all.
  */
 export default async function FloorPage({ params }: { params: { code: string } }) {
   const code = params.code?.toUpperCase()
   if (!code) notFound()
 
-  const owner = await prisma.user.findUnique({
-    where: { referralCode: code },
-    select: {
-      id: true,
-      teamName: true,
-      currentFloor: true,
-      totalInvites: true,
-      publicVisible: true,
-      unlockedItems: { select: { itemKey: true } },
-      recruitedTeams: {
-        select: { id: true, slug: true, name: true, role: true, pokes: true, isDefault: true },
-        orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+  // Owner record (the floor being visited) + visitor session in
+  // parallel — they're independent reads against different keys.
+  const [owner, session] = await Promise.all([
+    prisma.user.findUnique({
+      where: { referralCode: code },
+      select: {
+        id: true,
+        teamName: true,
+        currentFloor: true,
+        totalInvites: true,
+        recruitedTeams: {
+          select: { id: true, slug: true, name: true, role: true, pokes: true, isDefault: true },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        },
       },
-    },
-  })
+    }),
+    readSession(),
+  ])
 
-  if (!owner || !owner.publicVisible) notFound()
+  if (!owner) notFound()
 
-  let unlockedItemKeys = owner.unlockedItems.map(i => i.itemKey)
+  const unlocked = await getUnlockedItemsForFloor(owner.currentFloor)
+  let unlockedItemKeys = unlocked.map(i => i.itemKey)
   if (unlockedItemKeys.length === 0) unlockedItemKeys = ['company_picture_frame']
+
+  // Visitor's own profile — only fetched when there's a valid session.
+  // Anonymous visitors get blank values + the trial-state Header /
+  // MySquad fall back to those.
+  let visitorCurrentFloor = 1
+  let visitorTotalInvites = 0
+  let visitorTeamName: string | null = null
+  let visitorReferralCode: string | null = null
+  let visitorRecruits: { id: string; name: string; role: string; slug?: string | null; isDefault?: boolean; pokes?: number }[] = []
+  let visitorInviter: InviterInfo | null = null
+  let visitorEmail: string | null = null
+  let visitorEmailVerified = false
+
+  if (session) {
+    const me = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: {
+        email: true,
+        emailVerified: true,
+        currentFloor: true,
+        totalInvites: true,
+        teamName: true,
+        referralCode: true,
+        referredAt: true,
+        recruitedTeams: {
+          select: { id: true, name: true, role: true, slug: true, isDefault: true, pokes: true },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        },
+        referredBy: {
+          select: { referralCode: true, teamName: true, country: true, email: true },
+        },
+      },
+    })
+    if (me) {
+      visitorEmail = me.email
+      visitorEmailVerified = !!me.emailVerified
+      visitorCurrentFloor = me.currentFloor
+      visitorTotalInvites = me.totalInvites
+      visitorTeamName = me.teamName
+      visitorReferralCode = me.referralCode
+      visitorRecruits = me.recruitedTeams
+      if (me.referredBy) {
+        visitorInviter = {
+          referralCode: me.referredBy.referralCode,
+          teamName: me.referredBy.teamName,
+          country: me.referredBy.country,
+          emailMasked: maskEmail(me.referredBy.email),
+          invitedAt: me.referredAt ? me.referredAt.toISOString() : null,
+        }
+      }
+    }
+  }
 
   return (
     <FloorVisitorClient
@@ -42,6 +113,15 @@ export default async function FloorPage({ params }: { params: { code: string } }
       totalInvites={owner.totalInvites}
       unlockedItemKeys={unlockedItemKeys}
       teammates={owner.recruitedTeams}
+      visitorSignedIn={!!session}
+      visitorCurrentFloor={visitorCurrentFloor}
+      visitorTotalInvites={visitorTotalInvites}
+      visitorTeamName={visitorTeamName}
+      visitorReferralCode={visitorReferralCode}
+      visitorRecruits={visitorRecruits}
+      visitorInviter={visitorInviter}
+      visitorEmail={visitorEmail}
+      visitorEmailVerified={visitorEmailVerified}
     />
   )
 }

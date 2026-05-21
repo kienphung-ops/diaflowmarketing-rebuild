@@ -1,14 +1,35 @@
+/**
+ * POST /api/auth/signup
+ *
+ * Email + password signup. Optimised for Vercel ↔ Supabase latency:
+ *
+ *   - Independent reads (`existingUser`, `inviter`) + the bcrypt hash
+ *     run in parallel via `Promise.all` — bcrypt is CPU work that
+ *     doesn't block the DB round-trip.
+ *   - `prisma.$transaction` batches the create user (+ 3 default
+ *     teammates) and the inviter credit (event + user update) into a
+ *     single round-trip.
+ *   - `invalidateLeaderboard` is fired and-forgotten (`void`) so cache
+ *     bust doesn't add latency to the response.
+ *   - Rate limit is per-IP (5/hour) so a spammer can't bulk-create
+ *     accounts.
+ *
+ * Items are NOT seeded per-user — they're derived on every read from
+ * `FloorItem WHERE floorId <= User.currentFloor` (see lib/floorsDb.ts).
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   attachSessionCookie,
   createSessionJwt,
   generateReferralCode,
 } from '@/lib/auth'
-import { computeFloorForInvites, getFloorConfig } from '@/lib/floors'
+import { computeFloorForInvites } from '@/lib/floors'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
-import { seedDefaultTeammates } from '@/lib/defaultTeammates'
+import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 const BCRYPT_ROUNDS = 10
@@ -24,15 +45,6 @@ function getCountry(req: NextRequest): string | undefined {
   return req.headers.get('x-vercel-ip-country') ?? undefined
 }
 
-async function ensureUniqueReferralCode(): Promise<string> {
-  for (let i = 0; i < 8; i++) {
-    const code = generateReferralCode()
-    const existing = await prisma.user.findUnique({ where: { referralCode: code }, select: { id: true } })
-    if (!existing) return code
-  }
-  throw new Error('Failed to allocate unique referral code')
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
@@ -41,6 +53,15 @@ export async function POST(req: NextRequest) {
     const ref = typeof body.ref === 'string' ? body.ref.trim().toUpperCase() : ''
     const trialTeamName = typeof body.trialTeamName === 'string' ? body.trialTeamName.trim().slice(0, 60) : ''
     const trialTeamPurpose = typeof body.trialTeamPurpose === 'string' ? body.trialTeamPurpose.trim().slice(0, 240) : ''
+    // Diaflow-derived role recommendation captured during Mia
+    // onboarding. Migrated into User as-is so the assistant-match
+    // copy on subsequent sessions doesn't require a re-fetch.
+    const trialRecommendedRole = typeof body.trialRecommendedRole === 'string'
+      ? body.trialRecommendedRole.trim().slice(0, 200)
+      : ''
+    const trialReason = typeof body.trialReason === 'string'
+      ? body.trialReason.trim().slice(0, 500)
+      : ''
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
@@ -52,9 +73,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Rate-limit by IP: 5 signups / hour. Stops spammers from
-    // creating dozens of accounts from a single machine while still
-    // letting a small office (NAT'd behind one IP) sign up normally.
+    // Rate-limit by IP: 5 signups / hour.
     const ip = getClientIp(req)
     if (ip) {
       const rl = await checkRateLimit({ key: `signup-ip:${ip}`, limit: 5, windowSec: 3600 })
@@ -66,7 +85,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+    // ─── Parallel reads + bcrypt ─────────────────────────────────────
+    // Existing-user check, inviter lookup, and the bcrypt hash are
+    // independent — running them concurrently shaves ~200-400ms off
+    // the typical Vercel ↔ Supabase round-trip latency.
+    const [existing, inviter, passwordHash] = await Promise.all([
+      prisma.user.findUnique({ where: { email }, select: { id: true } }),
+      ref
+        ? prisma.user.findUnique({
+            where: { referralCode: ref },
+            // Fetch all fields we'll need for the credit-inviter step,
+            // so we don't need to re-query later.
+            select: { id: true, referralCode: true, totalInvites: true, currentFloor: true },
+          })
+        : Promise.resolve(null),
+      bcrypt.hash(password, BCRYPT_ROUNDS),
+    ])
+
     if (existing) {
       return NextResponse.json(
         { error: 'An account with that email already exists. Sign in instead.' },
@@ -75,74 +110,65 @@ export async function POST(req: NextRequest) {
     }
 
     const country = getCountry(req)
-    const referralCode = await ensureUniqueReferralCode()
-    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+    const userAgent = req.headers.get('user-agent') ?? undefined
+    const now = new Date()
 
-    // Resolve inviter from the ?ref= code, if any. The 409 guard above
-    // already ensures we never reach this branch for an existing user, so
-    // `referredByCode` + `referredAt` are sealed exactly once — at create
-    // time — and can never be overwritten by a later sign-up attempt.
-    let inviterId: string | null = null
-    let inviterCode: string | null = null
-    if (ref) {
-      const inviter = await prisma.user.findUnique({
-        where: { referralCode: ref },
-        select: { id: true, referralCode: true },
-      })
-      if (inviter) {
-        inviterId = inviter.id
-        inviterCode = inviter.referralCode
-      }
-    }
+    // Generate a referral code without a SELECT round-trip. The
+    // global @unique constraint on `referralCode` will reject any
+    // collision at INSERT time; we retry once with a fresh code in
+    // that case (collision odds ≈ 1 in 30^8 per attempt).
+    const createUserOnce = async (): Promise<{ user: { id: string } }> => {
+      const referralCode = generateReferralCode()
+      const inviterCode = inviter?.referralCode ?? null
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        first_email : email,
-        passwordHash,
-        ipAddress: ip,
-        country: country ?? null,
-        referralCode,
-        referredByCode: inviterCode,
-        referredAt: inviterCode ? new Date() : null,
-        teamName: trialTeamName || null,
-        teamPurpose: trialTeamPurpose || null,
-        emailVerified: null,
-      },
-    })
+      // Single $transaction batches: user create (+ 3 default teammates)
+      // AND the inviter credit chain if applicable. One round-trip to
+      // Supabase instead of 4-5 sequential ones. No per-user item rows
+      // anymore — unlocked items are derived from FloorItem at read time.
 
-    // Seed Floor-1 base unlock.
-    const baseCfg = getFloorConfig(1)
-    if (baseCfg) {
-      await prisma.unlockedItem.upsert({
-        where: { userId_itemKey: { userId: user.id, itemKey: baseCfg.unlockKey } },
-        create: { userId: user.id, itemKey: baseCfg.unlockKey, floor: 1 },
-        update: {},
-      })
-    }
+      const user = await prisma.$transaction(async tx => {
+        const u = await tx.user.create({
+          data: {
+            email,
+            first_email: email,
+            passwordHash,
+            ipAddress: ip,
+            country: country ?? null,
+            referralCode,
+            referredByCode: inviterCode,
+            referredAt: inviterCode ? now : null,
+            teamName: trialTeamName || null,
+            teamPurpose: trialTeamPurpose || null,
+            recommendedRole: trialRecommendedRole || null,
+            reason: trialReason || null,
+            emailVerified: null,
+            recruitedTeams: {
+              create: DEFAULT_TEAMMATES.map(d => ({
+                slug: d.slug,
+                name: d.name,
+                role: d.role,
+                isDefault: true,
+              })),
+            },
+          },
+          select: { id: true },
+        })
 
-    // Seed the 3 default NPCs (Iris/Mia/Leo) as DB-backed teammates
-    // so their poke counters persist and the share-floor view shows
-    // a consistent line-up for every user.
-    await seedDefaultTeammates(user.id)
-
-    // Credit inviter for this signup.
-    if (inviterId && inviterId !== user.id) {
-      const inviter = await prisma.user.findUnique({
-        where: { id: inviterId },
-        select: { id: true, totalInvites: true, currentFloor: true },
-      })
-      if (inviter) {
-        const newTotal = inviter.totalInvites + 1
-        const newFloor = computeFloorForInvites(newTotal)
-        await prisma.$transaction(async tx => {
+        // Inviter credit in the same transaction — atomic with the
+        // signup so a partial failure can't leave a phantom invite
+        // event behind. Floor bumps are reflected by updating
+        // `currentFloor`; downstream item reads cascade automatically
+        // through FloorItem.
+        if (inviter && inviter.id !== u.id) {
+          const newTotal = inviter.totalInvites + 1
+          const newFloor = computeFloorForInvites(newTotal)
           await tx.inviteEvent.create({
             data: {
               inviterUserId: inviter.id,
               invitedEmail: email,
-              invitedUserId: user.id,
+              invitedUserId: u.id,
               ipAddress: ip,
-              userAgent: req.headers.get('user-agent') ?? undefined,
+              userAgent,
               verified: true,
             },
           })
@@ -150,31 +176,41 @@ export async function POST(req: NextRequest) {
             where: { id: inviter.id },
             data: { totalInvites: newTotal, currentFloor: newFloor },
           })
-          if (newFloor > inviter.currentFloor) {
-            for (let f = inviter.currentFloor + 1; f <= newFloor; f++) {
-              const cfg = getFloorConfig(f)
-              if (!cfg) continue
-              await tx.unlockedItem.upsert({
-                where: { userId_itemKey: { userId: inviter.id, itemKey: cfg.unlockKey } },
-                create: { userId: inviter.id, itemKey: cfg.unlockKey, floor: f },
-                update: {},
-              })
-            }
-          }
-          // Note: inviter must add teammates manually via bulk-add modal —
-          // no auto-recruit row here.
-        })
-        // Leaderboard ranking changed for inviter — bust the cache so
-        // the next /api/leaderboard call returns the updated row.
-        await invalidateLeaderboard(inviter.id, user.id)
-      }
-    } else {
-      // Fresh signup with no referral — still drop top50 (a new bottom
-      // entry might matter when the leaderboard is sparse).
-      await invalidateLeaderboard(user.id)
+        }
+
+        return u
+      })
+
+      return { user }
     }
 
-    const jwt = await createSessionJwt(user.id)
+    let createdUser: { id: string }
+    try {
+      const r = await createUserOnce()
+      createdUser = r.user
+    } catch (err) {
+      // P2002 on `referralCode`: 1-in-30^8 collision. Retry once with a
+      // fresh code. Any other error bubbles up to the 500 handler.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002' &&
+        Array.isArray(err.meta?.target) &&
+        (err.meta?.target as string[]).includes('referralCode')
+      ) {
+        const r = await createUserOnce()
+        createdUser = r.user
+      } else {
+        throw err
+      }
+    }
+
+    // ─── Fire-and-forget cache bust ──────────────────────────────────
+    // Don't block the response on Redis — invalidation completing a
+    // few ms after the user gets their session cookie is fine; the
+    // 60s TTL is the backstop anyway.
+    void invalidateLeaderboard(inviter?.id ?? null, createdUser.id)
+
+    const jwt = await createSessionJwt(createdUser.id)
     const res = NextResponse.json({ success: true })
     attachSessionCookie(res, jwt)
     return res

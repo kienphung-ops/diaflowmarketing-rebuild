@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FLOOR_CONFIG, getFloorConfig } from '@/lib/floors'
+import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
 import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
-import { useFloorPresence } from '@/hooks/useFloorPresence'
 import { useOrigin } from '@/hooks/useOrigin'
 import type { InviterInfo } from '@/lib/inviter'
 
@@ -59,18 +58,34 @@ interface Props {
   /** Sign-out handler — POSTs /api/auth/logout, clears session cookie,
    *  reloads to the home page. Only wired up for signed-in users. */
   onLogout?: () => void
+  /** Live floor-activity stats — viewer count + total pokes — shown
+   *  as a compact pill near the top of the drawer. Used on:
+   *
+   *   - `/floor/[code]` (visitor): pass `ownerName` so the section
+   *     header reads "Visiting <ownerName>".
+   *   - `/office` and `/tower` (owner viewing their own floor): leave
+   *     `ownerName` null so the section header reads "Your floor".
+   *
+   *  When undefined the section doesn't render. */
+  visiting?: {
+    /** Owner's team name when the viewer is a guest; null when the
+     *  viewer is the owner themselves. */
+    ownerName: string | null
+    /** Number of users currently on the floor. Anonymous heartbeat
+     *  via `useFloorPresence` — see that hook for semantics. */
+    viewerCount: number
+    /** Sum of pokes across all teammates on the floor. */
+    totalPokes: number
+  }
 }
 
-// NOTE: We used to hard-code `PUBLIC_BASE` at module load time using
-// `typeof window !== 'undefined' ? window.location.origin : 'https://diaflow.io'`.
-// That produced a hydration mismatch — the server-rendered HTML said
-// `https://diaflow.io/?ref=...` while the first client paint said
-// `http://localhost:3000/?ref=...`. The fix is the `useOrigin()` hook
-// (see imports), which starts empty on both server + first paint and
-// upgrades only after mount.
+// Invite link + share-floor link are now the SAME URL — visitors land
+// on /floor/<code>, see the owner's scene, and unlogged users get a
+// bottom CTA that funnels them into the referral signup flow. Server
+// no longer gates by `publicVisible`, so every code resolves.
 function buildInviteUrl(origin: string, code: string | null): string {
   if (!code) return ''
-  return `${origin}/?ref=${code}`
+  return `${origin}/floor/${code}`
 }
 
 export function MySquadDrawer({
@@ -82,25 +97,22 @@ export function MySquadDrawer({
   totalInvites,
   currentFloor,
   emailCaptured,
-  teammates,
-  onTeammateUpdate,
-  onAddTeammate,
   onOpenSignup,
   inviter,
-  onResetAllPositions,
   rank,
   emailVerified,
   userEmail,
   onVerifyEmail,
-  publicVisible,
-  onTogglePublic,
   onLogout,
+  visiting,
+  // Below are still part of Props for callers but the drawer no longer
+  // renders share-floor / teammate-list / add-teammate UI. The /floor/<code>
+  // route is the canonical share + invite URL, and per-teammate
+  // interactions happen via the 3D scene + bulk-add modal.
 }: Props) {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(teamName ?? '')
   const [copied, setCopied] = useState(false)
-  const [editingTeammate, setEditingTeammate] = useState<string | null>(null)
-  const [editValues, setEditValues] = useState<{ name: string; role: string }>({ name: '', role: '' })
   const [howItWorksOpen, setHowItWorksOpen] = useState(false)
 
   useEffect(() => {
@@ -117,9 +129,12 @@ export function MySquadDrawer({
 
   const origin = useOrigin()
   const inviteUrl = buildInviteUrl(origin, referralCode)
-  const totalPokes = teammates.reduce((sum, t) => sum + (t.pokes ?? 0), 0)
-  const nextFloor = getFloorConfig(currentFloor + 1)
-  const currentFloorCfg = getFloorConfig(currentFloor)
+  // Live floor config from /api/floors (cached aggressively client-side).
+  // `useFloor` falls back to the static FLOOR_CONFIG snapshot until the
+  // API responds, so the progress bar never flashes empty.
+  const nextFloor = useFloor(currentFloor + 1)
+  const currentFloorCfg = useFloor(currentFloor)
+  const totalFloors = useFloorCount()
   const invitesToNext = nextFloor ? Math.max(0, nextFloor.invitesRequired - totalInvites) : 0
   const progressPct = nextFloor
     ? Math.min(
@@ -145,7 +160,7 @@ export function MySquadDrawer({
 
   function handleShare(network: 'x' | 'linkedin' | 'threads') {
     if (!inviteUrl) return
-    const text = `Building my AI squad with @Diaflow. Currently on Floor ${currentFloor} of ${FLOOR_CONFIG.length} — climb with me`
+    const text = `Building my AI squad with @Diaflow. Currently on Floor ${currentFloor} of ${totalFloors} — climb with me`
     const encoded = encodeURIComponent(text + ' ' + inviteUrl)
     const urls: Record<typeof network, string> = {
       x: `https://x.com/intent/tweet?text=${encoded}`,
@@ -155,16 +170,6 @@ export function MySquadDrawer({
     window.open(urls[network], '_blank', 'noopener,noreferrer,width=620,height=620')
   }
 
-  function startEditing(t: ServerRecruit) {
-    setEditingTeammate(t.id)
-    setEditValues({ name: t.name, role: t.role })
-  }
-
-  function saveTeammate() {
-    if (!editingTeammate) return
-    onTeammateUpdate?.(editingTeammate, { name: editValues.name.trim(), role: editValues.role.trim() })
-    setEditingTeammate(null)
-  }
 
   return (
     <div
@@ -180,9 +185,19 @@ export function MySquadDrawer({
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-        {emailCaptured && (
+        {/* "You're in" banner only shows when we DON'T have explicit
+            verification state (trial captures + legacy flow). For
+            signed-in users we route through the verify-email banner
+            below — showing green checkmark when actually unverified
+            was misleading users into thinking their email was confirmed. */}
+        {emailCaptured && emailVerified === undefined && (
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
             ✓ You&apos;re in — we&apos;ll email you on launch day
+          </div>
+        )}
+        {emailVerified === true && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+            ✓ Email verified
           </div>
         )}
 
@@ -190,15 +205,15 @@ export function MySquadDrawer({
             in the DB. Hidden once verification completes (parent
             re-fetches /api/me to flip `emailVerified` to true). */}
         {onVerifyEmail && emailVerified === false && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm">
+          <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2.5 text-sm">
             <div className="flex items-start gap-3">
-              <div className="text-amber-300 text-base leading-none mt-0.5" aria-hidden>⚠</div>
+              <div className="text-purple-300 text-base leading-none mt-0.5" aria-hidden>⚠</div>
               <div className="flex-1 min-w-0">
-                <div className="text-amber-200 font-semibold mb-0.5">
+                <div className="text-purple-200 font-semibold mb-0.5">
                   Verify your email
                 </div>
                 {userEmail && (
-                  <div className="text-[11px] text-amber-100/70 truncate">
+                  <div className="text-[11px] text-purple-100/70 truncate">
                     {userEmail}
                   </div>
                 )}
@@ -209,10 +224,55 @@ export function MySquadDrawer({
               </div>
               <button
                 onClick={onVerifyEmail}
-                className="shrink-0 px-3 py-1.5 rounded-md bg-amber-300 text-night-deep font-semibold text-xs hover:bg-amber-200 transition"
+                className="shrink-0 px-3 py-1.5 rounded-md bg-purple-300 text-night-deep font-semibold text-xs hover:bg-purple-200 transition"
               >
                 Verify
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Floor-activity stats — viewer count + total pokes.
+            Section label adapts to context:
+              - `ownerName` set → "Visiting <name>" (guest on /floor/[code])
+              - `ownerName` null → "Your floor" (owner on /office or /tower)
+            Provides a single place for floor-side metrics whether the
+            user is browsing their own page or someone else's. */}
+        {visiting && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+            <div className="flex items-baseline justify-between mb-2">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/80">
+                {visiting.ownerName ? 'Visiting' : 'Your floor'}
+              </div>
+              {visiting.ownerName && (
+                <div className="text-xs font-semibold text-amber-200 truncate ml-2 max-w-[160px]">
+                  {visiting.ownerName}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-night-deep/60 border border-white/5">
+                <DrawerEyeIcon />
+                <div className="leading-tight">
+                  <div className="text-sm font-bold text-tower-cream tabular-nums">
+                    {visiting.viewerCount}
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wider text-tower-cream/50">
+                    viewing
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-night-deep/60 border border-white/5">
+                <span className="text-amber-300 text-base leading-none" aria-hidden>★</span>
+                <div className="leading-tight">
+                  <div className="text-sm font-bold text-tower-cream tabular-nums">
+                    {visiting.totalPokes}
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wider text-tower-cream/50">
+                    {visiting.totalPokes === 1 ? 'total poke' : 'total pokes'}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -295,7 +355,7 @@ export function MySquadDrawer({
           </div>
           <div className="flex items-baseline gap-2 mt-1">
             <div className="text-5xl font-bold">{currentFloor}</div>
-            <div className="text-base text-tower-cream/50">of {FLOOR_CONFIG.length}</div>
+            <div className="text-base text-tower-cream/50">of {totalFloors}</div>
           </div>
           <div className="mt-3 h-1.5 rounded-full bg-night-deep/60 overflow-hidden">
             <div className="h-full bg-purple-400" style={{ width: `${progressPct}%` }} />
@@ -303,121 +363,19 @@ export function MySquadDrawer({
           <div className="mt-2 flex items-center justify-between text-xs">
             <span className="text-tower-cream/80">
               {nextFloor
-                ? `${invitesToNext} more ${invitesToNext === 1 ? 'invite' : 'invites'} → Floor ${nextFloor.floor}`
+                ? `${invitesToNext} more ${invitesToNext === 1 ? 'invite' : 'invites'} → Floor ${nextFloor.id}`
                 : 'You reached the top'}
             </span>
             {nextFloor && <span className="text-tower-cream/60">{nextFloor.label}</span>}
           </div>
         </div>
 
-        {/* Share-floor toggle — only shown when the parent wired up the
-            handler (signed-in users only). */}
-        {onTogglePublic && (
-          <ShareFloorToggle
-            publicVisible={!!publicVisible}
-            referralCode={referralCode}
-            onToggle={onTogglePublic}
-          />
-        )}
-
-        {/* Recruited teammate list */}
-        <div>
-          <div className="flex items-center justify-between mb-2 gap-2">
-            <div className="text-[11px] uppercase tracking-widest text-tower-cream/40">
-              Your teammates ({teammates.length})
-              {totalPokes > 0 && (
-                <span className="ml-2 text-amber-300/80 normal-case tracking-normal">
-                  ★ {totalPokes} pokes
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              {onResetAllPositions && (
-                <button
-                  onClick={onResetAllPositions}
-                  className="text-[10px] px-2 py-1 rounded bg-night-deep/60 border border-white/10 text-tower-cream/70 hover:border-tower-gold/40 hover:text-tower-gold font-medium"
-                  title="Send everyone back to their default spots (recover teammates dragged off-screen or behind walls)"
-                >
-                  ↺ Reset positions
-                </button>
-              )}
-              {onAddTeammate && (
-                <button
-                  onClick={onAddTeammate}
-                  className="text-xs px-2 py-1 rounded bg-tower-gold/15 text-tower-gold hover:bg-tower-gold/25 font-semibold"
-                >
-                  + Add
-                </button>
-              )}
-            </div>
-          </div>
-          {teammates.length > 0 && (
-          <div>
-            <div className="space-y-2">
-              {teammates.map(t => (
-                <div key={t.id} className="rounded-md bg-night-deep/60 border border-white/5 px-3 py-2">
-                  {editingTeammate === t.id ? (
-                    <div className="flex flex-col gap-2">
-                      <input
-                        value={editValues.name}
-                        onChange={e => setEditValues(v => ({ ...v, name: e.target.value.slice(0, 40) }))}
-                        className="px-2 py-1 rounded bg-night-mid border border-white/10 text-sm focus:border-tower-gold focus:outline-none"
-                        placeholder="Name"
-                      />
-                      <input
-                        value={editValues.role}
-                        onChange={e => setEditValues(v => ({ ...v, role: e.target.value.slice(0, 60) }))}
-                        className="px-2 py-1 rounded bg-night-mid border border-white/10 text-sm focus:border-tower-gold focus:outline-none"
-                        placeholder="Role"
-                      />
-                      <div className="flex gap-2 text-xs">
-                        <button onClick={saveTeammate} className="px-2 py-1 rounded bg-tower-gold text-night-deep font-semibold">
-                          Save
-                        </button>
-                        <button onClick={() => setEditingTeammate(null)} className="px-2 py-1 text-tower-cream/50">
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-semibold truncate">{t.name}</span>
-                          {t.isDefault && (
-                            <span className="shrink-0 text-[8px] uppercase tracking-wider px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">
-                              NPC
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-tower-cream/50 truncate">{t.role}</div>
-                      </div>
-                      {/* Pokes count — visible for every teammate (defaults
-                          + custom). Tooltip shows the full label. */}
-                      <div
-                        className="shrink-0 text-[11px] text-amber-300 font-semibold"
-                        title={`${t.pokes ?? 0} poke${(t.pokes ?? 0) === 1 ? '' : 's'}`}
-                      >
-                        ★ {t.pokes ?? 0}
-                      </div>
-                      {/* Edit only for user-recruited teammates — NPC
-                          defaults are immutable (rejected server-side). */}
-                      {!t.isDefault && (
-                        <button
-                          onClick={() => startEditing(t)}
-                          className="shrink-0 px-2 py-1 rounded text-xs text-tower-cream/70 hover:text-tower-gold hover:bg-night-mid/60 transition"
-                        >
-                          ✎ Edit
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        </div>
+        {/* Share-floor section + per-teammate list were removed per
+            product call: the invite URL above already doubles as the
+            share-floor URL (one /floor/<code> route), and the scene
+            view already shows everyone — the redundant drawer list
+            was clutter. Edit modal is still reachable by clicking
+            teammates in the 3D scene (or via the bulk-add CTA). */}
 
         {/* Share */}
         <div>
@@ -498,13 +456,13 @@ function InvitedByCard({ inviter }: { inviter: InviterInfo }) {
   const displayName = inviter.teamName?.trim() || inviter.emailMasked
   const invitedAtLabel = formatInvitedAt(inviter.invitedAt)
   return (
-    <div className="rounded-xl p-4 bg-gradient-to-br from-amber-900/20 to-amber-800/5 border border-amber-500/25">
-      <div className="text-[11px] uppercase tracking-widest text-amber-200/70 mb-2">
+    <div className="rounded-xl p-4 bg-gradient-to-br from-purple-900/20 to-purple-800/5 border border-purple-500/25">
+      <div className="text-[11px] uppercase tracking-widest text-purple-200/70 mb-2">
         Invited by
       </div>
       <div className="flex items-start gap-3">
         {/* Avatar — initial of team name or first letter of email */}
-        <div className="shrink-0 w-10 h-10 rounded-full bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-base font-bold text-amber-200">
+        <div className="shrink-0 w-10 h-10 rounded-full bg-purple-400/20 border border-purple-300/40 flex items-center justify-center text-base font-bold text-purple-200">
           {(displayName[0] ?? '?').toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
@@ -552,124 +510,25 @@ function formatInvitedAt(iso: string | null): string | null {
   return `${Math.floor(mo / 12)}y ago`
 }
 
-// ─── Share-floor toggle ─────────────────────────────────────────────────
-/**
- * Public/Private switch + the resulting `/floor/<code>` share URL.
- * When public, anyone hitting the URL can poke teammates and their
- * counters increment in real time (polling-driven).
- */
-function ShareFloorToggle({
-  publicVisible,
-  referralCode,
-  onToggle,
-}: {
-  publicVisible: boolean
-  referralCode: string | null
-  onToggle: (next: boolean) => void
-}) {
-  const [copied, setCopied] = useState(false)
-  // Same hydration-safe origin lookup as the parent drawer — see
-  // useOrigin docs for why we can't read window.location.origin
-  // synchronously here.
-  const origin = useOrigin()
-  const shareUrl = origin && referralCode ? `${origin}/floor/${referralCode}` : ''
-  // Owner observes their own floor's visitor count without registering
-  // as a visitor (mode='observe'). Polled at a relaxed 10s — the
-  // home page isn't the place anyone needs sub-5s freshness.
-  const visitorCount = useFloorPresence({
-    code: publicVisible ? referralCode : null,
-    mode: 'observe',
-    intervalMs: 10_000,
-  })
+// `ShareFloorToggle` + the per-section `EyeIcon` used to live here
+// for an in-drawer privacy switch. Now that the share URL is unified
+// with the invite URL (always `/floor/<code>`), there's no toggle —
+// the section was removed from the drawer.
 
-  async function handleCopy() {
-    if (!shareUrl) return
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      /* ignore */
-    }
-  }
-
-  return (
-    <div className="rounded-xl border border-white/10 bg-night-deep/40 px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] uppercase tracking-widest text-tower-cream/40 mb-1">
-            Share floor
-          </div>
-          <div className="text-sm font-semibold">
-            {publicVisible ? 'Public — anyone can visit' : 'Private — only you'}
-          </div>
-          <div className="text-[11px] text-tower-cream/50 mt-0.5">
-            Visitors can poke your teammates in real time.
-          </div>
-        </div>
-        {/* Toggle switch */}
-        <button
-          onClick={() => onToggle(!publicVisible)}
-          role="switch"
-          aria-checked={publicVisible}
-          className={`shrink-0 relative w-11 h-6 rounded-full transition ${
-            publicVisible ? 'bg-tower-gold' : 'bg-night-mid border border-white/10'
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 w-5 h-5 rounded-full bg-night-deep shadow transition-transform ${
-              publicVisible ? 'translate-x-[22px]' : 'translate-x-0.5'
-            }`}
-          />
-        </button>
-      </div>
-
-      {publicVisible && shareUrl && (
-        <>
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-md bg-night-deep border border-white/10">
-            <span className="flex-1 text-[11px] font-mono text-tower-cream/80 truncate">
-              {shareUrl}
-            </span>
-            <button
-              onClick={handleCopy}
-              aria-label="Copy floor share link"
-              className="text-tower-cream/60 hover:text-tower-gold text-sm"
-            >
-              {copied ? '✓' : '⧉'}
-            </button>
-          </div>
-          {/* Live visitor count — eye icon shows real-time presence
-              from Redis ZSET. 0 = nobody right now; 1+ = someone
-              currently on /floor/<code>. */}
-          <div
-            className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-tower-gold/90"
-            title={`${visitorCount} ${visitorCount === 1 ? 'visitor' : 'visitors'} on your floor right now`}
-          >
-            <EyeIcon />
-            <span className="font-semibold tabular-nums">{visitorCount}</span>
-            <span className="text-tower-cream/55">
-              {visitorCount === 1 ? 'viewer' : 'viewers'} on your floor
-            </span>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-/** Same eye glyph the visitor page uses — kept inline so the drawer
- *  module doesn't grow a shared icons dependency for one symbol. */
-function EyeIcon() {
+/** Minimal eye SVG — used for the "Visiting" pill so visitors can see
+ *  how many other people are also looking at the floor right now. */
+function DrawerEyeIcon() {
   return (
     <svg
-      width="14"
-      height="14"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      className="text-tower-cream/70 shrink-0"
       aria-hidden
     >
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />

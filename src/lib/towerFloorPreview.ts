@@ -1,25 +1,23 @@
 /**
- * Hard-coded per-floor preview data for `/tower-view/[floor]`.
+ * Server-side per-floor preview for `/tower-view/[floor]`.
  *
- * The route is fully public (no auth, no DB) — anyone can browse what
- * any floor looks like at its fully-decorated state. The teammates and
- * items are seeded deterministically from the floor number so the same
- * URL always renders identical content for everyone (good for sharing
- * + marketing).
+ * The route is fully public (no auth, no per-user data) — anyone can
+ * browse what any floor looks like at its fully-decorated state. The
+ * teammates and items are seeded deterministically from the floor
+ * number so the same URL always renders identical content for everyone
+ * (good for sharing + marketing).
  *
- * Numbers come from `FLOOR_MAX_TEAMMATES` and `FLOOR_CONFIG`:
+ * Numbers now come from the DB-backed catalogue (`lib/floorsApi`), so
+ * admin edits to floor labels / thresholds / item lists / max
+ * teammates flow through without touching code:
  *   - 3 default NPCs (Iris/Mia/Leo) are always rendered.
  *   - The remaining slots are filled with placeholder teammates drawn
  *     from PLACEHOLDER_NAMES + PLACEHOLDER_ROLES.
- *   - Items: every floor ≤ N has its unlock item visible.
+ *   - Items: union of every floor ≤ N's configured items, deduped by key.
  */
 
-import {
-  DEFAULT_NPC_COUNT,
-  FLOOR_CONFIG,
-  getMaxTeammates,
-  getUnlockedItemKeysForFloor,
-} from './floors'
+import { DEFAULT_NPC_COUNT } from './floors'
+import { getAllFloorsConfig } from './floorsApi'
 
 const PLACEHOLDER_NAMES = [
   'Sam', 'Alex', 'Jordan', 'Riley', 'Casey',
@@ -57,25 +55,29 @@ function pickPlaceholder(seed: number, count: number): PlaceholderTeammate[] {
 }
 
 /**
- * Resolve the full preview for a given floor.
- *  - `currentFloor`: clamped to 1..20
- *  - `unlockedItemKeys`: every item from floor 1 up to N
- *  - `teammates`: max-allowed for this floor, minus 3 default NPCs
- *  - `floorLabel`: the unlock-decor label (e.g. "Floor lamp")
- *  - `companyName`: a generic placeholder so the picture frame isn't blank
+ * Resolve the full preview for a given floor. Async because it consults
+ * the DB-backed floor catalogue (`getAllFloorsConfig`), but the catalogue
+ * is cached in Redis + in-process, so the hot path is sub-ms.
  */
-export function getFloorPreview(floorParam: string | number) {
+export async function getFloorPreview(floorParam: string | number) {
+  const all = await getAllFloorsConfig()
+  const maxFloor = all.length || 20
   const raw = typeof floorParam === 'string' ? parseInt(floorParam, 10) : floorParam
   const floor =
-    Number.isFinite(raw) && raw >= 1 && raw <= FLOOR_CONFIG.length
+    Number.isFinite(raw) && raw >= 1 && raw <= maxFloor
       ? Math.floor(raw)
       : 1
 
-  const max = getMaxTeammates(floor)
+  const cfg = all.find(f => f.id === floor)
+  const max = cfg?.maxTeammates ?? 4
   const placeholderCount = Math.max(0, max - DEFAULT_NPC_COUNT)
   const teammates = pickPlaceholder(floor, placeholderCount)
-  const unlockedItemKeys = getUnlockedItemKeysForFloor(floor).map(u => u.itemKey)
-  const cfg = FLOOR_CONFIG.find(c => c.floor === floor)
+
+  // Per-floor items: each floor's row in floor_items is authoritative
+  // for what shows on that floor (no cumulative union — see the
+  // matching change in FloorItems.tsx).
+  const unlockedItemKeys = cfg?.items.map(it => it.key) ?? []
+
   return {
     floor,
     floorLabel: cfg?.label ?? `Floor ${floor}`,
@@ -84,7 +86,8 @@ export function getFloorPreview(floorParam: string | number) {
     teammates,
     unlockedItemKeys,
     companyName: 'Acme Team',
+    totalFloors: maxFloor,
   }
 }
 
-export type FloorPreview = ReturnType<typeof getFloorPreview>
+export type FloorPreview = Awaited<ReturnType<typeof getFloorPreview>>

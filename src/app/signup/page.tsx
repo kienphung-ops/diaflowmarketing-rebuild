@@ -1,17 +1,31 @@
 'use client'
 
+/**
+ * /signup — dedicated email + password sign-up page.
+ *
+ * Mirrors the visual + interaction model of /login. The same flow lives
+ * inside `<SignupModal>` for trial-mode upgrades on the home page; this
+ * page exists so visitors arriving from /login's "Start your tower" CTA
+ * (or any external "Sign up" link) have a self-contained route instead
+ * of being dropped onto the marketing landing page and left to hunt for
+ * the modal.
+ *
+ * On success the signup API (`/api/auth/signup`) sets an HttpOnly
+ * session cookie and we `router.replace('/')` so the home page renders
+ * already-signed-in.
+ */
+
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ForgotPasswordModal } from '@/components/ForgotPasswordModal'
+import { clearTrialState, readTrialState } from '@/lib/trial'
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [forgotOpen, setForgotOpen] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,13 +40,41 @@ export default function LoginPage() {
     }
     setBusy(true)
     try {
-      const res = await fetch('/api/auth/login', {
+      // Pick up any pending referral code stashed by the home page
+      // (`useEffect` that reads `?ref=` and writes to localStorage), so
+      // the new account is credited correctly. Trial state is migrated
+      // for team-name / purpose continuity.
+      const ref =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem('diaflow_pending_ref') ?? undefined
+          : undefined
+      const trial = readTrialState()
+      const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          ref,
+          trialTeamName: trial?.teamName ?? undefined,
+          trialTeamPurpose: trial?.teamPurpose ?? undefined,
+          // Carry Diaflow role recommendation across signup — keeps
+          // the personalised Mia copy intact for the new account.
+          trialRecommendedRole: trial?.recommendedRole ?? undefined,
+          trialReason: trial?.reason ?? undefined,
+        }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.error ?? 'Sign in failed')
+      if (!res.ok) throw new Error(j.error ?? 'Sign up failed')
+      // Successful signup — session cookie is set server-side. Clear
+      // local trial state + pending ref so a fresh account starts
+      // cleanly, then redirect to the office view.
+      clearTrialState()
+      try {
+        window.localStorage.removeItem('diaflow_pending_ref')
+      } catch {
+        /* ignore */
+      }
       router.replace('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -47,12 +89,12 @@ export default function LoginPage() {
         <div className="flex items-center gap-2 mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md" />
-          <h1 className="text-lg font-semibold tracking-wide">Welcome back</h1>
+          <h1 className="text-lg font-semibold tracking-wide">Start your tower</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <p className="text-sm text-tower-cream/70">
-            Sign in to keep climbing your tower.
+            Create an account to save your team and start climbing.
           </p>
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-wider text-tower-cream/50">Email</span>
@@ -73,10 +115,10 @@ export default function LoginPage() {
               type="password"
               required
               minLength={6}
-              autoComplete="current-password"
+              autoComplete="new-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="your password"
+              placeholder="at least 6 characters"
               className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
             />
           </label>
@@ -85,33 +127,18 @@ export default function LoginPage() {
             disabled={busy}
             className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
           >
-            {busy ? 'Signing in…' : 'Sign in'}
+            {busy ? 'Creating account…' : 'Create account'}
           </button>
           {error && <p className="text-xs text-red-300">{error}</p>}
-          <div className="text-right">
-            <button
-              type="button"
-              onClick={() => setForgotOpen(true)}
-              className="text-[11px] text-tower-cream/60 hover:text-tower-gold underline-offset-2 hover:underline"
-            >
-              Forgot password?
-            </button>
-          </div>
         </form>
 
         <p className="mt-4 text-xs text-tower-cream/60 text-center">
-          Don&apos;t have an account?{' '}
-          <Link href="/signup" className="text-tower-gold hover:underline">
-            Start your tower →
+          Already have an account?{' '}
+          <Link href="/login" className="text-tower-gold hover:underline">
+            Sign in →
           </Link>
         </p>
       </div>
-
-      <ForgotPasswordModal
-        open={forgotOpen}
-        defaultEmail={email}
-        onClose={() => setForgotOpen(false)}
-      />
     </main>
   )
 }

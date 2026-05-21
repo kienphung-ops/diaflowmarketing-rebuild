@@ -8,19 +8,39 @@
 
 import { computeFloorForInvites, getUnlockedItemKeysForFloor } from './floors'
 
-export type OnboardingStep = 'iris' | 'mia' | 'leo' | 'done'
+/**
+ * Onboarding state machine:
+ *   iris       — collect team name
+ *   mia        — collect user's job role
+ *   mia-info   — show Mia's "what an Assistant does" intro card (no input)
+ *   leo        — collect waitlist email + video CTA
+ *   done       — onboarding complete
+ *
+ * Each transition reveals (or keeps) one character on the office floor;
+ * see the delay-after-step-change effect in TowerLanding.client so the
+ * modal doesn't pop up before the character has landed.
+ */
+export type OnboardingStep = 'iris' | 'mia' | 'mia-info' | 'leo' | 'done'
 
 export interface TrialState {
   /** Onboarding state machine — Iris → Mia → Leo → done. */
   onboardingStep: OnboardingStep
   teamName: string | null
-  /** Free-form description from Mia step (what the team builds). */
+  /** User's job role (collected on Mia step 1 — what they do for work). */
   teamPurpose: string | null
   email: string | null
   /** Gamification — simulated invites + derived floor. */
   totalInvites: number
   currentFloor: number
   unlockedItemKeys: string[]
+  /** Diaflow-derived role recommendation for `teamPurpose`. Populated
+   *  in the background after the Mia job submit by calling
+   *  /api/job-summary. Null until the upstream returns success — the
+   *  MiaInfoBubble falls back to its default copy in that case. */
+  recommendedRole: string | null
+  /** Short reason string that accompanies `recommendedRole`. Same
+   *  null-fallback semantics as above. */
+  reason: string | null
 }
 
 const STORAGE_KEY = 'diaflow_trial_state'
@@ -34,6 +54,8 @@ export function defaultTrialState(): TrialState {
     totalInvites: 0,
     currentFloor: 1,
     unlockedItemKeys: ['company_picture_frame'],
+    recommendedRole: null,
+    reason: null,
   }
 }
 
@@ -59,6 +81,8 @@ export function readTrialState(): TrialState | null {
       totalInvites,
       currentFloor,
       unlockedItemKeys,
+      recommendedRole: parsed.recommendedRole ?? null,
+      reason: parsed.reason ?? null,
     }
   } catch {
     return null
@@ -92,7 +116,8 @@ export function advanceTrialInvites(prev: TrialState): TrialState {
 
 export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
   if (step === 'iris') return 'mia'
-  if (step === 'mia') return 'leo'
+  if (step === 'mia') return 'mia-info'
+  if (step === 'mia-info') return 'leo'
   if (step === 'leo') return 'done'
   return 'done'
 }

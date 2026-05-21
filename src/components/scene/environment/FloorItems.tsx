@@ -2,7 +2,7 @@
 
 import { useMemo, type ReactNode } from 'react'
 import * as THREE from 'three'
-import { FLOOR_CONFIG } from '@/lib/floors'
+import { useFloorItems } from '@/lib/floorsConfigClient'
 
 const LOCKED_OPACITY = 0.18
 
@@ -329,22 +329,25 @@ function ArcadeMachine({ unlocked }: { unlocked: boolean }) {
 }
 
 function FloorCeilingWindows({ unlocked }: { unlocked: boolean }) {
+  // Narrower decor (2.4 wide vs old 3.5) so it fits the right-of-window
+  // strip (x ∈ [5, 7.4]) without overlapping the back-wall window cut-out
+  // (which lives at x ∈ [2, 5]).
   return (
     <group>
       <mesh>
-        <planeGeometry args={[3.5, 4.5]} />
+        <planeGeometry args={[2.4, 4.5]} />
         <M color="#101830" unlocked={unlocked} emissive="#5580c0" emissiveIntensity={0.3} />
       </mesh>
       {/* Frames */}
       <mesh position={[0, 0, 0.02]}>
-        <boxGeometry args={[3.5, 0.08, 0.06]} />
+        <boxGeometry args={[2.4, 0.08, 0.06]} />
         <M color="#1a1a2e" unlocked={unlocked} />
       </mesh>
-      <mesh position={[-1.2, 0, 0.02]}>
+      <mesh position={[-1.15, 0, 0.02]}>
         <boxGeometry args={[0.08, 4.5, 0.06]} />
         <M color="#1a1a2e" unlocked={unlocked} />
       </mesh>
-      <mesh position={[1.2, 0, 0.02]}>
+      <mesh position={[1.15, 0, 0.02]}>
         <boxGeometry args={[0.08, 4.5, 0.06]} />
         <M color="#1a1a2e" unlocked={unlocked} />
       </mesh>
@@ -457,30 +460,55 @@ function PenthouseCrown({ unlocked }: { unlocked: boolean }) {
 
 interface ItemSpec {
   key: string
+  /** Base position for the first instance. Multi-instance items (quantity > 1)
+   *  are offset along `offsetStep` per additional copy. */
   position: [number, number, number]
+  /** Offset added per extra instance when DB quantity > 1. Defaults to
+   *  [1.8, 0, 0] (one desk-width along x). */
+  offsetStep?: [number, number, number]
   render: (unlocked: boolean) => ReactNode
 }
 
-// Wall band reserved for the company picture frame: x in [-3.0, -1.5],
-// y in [1.7, 2.7]. No other wall item is allowed in this band so the
-// frame stays a single clear focal point.
+// Wall layout (z ≈ -5.3 plane). The back-wall window cut-out lives at
+// x ∈ [2, 5], y ∈ [1.3, 3.5] — every wall-mounted item below sits
+// outside that band so nothing overlaps the cityscape window.
+//
+//   x: [-7.5, -3.5]  → bookshelf + trophy
+//   x: [-3.1, -1.5]  → company_picture_frame (drawn from Walls.tsx)
+//   x: [-0.85, 1.35] → whiteboard (y < 1.2) + living_wall (y > 1.5)
+//   x: [2,   5]      → WINDOW (do not place items here)
+//   x: [4.35, 5.25]  → neon_sign (above window, y > 3.7)
+//   x: [5,   7.4]    → floor_ceiling_windows decor
 const ITEMS: ItemSpec[] = [
   // 1. company_picture_frame — drawn by Walls.CompanyFrame (always shown)
   { key: 'floor_lamp', position: [-6.2, -0.55, -2.0], render: u => <FloorLamp unlocked={u} /> },
-  { key: 'basic_chair_desk', position: [-3.2, -0.55, 1.5], render: u => <BasicChairDesk unlocked={u} /> },
+  // basic_chair_desk: multi-instance via DB quantity. Each extra copy
+  // steps +1.8 along x so 3 desks at quantity:3 sit side-by-side.
+  {
+    key: 'basic_chair_desk',
+    position: [-3.2, -0.55, 1.5],
+    offsetStep: [1.8, 0, 0],
+    render: u => <BasicChairDesk unlocked={u} />,
+  },
   { key: 'potted_plant', position: [-6.4, -0.55, -3.5], render: u => <PottedPlant unlocked={u} /> },
   { key: 'coffee_mug', position: [-3.2, -0.13, 1.4], render: u => <CoffeeMug unlocked={u} /> },
   { key: 'bookshelf', position: [-5.8, 0.75, -5.3], render: u => <Bookshelf unlocked={u} /> },
   { key: 'printer', position: [-1.3, -0.55, -3.5], render: u => <Printer unlocked={u} /> },
-  { key: 'whiteboard', position: [2.5, 1.5, -5.34], render: u => <Whiteboard unlocked={u} /> },
+  // Whiteboard repositioned to strip between picture frame and window
+  // (was 2.5,1.5 — half overlapped the window).
+  { key: 'whiteboard', position: [-0.3, 0.5, -5.34], render: u => <Whiteboard unlocked={u} /> },
   { key: 'mini_fridge', position: [6.2, -0.55, -3.8], render: u => <MiniFridge unlocked={u} /> },
   { key: 'trophy', position: [-5.8, 2.45, -5.18], render: u => <Trophy unlocked={u} /> },
   { key: 'couch', position: [3.5, -0.55, 2.5], render: u => <Couch unlocked={u} /> },
   { key: 'upgraded_desk', position: [0.5, -0.55, -2.5], render: u => <UpgradedDesk unlocked={u} /> },
-  { key: 'neon_sign', position: [4.8, 3.5, -5.36], render: u => <NeonSign unlocked={u} /> },
+  // Neon nudged up to y=4.0 so it sits above the window (top at y≈3.5).
+  { key: 'neon_sign', position: [4.8, 4.0, -5.36], render: u => <NeonSign unlocked={u} /> },
   { key: 'arcade_machine', position: [6.4, -0.55, -1.5], render: u => <ArcadeMachine unlocked={u} /> },
-  { key: 'floor_ceiling_windows', position: [5.5, 1.9, -5.4], render: u => <FloorCeilingWindows unlocked={u} /> },
-  { key: 'living_wall', position: [0.5, 1.3, -5.34], render: u => <LivingWall unlocked={u} /> },
+  // Floor-ceiling-windows decor narrowed (3.5→2.4 wide) and shifted
+  // right (5.5→6.2) so its left edge clears the real window at x=5.
+  { key: 'floor_ceiling_windows', position: [6.2, 1.9, -5.4], render: u => <FloorCeilingWindows unlocked={u} /> },
+  // Living wall moved up above the whiteboard so both can share strip B.
+  { key: 'living_wall', position: [-0.3, 2.7, -5.34], render: u => <LivingWall unlocked={u} /> },
   { key: 'espresso_machine', position: [6.0, -0.55, -4.5], render: u => <EspressoMachine unlocked={u} /> },
   { key: 'ping_pong_table', position: [2.0, -0.55, 3.0], render: u => <PingPongTable unlocked={u} /> },
   { key: 'rooftop_terrace', position: [-2.5, -0.55, 4.0], render: u => <RooftopTerrace unlocked={u} /> },
@@ -492,31 +520,45 @@ interface Props {
 }
 
 export function FloorItems({ currentFloor }: Props) {
-  // Item rendering rules:
-  //   - itemFloor <= currentFloor → render at full opacity (unlocked)
-  //   - itemFloor === currentFloor + 1 → render ghosted (preview next reward)
-  //   - itemFloor >  currentFloor + 1 → don't render at all (no spoilers)
-  // Build a map itemKey → 'unlocked' | 'preview' | 'hidden'.
-  const itemState = useMemo(() => {
-    const s = new Map<string, 'unlocked' | 'preview' | 'hidden'>()
-    for (const cfg of FLOOR_CONFIG) {
-      if (cfg.floor <= currentFloor) s.set(cfg.unlockKey, 'unlocked')
-      else if (cfg.floor === currentFloor + 1) s.set(cfg.unlockKey, 'preview')
-      else s.set(cfg.unlockKey, 'hidden')
-    }
-    return s
-  }, [currentFloor])
+  // PER-FLOOR semantic: each floor's row in floor_items lists exactly
+  // the items that floor owns, with quantities. We trust that list
+  // verbatim — no cumulative union, no preview ghosting of next-floor
+  // items. (Old cumulative behaviour was the reported bug: at F1 every
+  // item was visible because F1's row, plus all higher floors' rows,
+  // covered everything.)
+  const floorItems = useFloorItems(currentFloor)
+
+  // itemKey → quantity for fast lookup in the layout loop below.
+  const quantityByKey = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const it of floorItems) m.set(it.key, it.quantity)
+    return m
+  }, [floorItems])
 
   return (
     <group>
       {ITEMS.map(it => {
-        const state = itemState.get(it.key) ?? 'hidden'
-        if (state === 'hidden') return null
-        return (
-          <group key={it.key} position={it.position}>
-            {it.render(state === 'unlocked')}
-          </group>
-        )
+        const quantity = quantityByKey.get(it.key)
+        // Not configured for this floor → don't render anything.
+        if (!quantity || quantity < 1) return null
+        const offset = it.offsetStep ?? [1.8, 0, 0]
+        // Render `quantity` copies, each offset by `offset` from the
+        // previous. Quantity 1 renders exactly one copy at the base
+        // position — single-instance items behave as before.
+        const copies: ReactNode[] = []
+        for (let i = 0; i < quantity; i++) {
+          const pos: [number, number, number] = [
+            it.position[0] + offset[0] * i,
+            it.position[1] + offset[1] * i,
+            it.position[2] + offset[2] * i,
+          ]
+          copies.push(
+            <group key={`${it.key}-${i}`} position={pos}>
+              {it.render(true /* always 'unlocked' — it's on this floor */)}
+            </group>,
+          )
+        }
+        return <group key={it.key}>{copies}</group>
       })}
     </group>
   )

@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { SceneSkeleton } from '@/components/fallback/SceneSkeleton'
 import type { FloorPreview } from '@/lib/towerFloorPreview'
-import { FLOOR_CONFIG } from '@/lib/floors'
 
 const SceneCanvas = dynamic(
   () => import('@/components/scene/SceneCanvas').then(m => ({ default: m.SceneCanvas })),
@@ -17,7 +16,7 @@ interface Props {
 
 export default function TowerFloorViewClient({ preview }: Props) {
   const prevFloor = preview.floor > 1 ? preview.floor - 1 : null
-  const nextFloor = preview.floor < FLOOR_CONFIG.length ? preview.floor + 1 : null
+  const nextFloor = preview.floor < preview.totalFloors ? preview.floor + 1 : null
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-[#04040d]">
@@ -37,7 +36,7 @@ export default function TowerFloorViewClient({ preview }: Props) {
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-night-mid/60 border border-white/5 text-xs text-tower-cream/80">
             <span className="text-tower-gold font-semibold">Floor {preview.floor}</span>
             <span className="opacity-40">/</span>
-            <span>{FLOOR_CONFIG.length}</span>
+            <span>{preview.totalFloors}</span>
           </div>
         </div>
 

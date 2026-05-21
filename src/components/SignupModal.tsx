@@ -51,6 +51,11 @@ export function SignupModal({ onClose }: Props) {
           ref,
           trialTeamName: trial?.teamName ?? undefined,
           trialTeamPurpose: trial?.teamPurpose ?? undefined,
+          // Carry the Diaflow role recommendation across signup so the
+          // new account inherits the personalised copy and doesn't
+          // need to re-call the upstream on first load.
+          trialRecommendedRole: trial?.recommendedRole ?? undefined,
+          trialReason: trial?.reason ?? undefined,
         }),
       })
       const j = await res.json().catch(() => ({}))

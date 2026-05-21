@@ -17,25 +17,34 @@ export default async function TowerRoute() {
   let totalInvites = 0
   let teamName: string | null = null
   let referralCode: string | null = null
-  let serverRecruits: { id: string; name: string; role: string }[] = []
+  let serverRecruits: { id: string; name: string; role: string; slug?: string | null; isDefault?: boolean; pokes?: number }[] = []
   let inviter: InviterInfo | null = null
+  let userEmail: string | null = null
+  let emailVerified = false
 
   if (session) {
     const u = await prisma.user.findUnique({
       where: { id: session.userId },
       select: {
+        email: true,
+        emailVerified: true,
         currentFloor: true,
         totalInvites: true,
         teamName: true,
         referralCode: true,
         referredAt: true,
-        recruitedTeams: { select: { id: true, name: true, role: true }, orderBy: { createdAt: 'asc' } },
+        recruitedTeams: {
+          select: { id: true, name: true, role: true, slug: true, isDefault: true, pokes: true },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        },
         referredBy: {
           select: { referralCode: true, teamName: true, country: true, email: true },
         },
       },
     })
     if (u) {
+      userEmail = u.email
+      emailVerified = !!u.emailVerified
       currentFloor = u.currentFloor
       totalInvites = u.totalInvites
       teamName = u.teamName
@@ -62,6 +71,8 @@ export default async function TowerRoute() {
       referralCode={referralCode}
       serverRecruits={serverRecruits}
       inviter={inviter}
+      userEmail={userEmail}
+      emailVerified={emailVerified}
     />
   )
 }

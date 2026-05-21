@@ -43,6 +43,17 @@ export function getFloorConfig(floor: number): FloorConfig | undefined {
   return FLOOR_CONFIG.find(c => c.floor === floor)
 }
 
+/**
+ * Static fallback for "items visible on floor N". Returns the cumulative
+ * set (every floor 1..N's unlock key) because the static `FLOOR_CONFIG`
+ * snapshot only stores ONE item per floor — so the cumulative roll-up
+ * is the equivalent of the cumulative-inclusive DB seed used in
+ * production (see prisma/seed.mjs).
+ *
+ * The live DB-backed code path (lib/floorsApi → useFloorItems) is
+ * per-floor non-cumulative since the floor_items table already lists
+ * everything visible at each floor explicitly.
+ */
 export function getUnlockedItemKeysForFloor(floor: number): { itemKey: string; floor: number }[] {
   return FLOOR_CONFIG.filter(c => c.floor <= floor).map(c => ({ itemKey: c.unlockKey, floor: c.floor }))
 }
@@ -64,4 +75,35 @@ export function getMaxTeammates(floor: number): number {
 export function getRecruitSlotsAvailable(floor: number, recruitedCount: number): number {
   const max = getMaxTeammates(floor)
   return Math.max(0, max - DEFAULT_NPC_COUNT - recruitedCount)
+}
+
+/**
+ * Total teammate count for the "X / Y teammates" badge.
+ *
+ * Handles both flows uniformly:
+ *  - Signed-in users: the `teammates` array already contains the 3
+ *    default NPCs as DB rows (isDefault=true) plus N user-recruited.
+ *    Just return its length.
+ *  - Anonymous trial users: `teammates` is empty (trial recruits aren't
+ *    persisted), but the 3 NPCs are still visually rendered, so we
+ *    add `DEFAULT_NPC_COUNT` on top of the array length.
+ *
+ * Detection: if any row has `isDefault: true`, the array already
+ * includes the NPCs; otherwise it doesn't.
+ */
+export function computeTeammateCount(teammates: { isDefault?: boolean }[]): number {
+  const includesDefaults = teammates.some(t => t.isDefault)
+  if (includesDefaults) return teammates.length
+  return DEFAULT_NPC_COUNT + teammates.length
+}
+
+/**
+ * Returns just the user-recruited teammates (excludes the 3 default
+ * NPCs). Used by OfficeScene to avoid double-rendering Iris/Mia/Leo
+ * and by slot-math to compute "how many more can you add".
+ */
+export function filterCustomTeammates<T extends { isDefault?: boolean }>(
+  teammates: T[]
+): T[] {
+  return teammates.filter(t => !t.isDefault)
 }

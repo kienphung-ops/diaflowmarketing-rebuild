@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FLOOR_CONFIG, getMaxTeammates } from '@/lib/floors'
+import { useFloorsConfig } from '@/lib/floorsConfigClient'
 
 interface Props {
   open: boolean
@@ -22,6 +22,9 @@ const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
 export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
   const [copied, setCopied] = useState(false)
+  // Live floor catalogue from /api/floors. Falls back to the static
+  // FLOOR_CONFIG snapshot until the first response lands.
+  const floors = useFloorsConfig()
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -165,37 +168,37 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
 
         {/* Scrollable table rows */}
         <div style={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
-          {FLOOR_CONFIG.map((cfg, i) => {
-            const reward = FLOOR_REWARDS[cfg.floor]
-            const isLast = i === FLOOR_CONFIG.length - 1
-            const isPenthouse = cfg.floor === 20
+          {floors.map((cfg, i) => {
+            const reward = cfg.productReward ?? FLOOR_REWARDS[cfg.id]
+            const isLast = i === floors.length - 1
+            const isPenthouse = cfg.id === floors.length
             return (
               <div
-                key={cfg.floor}
+                key={cfg.id}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '56px 70px 100px 1fr 100px',
                   gap: 0,
                   padding: '13px 0',
                   borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                  background: cfg.floor === 1 ? 'rgba(129,140,248,0.07)' : 'transparent',
+                  background: cfg.id === 1 ? 'rgba(129,140,248,0.07)' : 'transparent',
                 }}
               >
                 <p
                   style={{
                     margin: 0,
                     fontSize: '14px',
-                    fontWeight: cfg.floor === 1 ? 700 : 400,
+                    fontWeight: cfg.id === 1 ? 700 : 400,
                     color: isPenthouse ? '#fbbf24' : 'white',
                   }}
                 >
-                  {cfg.floor}
+                  {cfg.id}
                 </p>
                 <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
                   {cfg.invitesRequired}
                 </p>
                 <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
-                  {getMaxTeammates(cfg.floor)}
+                  {cfg.maxTeammates}
                 </p>
                 <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)' }}>
                   {isPenthouse ? '🏆 ' : ''}

@@ -1,21 +1,34 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TowerView } from '@/components/TowerView'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
 import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { SignupModal } from '@/components/SignupModal'
 import { LeaderboardModal } from '@/components/LeaderboardModal'
+import { EmailVerifyModal } from '@/components/EmailVerifyModal'
+import { CelebrationModal } from '@/components/CelebrationModal'
 import { Header } from '@/components/Header'
+import { ToastStack, type ToastMessage } from '@/components/Toast'
 import { readTrialState } from '@/lib/trial'
-import { getMaxTeammates, getRecruitSlotsAvailable, DEFAULT_NPC_COUNT } from '@/lib/floors'
+import {
+  computeTeammateCount,
+  filterCustomTeammates,
+  DEFAULT_NPC_COUNT,
+} from '@/lib/floors'
+import { useMaxTeammates } from '@/lib/floorsConfigClient'
+import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
+import { useFloorPresence } from '@/hooks/useFloorPresence'
 import type { InviterInfo } from '@/lib/inviter'
 
 interface ServerRecruit {
   id: string
   name: string
   role: string
+  slug?: string | null
+  isDefault?: boolean
+  pokes?: number
 }
 
 interface Props {
@@ -27,6 +40,8 @@ interface Props {
   referralCode: string | null
   serverRecruits: ServerRecruit[]
   inviter: InviterInfo | null
+  userEmail: string | null
+  emailVerified: boolean
 }
 
 export default function TowerPageClient(props: Props) {
@@ -34,6 +49,35 @@ export default function TowerPageClient(props: Props) {
   const [squadOpen, setSquadOpen] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
+  const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
+  // Mirror server-supplied emailVerified locally so completing the
+  // EmailVerifyModal flow hides the "Verify your email" banner
+  // immediately (without waiting for /api/me round-trip).
+  const [emailVerified, setEmailVerified] = useState(props.emailVerified)
+  // Leaderboard rank — fetched client-side from /api/leaderboard,
+  // mirroring the home-page flow. `null` while loading / for trial.
+  const [rank, setRank] = useState<number | null>(null)
+  // Live server-side state that supersedes the initial props once SSE
+  // events start landing. The initial render uses props (server-fetched
+  // at request time); the SSE stream then pushes deltas as invites
+  // verify in the background. Without this, /tower would freeze on
+  // the values captured at first paint and miss any subsequent invite
+  // credits — which was the original bug.
+  const [liveTotalInvites, setLiveTotalInvites] = useState(props.totalInvites)
+  const [liveCurrentFloor, setLiveCurrentFloor] = useState(props.currentFloor)
+  // Toasts + celebration modal — same UX as the office view, so the
+  // user gets the same feedback regardless of which view they're on
+  // when an invite gets credited.
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const [celebrationFloor, setCelebrationFloor] = useState<number | null>(null)
+  const [celebrationFloorsClimbed, setCelebrationFloorsClimbed] = useState(0)
+
+  const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
+    setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
+  }, [])
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   async function handleLogout() {
     // Clear session server-side, then hard-reload home so the server
@@ -43,6 +87,77 @@ export default function TowerPageClient(props: Props) {
     } catch {/* fall through */}
     window.location.href = '/'
   }
+
+  // Fetch leaderboard rank for signed-in users. Re-fetches whenever the
+  // LIVE total-invites moves (driven by either the initial server prop
+  // OR a subsequent SSE invite-accepted event), so /tower's rank pill
+  // stays in sync with /api/leaderboard the same way the office view's
+  // does.
+  useEffect(() => {
+    if (!props.signedIn) {
+      setRank(null)
+      return
+    }
+    const ac = new AbortController()
+    fetch('/api/leaderboard', { cache: 'no-store', signal: ac.signal })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (ac.signal.aborted || !data) return
+        setRank(typeof data.currentUserRank === 'number' ? data.currentUserRank : null)
+      })
+      .catch(err => {
+        if ((err as Error).name === 'AbortError') return
+        /* swallow */
+      })
+    return () => ac.abort()
+  }, [props.signedIn, liveTotalInvites])
+
+  // Real-time updates via SSE — mirrors the office view (TowerLanding).
+  // Without this hook, /tower would never learn that an invite just
+  // verified, so the YOU marker, rank pill, MySquad progress bar, and
+  // teammate-slot math would all freeze on the values captured at first
+  // paint. Vercel's 25-second function cap forces SSE reconnects; the
+  // `onSnapshot` handler diffs the post-reconnect baseline against
+  // client state so any updates that landed during the reconnect window
+  // still surface as a celebration / toast.
+  useRealtimeFloor({
+    enabled: props.signedIn,
+    onSnapshot: data => {
+      const floorClimbed = data.currentFloor - liveCurrentFloor
+      const invitesDelta = data.totalInvites - liveTotalInvites
+      if (floorClimbed > 0) {
+        setCelebrationFloorsClimbed(floorClimbed)
+        setCelebrationFloor(data.currentFloor)
+      }
+      if (invitesDelta > 0) {
+        pushToast({
+          title:
+            invitesDelta === 1
+              ? '+1 invite accepted'
+              : `+${invitesDelta} invites accepted`,
+          body: 'A new teammate slot is waiting — add them to your squad.',
+          tone: 'success',
+        })
+      }
+      setLiveCurrentFloor(data.currentFloor)
+      setLiveTotalInvites(data.totalInvites)
+    },
+    onFloorUp: data => {
+      const climbed = Math.max(1, data.currentFloor - liveCurrentFloor)
+      setCelebrationFloorsClimbed(climbed)
+      setCelebrationFloor(data.currentFloor)
+      setLiveCurrentFloor(data.currentFloor)
+      setLiveTotalInvites(data.totalInvites)
+    },
+    onInviteAccepted: data => {
+      setLiveTotalInvites(data.totalInvites)
+      pushToast({
+        title: data.delta === 1 ? '+1 invite accepted' : `+${data.delta} invites accepted`,
+        body: 'A new teammate slot is waiting — add them to your squad.',
+        tone: 'success',
+      })
+    },
+  })
 
   // Anonymous visitors hydrate from localStorage so My Squad still shows
   // their trial team name + invite count. Trial state never grants a YOU
@@ -64,8 +179,11 @@ export default function TowerPageClient(props: Props) {
   const effective = props.signedIn
     ? {
         teamName: props.teamName,
-        totalInvites: props.totalInvites,
-        currentFloor: props.currentFloor,
+        // Live values from the SSE stream when available — they fall
+        // back to the props on initial render (before the first
+        // snapshot event arrives) so SSR hydration matches.
+        totalInvites: liveTotalInvites,
+        currentFloor: liveCurrentFloor,
         teammates: props.serverRecruits,
       }
     : {
@@ -75,9 +193,30 @@ export default function TowerPageClient(props: Props) {
         teammates: [] as ServerRecruit[],
       }
 
-  const teammateCount = DEFAULT_NPC_COUNT + effective.teammates.length
-  const maxTeammates = getMaxTeammates(effective.currentFloor)
-  const slotsAvailable = getRecruitSlotsAvailable(effective.currentFloor, effective.teammates.length)
+  // Defaults (Iris/Mia/Leo) live in the DB now, so `effective.teammates`
+  // for a signed-in user already contains them. Use the shared helper
+  // so the count matches the home-page badge exactly.
+  const teammateCount = computeTeammateCount(effective.teammates)
+  // Live max-teammates from /api/floors (cached). Falls back to static
+  // FLOOR_MAX_TEAMMATES until the first API response.
+  const maxTeammates = useMaxTeammates(effective.currentFloor)
+  // Slot math runs against the user-recruited slice only — defaults
+  // never block adding new teammates.
+  const customCount = filterCustomTeammates(effective.teammates).length
+  const slotsAvailable = Math.max(0, maxTeammates - DEFAULT_NPC_COUNT - customCount)
+
+  // Owner-side floor stats — same as /office: live viewer count via
+  // `observe` mode (no self-counting) + sum of teammate pokes. Surfaced
+  // in MySquadDrawer's "Your floor" pill. Anonymous users have no
+  // referralCode, so the hook returns 0 and the pill is suppressed.
+  const ownerViewerCount = useFloorPresence({
+    code: props.signedIn ? props.referralCode : null,
+    mode: 'observe',
+  })
+  const ownerTotalPokes = effective.teammates.reduce(
+    (sum, t) => sum + (t.pokes ?? 0),
+    0,
+  )
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-[#04040d]">
@@ -125,6 +264,23 @@ export default function TowerPageClient(props: Props) {
         inviter={props.inviter}
         onOpenSignup={!props.signedIn ? () => setSignupOpen(true) : undefined}
         onLogout={props.signedIn ? handleLogout : undefined}
+        emailVerified={props.signedIn ? emailVerified : undefined}
+        userEmail={props.userEmail}
+        onVerifyEmail={
+          props.signedIn && !emailVerified ? () => setEmailVerifyOpen(true) : undefined
+        }
+        rank={rank}
+        // Owner-side floor activity — `ownerName: null` flips the
+        // drawer's pill label from "Visiting <name>" to "Your floor".
+        visiting={
+          props.signedIn && props.referralCode
+            ? {
+                ownerName: null,
+                viewerCount: ownerViewerCount,
+                totalPokes: ownerTotalPokes,
+              }
+            : undefined
+        }
       />
 
       <LeaderboardModal
@@ -135,6 +291,32 @@ export default function TowerPageClient(props: Props) {
       />
 
       {signupOpen && <SignupModal onClose={() => setSignupOpen(false)} />}
+
+      <EmailVerifyModal
+        open={emailVerifyOpen}
+        onClose={() => setEmailVerifyOpen(false)}
+        email={props.userEmail}
+        onVerified={() => setEmailVerified(true)}
+      />
+
+      {/* Floor-up celebration — gated behind signed-in (anonymous /
+          trial users never see this modal, matching the office view's
+          policy). Fires from the SSE `floor-up` handler above. */}
+      {props.signedIn && celebrationFloor != null && (
+        <CelebrationModal
+          floor={celebrationFloor}
+          totalInvites={effective.totalInvites}
+          trialMode={false}
+          floorsClimbed={celebrationFloorsClimbed}
+          onClose={() => setCelebrationFloor(null)}
+          onOpenSquad={() => setSquadOpen(true)}
+        />
+      )}
+
+      {/* Toasts — used by the SSE `invite-accepted` handler so the user
+          gets the same "+1 invite accepted" feedback on /tower as they
+          do in the office view. */}
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </main>
   )
 }
