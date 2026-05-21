@@ -158,16 +158,55 @@ export function MySquadDrawer({
     }
   }
 
-  function handleShare(network: 'x' | 'linkedin' | 'threads') {
+  /**
+   * Build the share copy + open the network's intent URL. Copy is
+   * sourced from requirements/share-btn.md so marketing controls the
+   * wording — only the dynamic `invitesToNext` count + `inviteUrl`
+   * are injected at runtime.
+   *
+   *   X         → "just built my AI office at diaflow. {N} invites
+   *                from unlocking the next floor 👀 {url}"
+   *   LinkedIn  → "Trying Diaflow's early access — you build an AI
+   *                team in a virtual office and climb a tower by
+   *                inviting people. I'm {N} invites from the next
+   *                floor. {url}"
+   *
+   * LinkedIn's share-offsite intent only accepts a `url` param (no
+   * pre-filled `text`), so we still pass the URL — the user then
+   * pastes the suggested copy from the system clipboard which we
+   * populate at click time.
+   */
+  function handleShare(network: 'x' | 'linkedin') {
     if (!inviteUrl) return
-    const text = `Building my AI squad with @Diaflow. Currently on Floor ${currentFloor} of ${totalFloors} — climb with me`
-    const encoded = encodeURIComponent(text + ' ' + inviteUrl)
-    const urls: Record<typeof network, string> = {
-      x: `https://x.com/intent/tweet?text=${encoded}`,
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`,
-      threads: `https://www.threads.net/intent/post?text=${encoded}`,
+    const invitesPhrase = nextFloor
+      ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from`
+      : 'just reached the top floor —'
+    const xText = nextFloor
+      ? `just built my AI office at diaflow. ${invitesPhrase} unlocking the next floor 👀\n${inviteUrl}`
+      : `just topped out my AI office at diaflow 🏆\n${inviteUrl}`
+    const linkedinText = nextFloor
+      ? `Trying Diaflow's early access — you build an AI team in a virtual office and climb a tower by inviting people.\nI'm ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from the next floor.\n${inviteUrl}`
+      : `Trying Diaflow's early access — you build an AI team in a virtual office and climb a tower by inviting people.\nJust reached the top floor.\n${inviteUrl}`
+
+    if (network === 'x') {
+      window.open(
+        `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}`,
+        '_blank',
+        'noopener,noreferrer,width=620,height=620',
+      )
+      return
     }
-    window.open(urls[network], '_blank', 'noopener,noreferrer,width=620,height=620')
+    // LinkedIn: drop the suggested copy on the user's clipboard so
+    // they can paste it in the share modal (the intent URL only
+    // accepts a `url` param, not pre-filled text).
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(linkedinText).catch(() => {/* best-effort */})
+    }
+    window.open(
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`,
+      '_blank',
+      'noopener,noreferrer,width=620,height=620',
+    )
   }
 
 
@@ -201,54 +240,20 @@ export function MySquadDrawer({
           </div>
         )}
 
-        {/* Unverified-email CTA — signed-in user, emailVerified is false
-            in the DB. Hidden once verification completes (parent
-            re-fetches /api/me to flip `emailVerified` to true). */}
-        {onVerifyEmail && emailVerified === false && (
-          <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2.5 text-sm">
-            <div className="flex items-start gap-3">
-              <div className="text-purple-300 text-base leading-none mt-0.5" aria-hidden>⚠</div>
-              <div className="flex-1 min-w-0">
-                <div className="text-purple-200 font-semibold mb-0.5">
-                  Verify your email
-                </div>
-                {userEmail && (
-                  <div className="text-[11px] text-purple-100/70 truncate">
-                    {userEmail}
-                  </div>
-                )}
-                <div className="text-[11px] text-tower-cream/60 mt-1">
-                  Confirms we can reach you with floor-up notifications and
-                  invite credits.
-                </div>
-              </div>
-              <button
-                onClick={onVerifyEmail}
-                className="shrink-0 px-3 py-1.5 rounded-md bg-purple-300 text-night-deep font-semibold text-xs hover:bg-purple-200 transition"
-              >
-                Verify
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Floor-activity stats — viewer count + total pokes.
-            Section label adapts to context:
-              - `ownerName` set → "Visiting <name>" (guest on /floor/[code])
-              - `ownerName` null → "Your floor" (owner on /office or /tower)
-            Provides a single place for floor-side metrics whether the
-            user is browsing their own page or someone else's. */}
-        {visiting && (
+        {/* Standalone "Visiting <name>" pill — ONLY for guests on
+            /floor/[code] (i.e. `visiting.ownerName` is set). The
+            owner-side stats are merged INTO the Current Floor card
+            below so the drawer has a single focal card instead of
+            two stacked panels. */}
+        {visiting && visiting.ownerName && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
             <div className="flex items-baseline justify-between mb-2">
               <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/80">
-                {visiting.ownerName ? 'Visiting' : 'Your floor'}
+                Visiting
               </div>
-              {visiting.ownerName && (
-                <div className="text-xs font-semibold text-amber-200 truncate ml-2 max-w-[160px]">
-                  {visiting.ownerName}
-                </div>
-              )}
+              <div className="text-xs font-semibold text-amber-200 truncate ml-2 max-w-[160px]">
+                {visiting.ownerName}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-night-deep/60 border border-white/5">
@@ -368,6 +373,32 @@ export function MySquadDrawer({
             </span>
             {nextFloor && <span className="text-tower-cream/60">{nextFloor.label}</span>}
           </div>
+
+          {/* Owner floor-activity row — only rendered when the drawer
+              is mounted on the OWNER's own page (visiting present
+              without an ownerName). Sits inside the Current Floor
+              card as a thin stats row so the previous standalone
+              "Your floor" panel doesn't double the visual weight. */}
+          {visiting && !visiting.ownerName && (
+            <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-5 text-xs">
+              <span className="flex items-center gap-1.5 text-tower-cream/85">
+                <DrawerEyeIcon />
+                <strong className="text-sm font-bold tabular-nums text-tower-cream">
+                  {visiting.viewerCount}
+                </strong>
+                <span className="text-tower-cream/55">viewing</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-tower-cream/85">
+                <span className="text-amber-300 text-sm leading-none" aria-hidden>★</span>
+                <strong className="text-sm font-bold tabular-nums text-tower-cream">
+                  {visiting.totalPokes}
+                </strong>
+                <span className="text-tower-cream/55">
+                  {visiting.totalPokes === 1 ? 'poke' : 'pokes'}
+                </span>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Share-floor section + per-teammate list were removed per
@@ -377,20 +408,30 @@ export function MySquadDrawer({
             was clutter. Edit modal is still reachable by clicking
             teammates in the 3D scene (or via the bulk-add CTA). */}
 
-        {/* Share */}
+        {/* Share — two networks (X + LinkedIn). Threads was retired
+            per product decision: most users already cross-post X →
+            Threads, and our share copy reads better in tweet form. */}
         <div>
           <div className="text-sm font-semibold mb-2">Share to climb faster</div>
-          <div className="grid grid-cols-3 gap-2">
-            {(['x', 'linkedin', 'threads'] as const).map(net => (
-              <button
-                key={net}
-                onClick={() => handleShare(net)}
-                className="px-3 py-2 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold capitalize hover:bg-night-deep transition"
-                disabled={!inviteUrl}
-              >
-                {net === 'x' ? '𝕏 X' : net === 'linkedin' ? '🔗 LinkedIn' : '@ Threads'}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleShare('x')}
+              disabled={!inviteUrl}
+              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Share on X"
+            >
+              <XLogo />
+              <span>X</span>
+            </button>
+            <button
+              onClick={() => handleShare('linkedin')}
+              disabled={!inviteUrl}
+              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Share on LinkedIn"
+            >
+              <LinkedInLogo />
+              <span>LinkedIn</span>
+            </button>
           </div>
         </div>
 
@@ -401,6 +442,36 @@ export function MySquadDrawer({
           <span className="flex items-center gap-1 text-tower-cream/50">ⓘ How it works</span>
           <span className="text-purple-300 hover:text-purple-200 font-semibold">Open →</span>
         </button>
+
+        {/* Unverified-email CTA — signed-in user, emailVerified is false
+            in the DB. Hidden once verification completes (parent re-
+            fetches /api/me to flip `emailVerified` to true). Moved
+            BELOW the "How it works" row so it doesn't dominate the
+            top of the drawer — the prompt is still findable but isn't
+            the first thing the user sees. */}
+        {onVerifyEmail && emailVerified === false && (
+          <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2.5 text-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-purple-300 text-base leading-none mt-0.5" aria-hidden>⚠</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-purple-200 font-semibold mb-0.5">
+                  Verify your email
+                </div>
+                {userEmail && (
+                  <div className="text-[11px] text-purple-100/70 truncate">
+                    {userEmail}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={onVerifyEmail}
+                className="shrink-0 px-3 py-1.5 rounded-md bg-purple-300 text-night-deep font-semibold text-xs hover:bg-purple-200 transition"
+              >
+                Verify
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <HowItWorksModal
@@ -514,6 +585,37 @@ function formatInvitedAt(iso: string | null): string | null {
 // for an in-drawer privacy switch. Now that the share URL is unified
 // with the invite URL (always `/floor/<code>`), there's no toggle —
 // the section was removed from the drawer.
+
+/** X / Twitter wordmark — single-glyph "𝕏" doesn't render reliably on
+ *  every OS font set, so we use the official path. */
+function XLogo() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
+/** LinkedIn "in" mark. */
+function LinkedInLogo() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.063 2.063 0 1 1 2.063 2.065zm1.778 13.019H3.555V9h3.56v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+    </svg>
+  )
+}
 
 /** Minimal eye SVG — used for the "Visiting" pill so visitors can see
  *  how many other people are also looking at the floor right now. */

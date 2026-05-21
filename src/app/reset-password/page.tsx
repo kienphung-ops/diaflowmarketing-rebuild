@@ -10,6 +10,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { PasswordInput } from '@/components/PasswordInput'
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -80,8 +81,7 @@ function ResetPasswordForm() {
               <span className="text-xs uppercase tracking-wider text-tower-cream/50">
                 New password
               </span>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 minLength={6}
                 autoFocus
@@ -89,22 +89,19 @@ function ResetPasswordForm() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="at least 6 characters"
-                className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
               />
             </label>
             <label className="block space-y-1">
               <span className="text-xs uppercase tracking-wider text-tower-cream/50">
                 Confirm password
               </span>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 minLength={6}
                 autoComplete="new-password"
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
                 placeholder="re-type it"
-                className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
               />
             </label>
             <button

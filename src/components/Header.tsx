@@ -15,6 +15,11 @@ interface Props {
   onOpenSignup?: () => void
   onToggleTower?: () => void
   onAddTeammates?: () => void
+  /** When true, suppress the unlogged-user "Claim your team" CTA in
+   *  the header's right slot. Used by /floor/[code] where the bottom-
+   *  center "Build your own office" button already covers the
+   *  signup path and a duplicate header button reads as clutter. */
+  hideAuthCta?: boolean
 }
 
 export function Header({
@@ -29,6 +34,7 @@ export function Header({
   onOpenSignup,
   onToggleTower,
   onAddTeammates,
+  hideAuthCta,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -89,8 +95,11 @@ export function Header({
             (anonymous home) or routes to /login (any other unlogged
             page) — same intent, single message. */}
         {signedIn && referralCode ? (
+          // Signed-in: always show the invite-link copy button, even
+          // when `hideAuthCta` is set — it's not an auth CTA, it's a
+          // utility for the user's own referral link.
           <ReferralCopyButton code={referralCode} />
-        ) : onOpenSignup ? (
+        ) : hideAuthCta ? null : onOpenSignup ? (
           <button
             onClick={onOpenSignup}
             className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[11px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"

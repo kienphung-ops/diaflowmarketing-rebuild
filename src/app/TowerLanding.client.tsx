@@ -467,6 +467,60 @@ export default function TowerLanding(props: Props) {
     }
   }
 
+  /**
+   * Drag-to-poke handler — fires from OfficeScene whenever a teammate
+   * was meaningfully dragged (> 0.2 world units). Mirrors the visitor
+   * view's `pokeBySlug` so the owner gets the same "drag = poke"
+   * affordance over their own floor.
+   *
+   * Slug mapping:
+   *   - 'iris' | 'mia' | 'leo' — matched against `recruits` by slug
+   *     column (defaults seeded at signup carry their slug).
+   *   - 'recruited-N'          — N-th custom (non-default) teammate.
+   *
+   * Trial users have an empty `recruits` array (no DB rows), so the
+   * lookup misses and the API call is silently skipped — the visual
+   * poke animation in OfficeScene still plays.
+   */
+  function handleTeammatePoke(charSlug: string) {
+    let target: ServerRecruit | undefined
+    if (charSlug.startsWith('recruited-')) {
+      const idx = parseInt(charSlug.slice('recruited-'.length), 10)
+      if (Number.isNaN(idx)) return
+      target = recruits.filter(r => !r.isDefault)[idx]
+    } else {
+      target = recruits.find(r => r.slug === charSlug)
+    }
+    if (!target) return
+    // Skip trial-only client-side rows — they have no DB id to bump.
+    if (target.id.startsWith('trial-')) return
+
+    // Optimistic increment so the rank pill / MySquad pokes view bumps
+    // immediately. Revert on API failure.
+    setRecruits(prev =>
+      prev.map(t => (t.id === target!.id ? { ...t, pokes: (t.pokes ?? 0) + 1 } : t))
+    )
+    fetch(`/api/poke/${target.id}`, { method: 'POST' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => {
+        if (j && typeof j.pokes === 'number') {
+          // Sync to server-authoritative count (covers concurrent
+          // pokes from other viewers).
+          setRecruits(prev =>
+            prev.map(t => (t.id === target!.id ? { ...t, pokes: j.pokes } : t))
+          )
+        }
+      })
+      .catch(() => {
+        // Network failure — revert the optimistic bump.
+        setRecruits(prev =>
+          prev.map(t =>
+            t.id === target!.id ? { ...t, pokes: Math.max(0, (t.pokes ?? 1) - 1) } : t,
+          ),
+        )
+      })
+  }
+
   function handleAddTeammate() {
     const id = isTrial ? `trial-${Date.now()}` : ''
     if (isTrial) {
@@ -649,6 +703,12 @@ export default function TowerLanding(props: Props) {
           const t = customRecruits[idx]
           if (t) setEditingTeammate(t)
         }}
+        // Drag → poke. OfficeScene fires this whenever the user drags
+        // a teammate by > 0.2 units; we map the slug to the DB row
+        // and bump the poke counter (server-side + optimistic local).
+        // Works for anyone, signed-in or not — the /api/poke/[id]
+        // endpoint has no auth gate.
+        onTeammatePoke={handleTeammatePoke}
         resetSignal={resetSignal}
       />
 

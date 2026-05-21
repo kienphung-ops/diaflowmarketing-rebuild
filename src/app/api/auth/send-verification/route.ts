@@ -2,10 +2,12 @@
  * POST /api/auth/send-verification
  *
  * For the currently-signed-in user: generate a 6-digit OTP, store its
- * hash in AuthToken with type=EMAIL_VERIFY, and email it via Diaflow.
- * No-ops (200 success) if the user is already verified, so the client
- * can call this idempotently without leaking verification state to
- * unauthenticated probes.
+ * hash in AuthToken with type=EMAIL_VERIFY, and fire the
+ * `diaflow-tower` event in Klaviyo (with `type: verify_email`) so the
+ * configured Flow can deliver the OTP email. No-ops (200 success) if
+ * the user is already verified, so the client can call this
+ * idempotently without leaking verification state to unauthenticated
+ * probes.
  */
 
 import { NextResponse } from 'next/server'
@@ -16,7 +18,7 @@ import {
   readSession,
   TOKEN_TTL_MINUTES,
 } from '@/lib/auth'
-import { buildVerifyEmailHtml, sendDiaflowEmail } from '@/lib/diaflowEmail'
+import { trackKlaviyoEvent, KlaviyoEvent, KlaviyoEventType } from '@/lib/klaviyo'
 
 export const runtime = 'nodejs'
 
@@ -62,17 +64,30 @@ export async function POST() {
     },
   })
 
-  await sendDiaflowEmail({
-    to: user.email,
-    subject: 'Verify your Diaflow email',
-    html: buildVerifyEmailHtml({ otp }),
-    devPreview: `OTP: ${otp}`,
+  // Fire the Klaviyo event — the actual email is templated + sent by
+  // the Flow configured in Klaviyo against the `diaflow-tower` metric
+  // with a filter on `event.type == "verify_email"`. `otp` and
+  // `expiresInMinutes` are referenced inside the template as
+  // `{{ event.otp }}` / `{{ event.expiresInMinutes }}`. Best-effort:
+  // `trackKlaviyoEvent` never throws, so a Klaviyo outage doesn't
+  // block the API response (the user can resend via the modal).
+  await trackKlaviyoEvent({
+    metricName: KlaviyoEvent.METRIC,
+    profile: { email: user.email },
+    properties: {
+      type: KlaviyoEventType.VERIFY_EMAIL,
+      otp,
+      expiresInMinutes: TOKEN_TTL_MINUTES,
+    },
+    // Dedupe key — Klaviyo will treat retries of the same OTP as the
+    // same event so a flaky network doesn't double-send the email.
+    uniqueId: `verify_email:${session.userId}:${tokenHash}`,
   })
 
-  // Dev helper — surface the OTP in the response when Diaflow API
-  // isn't configured, so local testing works.
+  // Dev helper — surface the OTP in the response when Klaviyo isn't
+  // configured, so local testing works without a real inbox.
   const expose =
-    process.env.NODE_ENV !== 'production' || !process.env.DIAFLOW_API_KEY
+    process.env.NODE_ENV !== 'production' || !process.env.KLAVIYO_PRIVATE_API_KEY
   return NextResponse.json({
     success: true,
     ...(expose ? { devOtp: otp } : {}),

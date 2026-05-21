@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { clearTrialState, readTrialState } from '@/lib/trial'
+import { PasswordInput } from './PasswordInput'
 
 interface Props {
   onClose: () => void
@@ -118,15 +119,13 @@ export function SignupModal({ onClose }: Props) {
           </label>
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-wider text-tower-cream/50">Password</span>
-            <input
-              type="password"
+            <PasswordInput
               required
               minLength={6}
               autoComplete="new-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="at least 6 characters"
-              className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
             />
           </label>
           <button

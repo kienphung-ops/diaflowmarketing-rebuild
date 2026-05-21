@@ -332,7 +332,12 @@ export default function FloorVisitorClient(props: Props) {
         slotsAvailable={visitorSlotsAvailable}
         showTower={false}
         onToggleTower={() => router.push('/tower')}
-        onOpenSignup={!props.visitorSignedIn ? () => setSignupOpen(true) : undefined}
+        // No header "Claim your team" button while visiting someone
+        // else's floor — the bottom-center "Build your own office"
+        // CTA already funnels unlogged visitors into signup with the
+        // owner's ref code attached, so a duplicate top-right button
+        // is just clutter.
+        hideAuthCta
       />
 
       {/* Top-left card identifying who you're visiting + the owner's

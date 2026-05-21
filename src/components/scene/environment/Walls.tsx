@@ -7,30 +7,32 @@ import { Text, useTexture } from '@react-three/drei'
 // Memoize so re-renders of the parent (camera target changes, scene reflows)
 // don't force the SDF text atlas to rebuild — which manifested as flicker.
 //
-// Frame enlarged ~50% (1.08 → 1.6) so the company name reads clearly from
-// the static camera distance. Reserved band on the back wall is now
-// x ∈ [-3.1, -1.5], y ∈ [1.4, 3.0]; the FloorItems layout keeps other
-// wall items clear of this box.
+// Frame doubled (1.6 → 3.2 on both axes) so the company name reads from
+// further back in the scene. Depth stays as-is — only x/y were
+// doubled per the product spec. Reserved band on the back wall is
+// now x ∈ [-3.9, -0.7], y ∈ [0.6, 3.8] (centred at -2.3, 2.2). Wall
+// items in FloorItems may need to be shifted further out to clear
+// this larger footprint.
 const CompanyFrame = memo(function CompanyFrame({ companyName }: { companyName?: string }) {
   return (
     <group position={[-2.3, 2.2, -5.4]}>
       <mesh castShadow>
-        <boxGeometry args={[1.6, 1.6, 0.05]} />
+        <boxGeometry args={[3.2, 3.2, 0.05]} />
         <meshLambertMaterial color="#5a3a10" />
       </mesh>
       <mesh position={[0, 0, 0.03]}>
-        <boxGeometry args={[1.42, 1.42, 0.03]} />
+        <boxGeometry args={[2.84, 2.84, 0.03]} />
         <meshLambertMaterial color="#7a5520" />
       </mesh>
       <mesh position={[0, 0, 0.046]}>
-        <planeGeometry args={[1.38, 1.38]} />
+        <planeGeometry args={[2.76, 2.76]} />
         <meshLambertMaterial color="#f5f0e8" />
       </mesh>
       {companyName && (
         <Text
           position={[0, 0, 0.08]}
-          fontSize={0.15}
-          maxWidth={1.2}
+          fontSize={0.3}
+          maxWidth={2.4}
           textAlign="center"
           color="#1a1a2e"
           anchorX="center"

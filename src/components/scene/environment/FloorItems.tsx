@@ -471,11 +471,15 @@ interface ItemSpec {
 
 // Wall layout (z ≈ -5.3 plane). The back-wall window cut-out lives at
 // x ∈ [2, 5], y ∈ [1.3, 3.5] — every wall-mounted item below sits
-// outside that band so nothing overlaps the cityscape window.
+// outside that band so nothing overlaps the cityscape window. The
+// company picture frame was doubled to 3.2×3.2 (see Walls.tsx
+// CompanyFrame), so its reserved band stretches further than before.
 //
-//   x: [-7.5, -3.5]  → bookshelf + trophy
-//   x: [-3.1, -1.5]  → company_picture_frame (drawn from Walls.tsx)
-//   x: [-0.85, 1.35] → whiteboard (y < 1.2) + living_wall (y > 1.5)
+//   x: [-7.5, -3.9]  → bookshelf + trophy
+//   x: [-3.9, -0.7]  → company_picture_frame (drawn from Walls.tsx)
+//                      reserved band y ∈ [0.6, 3.8]
+//   x: [-0.5, 1.7]   → living_wall (lower) stacked under whiteboard (upper);
+//                      both centred at x = 0.6
 //   x: [2,   5]      → WINDOW (do not place items here)
 //   x: [4.35, 5.25]  → neon_sign (above window, y > 3.7)
 //   x: [5,   7.4]    → floor_ceiling_windows decor
@@ -494,9 +498,12 @@ const ITEMS: ItemSpec[] = [
   { key: 'coffee_mug', position: [-3.2, -0.13, 1.4], render: u => <CoffeeMug unlocked={u} /> },
   { key: 'bookshelf', position: [-5.8, 0.75, -5.3], render: u => <Bookshelf unlocked={u} /> },
   { key: 'printer', position: [-1.3, -0.55, -3.5], render: u => <Printer unlocked={u} /> },
-  // Whiteboard repositioned to strip between picture frame and window
-  // (was 2.5,1.5 — half overlapped the window).
-  { key: 'whiteboard', position: [-0.3, 0.5, -5.34], render: u => <Whiteboard unlocked={u} /> },
+  // Whiteboard sits in the strip between the (now doubled) picture
+  // frame and the cityscape window. UPPER half — placed ABOVE the
+  // living wall per product spec. Centred at x = 0.6 (clears the
+  // frame's right edge at x = -0.7 with a 0.2 unit gap, and clears
+  // the window's left edge at x = 2 with a 0.3 unit gap).
+  { key: 'whiteboard', position: [0.6, 2.6, -5.34], render: u => <Whiteboard unlocked={u} /> },
   { key: 'mini_fridge', position: [6.2, -0.55, -3.8], render: u => <MiniFridge unlocked={u} /> },
   { key: 'trophy', position: [-5.8, 2.45, -5.18], render: u => <Trophy unlocked={u} /> },
   { key: 'couch', position: [3.5, -0.55, 2.5], render: u => <Couch unlocked={u} /> },
@@ -507,8 +514,11 @@ const ITEMS: ItemSpec[] = [
   // Floor-ceiling-windows decor narrowed (3.5→2.4 wide) and shifted
   // right (5.5→6.2) so its left edge clears the real window at x=5.
   { key: 'floor_ceiling_windows', position: [6.2, 1.9, -5.4], render: u => <FloorCeilingWindows unlocked={u} /> },
-  // Living wall moved up above the whiteboard so both can share strip B.
-  { key: 'living_wall', position: [-0.3, 2.7, -5.34], render: u => <LivingWall unlocked={u} /> },
+  // Living wall — LOWER half of the same strip between the frame and
+  // the window. Now sits BELOW the whiteboard (swap from the previous
+  // layout) so the order top→bottom is whiteboard then living wall.
+  // Same x = 0.6 centre as the whiteboard above.
+  { key: 'living_wall', position: [0.6, 0.5, -5.34], render: u => <LivingWall unlocked={u} /> },
   { key: 'espresso_machine', position: [6.0, -0.55, -4.5], render: u => <EspressoMachine unlocked={u} /> },
   { key: 'ping_pong_table', position: [2.0, -0.55, 3.0], render: u => <PingPongTable unlocked={u} /> },
   { key: 'rooftop_terrace', position: [-2.5, -0.55, 4.0], render: u => <RooftopTerrace unlocked={u} /> },

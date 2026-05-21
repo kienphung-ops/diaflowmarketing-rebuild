@@ -4,15 +4,17 @@
  * Body: { email: string }
  *
  * Generates a one-time reset link backed by an AuthToken row with
- * type=PASSWORD_RESET. Sends the link via Diaflow email. Always
- * returns 200 (whether the email exists or not) to prevent account
- * enumeration via the public endpoint.
+ * type=PASSWORD_RESET, then fires the `diaflow-tower` event in
+ * Klaviyo (with `type: forgot_password`) so the configured Flow
+ * delivers the reset-link email. Always returns 200 (whether the
+ * email exists or not) to prevent account enumeration via the
+ * public endpoint.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateMagicLinkToken } from '@/lib/auth'
-import { buildPasswordResetHtml, sendDiaflowEmail } from '@/lib/diaflowEmail'
+import { trackKlaviyoEvent, KlaviyoEvent, KlaviyoEventType } from '@/lib/klaviyo'
 
 export const runtime = 'nodejs'
 
@@ -68,15 +70,31 @@ export async function POST(req: NextRequest) {
     const origin = getOrigin(req)
     const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(link.raw)}`
 
-    await sendDiaflowEmail({
-      to: user.email,
-      subject: 'Reset your Diaflow password',
-      html: buildPasswordResetHtml({ resetUrl }),
-      devPreview: resetUrl,
+    // Fire the Klaviyo event — the actual email is templated + sent
+    // by the Flow configured in Klaviyo against the `diaflow-tower`
+    // metric with a filter on `event.type == "forgot_password"`. The
+    // Flow's email template references `{{ event.resetUrl }}` and
+    // `{{ event.expiresInMinutes }}`. `trackKlaviyoEvent` is best-
+    // effort (never throws), so a Klaviyo outage doesn't change the
+    // response — we still return success to avoid leaking whether
+    // the request was actually mailed.
+    await trackKlaviyoEvent({
+      metricName: KlaviyoEvent.METRIC,
+      profile: { email: user.email },
+      properties: {
+        type: KlaviyoEventType.FORGOT_PASSWORD,
+        resetUrl,
+        expiresInMinutes: TOKEN_TTL_MINUTES,
+      },
+      // Dedupe key — Klaviyo treats retries of the same reset link as
+      // the same event, so a flaky network can't double-mail one user.
+      uniqueId: `forgot_password:${user.id}:${link.hash}`,
     })
 
+    // Dev helper — surface the reset URL in the response when Klaviyo
+    // isn't configured, so local testing works without a real inbox.
     const expose =
-      process.env.NODE_ENV !== 'production' || !process.env.DIAFLOW_API_KEY
+      process.env.NODE_ENV !== 'production' || !process.env.KLAVIYO_PRIVATE_API_KEY
     return NextResponse.json({
       success: true,
       ...(expose ? { devResetUrl: resetUrl } : {}),

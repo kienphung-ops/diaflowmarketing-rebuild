@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ForgotPasswordModal } from '@/components/ForgotPasswordModal'
+import { PasswordInput } from '@/components/PasswordInput'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -69,15 +70,13 @@ export default function LoginPage() {
           </label>
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-wider text-tower-cream/50">Password</span>
-            <input
-              type="password"
+            <PasswordInput
               required
               minLength={6}
               autoComplete="current-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="your password"
-              className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
             />
           </label>
           <button

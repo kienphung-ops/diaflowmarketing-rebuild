@@ -112,8 +112,10 @@ export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
       <div className="text-center">
         <div className="text-4xl mb-3" aria-hidden>🤝</div>
         <h2 className="text-xl font-bold mb-1">Hi, I&apos;m Iris</h2>
-        <p className="text-sm text-tower-cream/70 mb-5">
-          Every great team needs a name. What&apos;s yours called?
+        <p className="text-sm text-tower-cream/70 mb-5 leading-relaxed">
+          Welcome to Diaflow Tower. Our AI teammates launch soon — meanwhile,
+          build your team, climb the tower, and the top floors win free usage
+          at launch. Every great team needs a name. What&apos;s yours called?
         </p>
         <form
           onSubmit={e => {
