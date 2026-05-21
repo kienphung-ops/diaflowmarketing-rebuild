@@ -121,14 +121,30 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading }:
             </div>
           </div>
         ) : hasReason ? (
-          // PERSONALISED — Diaflow returned a real rationale. The
+          // PERSONALISED — Diaflow returned a real rationale. Its
           // upstream returns bullet-style text separated by `\n`, so
-          // `whitespace-pre-line` preserves those newlines as real
-          // line breaks. The default skills list is suppressed; the
-          // reason text replaces it.
-          <p className="whitespace-pre-line text-sm text-tower-cream/85 leading-relaxed mb-5">
-            {reason}
-          </p>
+          // we split on newlines and render each non-empty line as a
+          // styled list item inside the same "What Mia will do for
+          // you" card the default branch uses. Leading bullet
+          // characters (`-`, `•`, `·`, `*`) are stripped because we
+          // supply our own purple bullet glyph for visual consistency.
+          <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-4 py-3 mb-5">
+            <p className="text-[11px] uppercase tracking-widest text-purple-300/80 mb-2">
+              What Mia will do for you
+            </p>
+            <ul className="space-y-2">
+              {reason!
+                .split('\n')
+                .map(line => line.replace(/^[-•·*]\s*/, '').trim())
+                .filter(line => line.length > 0)
+                .map((line, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <span className="text-purple-300 mt-0.5 leading-none" aria-hidden>•</span>
+                    <span className="text-tower-cream/85">{line}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
         ) : (
           // DEFAULT — `reason` is null. Show the generic "What I do"
           // intro + the static skills checklist so the modal isn't

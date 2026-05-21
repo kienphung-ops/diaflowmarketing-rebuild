@@ -22,6 +22,8 @@ interface Props {
   readonly?: boolean
   /** Drag-drop poke callback — see OfficeScene Props. */
   onTeammatePoke?: (slug: string) => void
+  /** Optional override for Mia's NameBadge role label — see OfficeScene. */
+  miaRole?: string | null
 }
 
 export function SceneCanvas(props: Props) {

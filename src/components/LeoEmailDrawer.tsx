@@ -1,24 +1,30 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+/**
+ * LeoEmailDrawer — the modal that opens when the user clicks Leo in
+ * the office scene (post-onboarding).
+ *
+ * Used to capture a waitlist email; that flow was retired because the
+ * signup route already records every signed-up email into both
+ * `User` and `EmailCapture`, making Leo's manual form redundant.
+ * Leo now just plays the Diaflow intro video — same content the
+ * onboarding-time `LeoBubble` shows. Export name and props are kept
+ * minimal so any existing callers don't break.
+ */
+
+import { useEffect } from 'react'
 import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
 
 interface Props {
   open: boolean
   onClose: () => void
-  defaultEmail?: string | null
-  onCaptured?: (email: string) => void
 }
 
-export function LeoEmailDrawer({ open, onClose, defaultEmail, onCaptured }: Props) {
-  const [email, setEmail] = useState(defaultEmail ?? '')
-  const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(false)
+export function LeoEmailDrawer({ open, onClose }: Props) {
   // Same env-driven helper LeoBubble uses — keeps the two Leo modals
   // in sync. Falls back to the canonical Diaflow intro when
   // NEXT_PUBLIC_YOUTUBE_URL isn't set (see lib/youtubeUrl).
   const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -27,41 +33,6 @@ export function LeoEmailDrawer({ open, onClose, defaultEmail, onCaptured }: Prop
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
-
-  useEffect(() => {
-    if (open) {
-      setEmail(defaultEmail ?? '')
-      setDone(!!defaultEmail)
-      setError(null)
-    }
-  }, [open, defaultEmail])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!email.includes('@')) {
-      setError('Enter a valid email')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/capture-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), source: 'leo-click' }),
-      })
-      if (!res.ok) throw new Error('Failed')
-      setDone(true)
-      onCaptured?.(email.trim().toLowerCase())
-    } catch (err) {
-      // Even on failure, the API logs the email — show success message.
-      setDone(true)
-      onCaptured?.(email.trim().toLowerCase())
-      void err
-    } finally {
-      setBusy(false)
-    }
-  }
 
   if (!open) return null
   return (
@@ -77,10 +48,16 @@ export function LeoEmailDrawer({ open, onClose, defaultEmail, onCaptured }: Prop
       >
         <div className="flex items-start justify-between mb-4">
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">Waitlist Coach</div>
+            <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
+              Demo Specialist
+            </div>
             <h2 className="text-2xl font-bold mt-1">Hi, I&apos;m Leo 👋</h2>
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-tower-cream/50 hover:text-tower-cream text-xl">
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-tower-cream/50 hover:text-tower-cream text-xl"
+          >
             ×
           </button>
         </div>
@@ -95,40 +72,26 @@ export function LeoEmailDrawer({ open, onClose, defaultEmail, onCaptured }: Prop
           />
         </div>
 
-        {done ? (
-          <div className="space-y-3">
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-              ✓ You&apos;re on the list — we&apos;ll email you on launch day.
-            </div>
-            <button onClick={onClose} className="w-full px-4 py-2.5 rounded-md bg-tower-gold text-night-deep font-semibold text-sm">
-              Back to the office
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <p className="text-sm text-tower-cream/80">
-              Want early access? Drop your email and I&apos;ll keep you posted on launch day,
-              new teammates, and weekly tips for climbing the tower.
-            </p>
-            <input
-              type="email"
-              required
-              autoFocus
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3 py-2 rounded-md bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
-            />
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full px-4 py-2.5 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
-            >
-              {busy ? 'Saving…' : 'Join waitlist'}
-            </button>
-            {error && <p className="text-xs text-red-300">{error}</p>}
-          </form>
-        )}
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <p className="text-sm text-tower-cream/80">
+            Here&apos;s a quick tour of what we&apos;re building.
+          </p>
+          <a
+            href={video.watch}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-deep/80 border border-white/10 text-xs text-tower-cream/80 hover:bg-night-deep hover:text-tower-cream transition whitespace-nowrap"
+          >
+            ▶ Watch on YouTube
+          </a>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full px-4 py-2.5 rounded-md bg-tower-gold text-night-deep font-semibold text-sm hover:bg-tower-gold/90"
+        >
+          Back to the office
+        </button>
       </div>
     </div>
   )

@@ -232,11 +232,13 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaI
           </>
         ) : hasReason ? (
           // Diaflow returned a real rationale — surface the role as
-          // the heading and the reason as the body. The upstream
-          // returns bullet-style text separated by `\n`, so
-          // `whitespace-pre-line` preserves those newlines as real
-          // line breaks. The generic "12 hours back" pitch is
-          // suppressed.
+          // the heading and the reason as a styled bullet list. The
+          // upstream returns bullet-style text separated by `\n`, so
+          // we split on newlines and render each non-empty line as a
+          // <li> inside the same purple-bordered card the MiaInfoCard
+          // uses. Leading bullet characters are stripped so we can
+          // supply our own glyph (visual consistency between the two
+          // Mia surfaces).
           <>
             <div className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80 mb-1">
               Your AI assistant match
@@ -244,9 +246,23 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaI
             <h2 className="text-xl font-bold mb-3">
               {recommendedRole ?? 'Hi, I’m Mia — your Assistant.'}
             </h2>
-            <p className="whitespace-pre-line text-sm text-tower-cream/80 leading-relaxed mb-5">
-              {reason}
-            </p>
+            <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-4 py-3 mb-5">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80 mb-2">
+                What Mia will do for you
+              </p>
+              <ul className="space-y-2">
+                {reason!
+                  .split('\n')
+                  .map(line => line.replace(/^[-•·*]\s*/, '').trim())
+                  .filter(line => line.length > 0)
+                  .map((line, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <span className="text-purple-300 mt-0.5 leading-none" aria-hidden>•</span>
+                      <span className="text-tower-cream/85">{line}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
           </>
         ) : (
           // Default fallback — Diaflow not configured / upstream
@@ -314,49 +330,30 @@ function MiaSpinner() {
   )
 }
 
-/* ── 4. Leo — waitlist email + YouTube video ───────────────────── */
+/* ── 4. Leo — YouTube video (waitlist email was removed) ─────────
+ *
+ * Leo used to capture an email for a separate waitlist list. That
+ * collection now happens implicitly at signup — the signup route
+ * writes the user's email into both `User` and `EmailCapture`. Leo's
+ * job in onboarding is to play the intro video and hand control off
+ * to the final office scene.
+ */
 
 interface LeoProps {
-  onSubmit: (email: string) => void
-  onSkip: () => void
+  /** Fired when the user dismisses the modal (X close, backdrop
+   *  click, or the "Got it" CTA). Advances `onboardingStep` to
+   *  `done` so the office unlocks. */
+  onContinue: () => void
 }
 
-export function LeoBubble({ onSubmit, onSkip }: LeoProps) {
-  const [email, setEmail] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+export function LeoBubble({ onContinue }: LeoProps) {
   // Resolve YouTube URL from env. Both embed + watch flavours of the
   // same ID are returned so the iframe can play in-place AND the
   // "Watch on YouTube" button can deep-link to youtube.com.
   const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!email.includes('@')) {
-      setError('Enter a valid email')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      await fetch('/api/capture-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), source: 'onboarding-leo' }),
-      })
-      onSubmit(email.trim().toLowerCase())
-    } catch {
-      // Network failure — still close the modal so the user isn't
-      // stuck. The capture endpoint already logs server-side.
-      onSubmit(email.trim().toLowerCase())
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
-    <ModalShell onClose={onSkip} wide>
+    <ModalShell onClose={onContinue} wide>
       <div>
         {/* Video — embedded YouTube iframe driven by NEXT_PUBLIC_YOUTUBE_URL */}
         <div className="rounded-lg overflow-hidden border border-white/10 aspect-video bg-black mb-4 relative">
@@ -370,39 +367,26 @@ export function LeoBubble({ onSubmit, onSkip }: LeoProps) {
         </div>
 
         <div className="flex items-center justify-between mb-4 gap-3">
+          <p className="text-sm font-semibold text-tower-cream">
+            🚀 Hi, I&apos;m Leo — here&apos;s a quick tour of what we&apos;re building.
+          </p>
           <a
             href={video.watch}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-deep/80 border border-white/10 text-xs text-tower-cream/80 hover:bg-night-deep hover:text-tower-cream transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-deep/80 border border-white/10 text-xs text-tower-cream/80 hover:bg-night-deep hover:text-tower-cream transition whitespace-nowrap"
           >
             ▶ Watch on YouTube
           </a>
         </div>
 
-        <div className="border-t border-white/10 pt-4">
-          <p className="text-sm font-semibold mb-3">
-            🚀 Hi, I&apos;m Leo — join the waitlist to get early access
-          </p>
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <input
-              type="email"
-              autoFocus
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="flex-1 px-3 py-2.5 rounded-lg bg-night-deep/80 border border-white/10 focus:border-tower-gold focus:outline-none text-sm"
-            />
-            <button
-              type="submit"
-              disabled={busy}
-              className="px-5 py-2.5 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition disabled:opacity-50 whitespace-nowrap"
-            >
-              {busy ? 'Saving…' : 'Join waitlist'}
-            </button>
-          </form>
-          {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
-        </div>
+        <button
+          type="button"
+          onClick={onContinue}
+          className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition"
+        >
+          Got it — let&apos;s climb →
+        </button>
       </div>
     </ModalShell>
   )

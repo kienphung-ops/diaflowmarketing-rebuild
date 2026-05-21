@@ -59,16 +59,32 @@ export async function POST(req: NextRequest) {
     const session = await readSession()
     if (session) {
       try {
-        await prisma.user.update({
-          where: { id: session.userId },
-          data: {
-            recommendedRole: result.recommendedRole,
-            reason: result.reason,
-            // Make sure `teamPurpose` reflects the job text we used —
-            // covers backfill cases where the column was empty.
-            teamPurpose: job,
-          },
-        })
+        // Two writes in parallel:
+        //   1. User row — recommendedRole + reason + teamPurpose
+        //   2. RecruitedTeammate (slug='mia') — keep Mia's role label
+        //      in sync with the recommendation so MySquadDrawer /
+        //      poke leaderboard / any teammate-list UI shows the
+        //      personalised role instead of the seeded default
+        //      ("Assistant").
+        // `updateMany` is forgiving when the Mia row doesn't exist
+        // yet (legacy accounts that pre-date the seeding): zero rows
+        // updated, no error.
+        await Promise.all([
+          prisma.user.update({
+            where: { id: session.userId },
+            data: {
+              recommendedRole: result.recommendedRole,
+              reason: result.reason,
+              // Make sure `teamPurpose` reflects the job text we used
+              // — covers backfill cases where the column was empty.
+              teamPurpose: job,
+            },
+          }),
+          prisma.recruitedTeammate.updateMany({
+            where: { userId: session.userId, slug: 'mia' },
+            data: { role: result.recommendedRole },
+          }),
+        ])
       } catch (err) {
         // DB write failure shouldn't fail the response; the client
         // can still display the personalised copy from the result.

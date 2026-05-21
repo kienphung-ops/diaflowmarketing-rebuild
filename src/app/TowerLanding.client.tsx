@@ -455,13 +455,11 @@ export default function TowerLanding(props: Props) {
     persist({ ...trial, onboardingStep: nextOnboardingStep('mia-info') })
   }, [trial])
 
-  const handleLeoSubmit = useCallback(
-    (email: string) => {
-      persist({ ...trial, email, onboardingStep: 'done' })
-    },
-    [trial]
-  )
-  const handleLeoSkip = useCallback(() => {
+  // Leo's onboarding modal is now video-only (the waitlist email
+  // capture moved to signup itself). A single handler advances the
+  // step regardless of whether the user clicked "Got it" or X-closed
+  // — both mean "I'm done watching, let me into the office".
+  const handleLeoDone = useCallback(() => {
     persist({ ...trial, onboardingStep: 'done' })
   }, [trial])
 
@@ -675,6 +673,16 @@ export default function TowerLanding(props: Props) {
   const maxTeammates = useMaxTeammates(effective.currentFloor)
   const slotsAvailable = Math.max(0, maxTeammates - DEFAULT_NPC_COUNT - customRecruits.length)
 
+  // Mia's role override for the in-scene NameBadge. Signed-in users
+  // read it off their `RecruitedTeammate(slug='mia').role` row (which
+  // /api/job-summary keeps in sync with the Diaflow recommendation);
+  // anonymous trial users fall back to `trial.recommendedRole`. Empty
+  // string / null → OfficeScene uses the hard-coded default
+  // ("Assistant") from characters.config.
+  const miaRole = props.signedIn
+    ? recruits.find(r => r.slug === 'mia')?.role ?? null
+    : trial.recommendedRole
+
   // ─── Owner's own floor stats — feed the MySquad "Your floor" pill.
   // `observe` mode polls /api/floor/[code]/visitors WITHOUT registering
   // the owner as a visitor of themselves, so they get a clean count
@@ -727,6 +735,9 @@ export default function TowerLanding(props: Props) {
         // Works for anyone, signed-in or not — the /api/poke/[id]
         // endpoint has no auth gate.
         onTeammatePoke={handleTeammatePoke}
+        // Override Mia's hard-coded "Assistant" label with whatever
+        // role is stored for her (Diaflow recommendation when set).
+        miaRole={miaRole}
         resetSignal={resetSignal}
       />
 
@@ -763,7 +774,7 @@ export default function TowerLanding(props: Props) {
         />
       )}
       {isTrial && onboardingModalVisible && activeStep === 'leo' && (
-        <LeoBubble onSubmit={handleLeoSubmit} onSkip={handleLeoSkip} />
+        <LeoBubble onContinue={handleLeoDone} />
       )}
 
       <MySquadDrawer
@@ -832,13 +843,12 @@ export default function TowerLanding(props: Props) {
         loading={jobSummaryLoading || signedInBackfillLoading}
       />
 
+      {/* Click-Leo modal — video-only (no email form). The drawer
+          file name is kept (LeoEmailDrawer) so existing imports
+          don't break, even though it no longer captures email. */}
       <LeoEmailDrawer
         open={activeNpcModal === 'leo'}
         onClose={() => setActiveNpcModal(null)}
-        defaultEmail={effective.email ?? null}
-        onCaptured={email => {
-          if (isTrial) persist({ ...trial, email })
-        }}
       />
 
       {/* Floor-upgrade celebration — never rendered for anonymous

@@ -63,6 +63,12 @@ interface Props {
    *  owner's teammates around. `slug` is `'iris'|'mia'|'leo'` for
    *  default NPCs or `'recruited-N'` for user-added teammates. */
   onTeammatePoke?: (slug: string) => void
+  /** Optional override for Mia's role label in the scene NameBadge.
+   *  When provided, replaces the hard-coded `'Assistant'` from
+   *  `characters.config.ts` so the personalised Diaflow recommendation
+   *  (stored in `User.recommendedRole` / `RecruitedTeammate(slug='mia').role`)
+   *  shows up above her head. Iris + Leo keep their static defaults. */
+  miaRole?: string | null
 }
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -155,6 +161,7 @@ export function OfficeScene({
   resetSignal,
   readonly = false,
   onTeammatePoke,
+  miaRole,
 }: Props) {
   // `unlockedItemKeys` is no longer consumed here — FloorItems reads
   // its config straight from /api/floors via useFloorItems. Kept on
@@ -240,7 +247,16 @@ export function OfficeScene({
   const showLeo = onboardingStep === 'leo' || onboardingStep === 'done'
 
   const iris = CHARACTERS.find(c => c.slug === 'iris')!
-  const mia = CHARACTERS.find(c => c.slug === 'mia')!
+  // Mia's role is overrideable — apply the caller-supplied `miaRole`
+  // (Diaflow recommendation) on top of the hard-coded config so the
+  // NameBadge under her head reads e.g. "Senior Code Review Assistant"
+  // instead of the seeded "Assistant". `null` / `undefined` falls back
+  // to the config default.
+  const baseMia = CHARACTERS.find(c => c.slug === 'mia')!
+  const mia = useMemo(
+    () => (miaRole && miaRole.trim() ? { ...baseMia, role: miaRole } : baseMia),
+    [baseMia, miaRole],
+  )
   const leo = CHARACTERS.find(c => c.slug === 'leo')!
 
   const visibleDeskChars = useMemo(
@@ -250,8 +266,13 @@ export function OfficeScene({
         if (c.slug === 'mia' && !showMia) return false
         if (c.slug === 'leo' && !showLeo) return false
         return true
-      }),
-    [showMia, showLeo]
+      }).map(c =>
+        // Apply the same Mia override when iterating the desk-list so
+        // the NameBadge there reads the personalised role too. Iris is
+        // already excluded (hasDeskAndChair=false); Leo unchanged.
+        c.slug === 'mia' ? mia : c,
+      ),
+    [showMia, showLeo, mia]
   )
 
   const recruitedConfigs = useMemo<CharacterConfig[]>(

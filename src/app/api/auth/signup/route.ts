@@ -143,15 +143,31 @@ export async function POST(req: NextRequest) {
             reason: trialReason || null,
             emailVerified: null,
             recruitedTeams: {
+              // Seed the 3 default NPCs. Mia's role is overridden by
+              // `trialRecommendedRole` when present, so the new
+              // account starts with Mia's role already synced to the
+              // Diaflow recommendation collected during onboarding.
+              // Iris + Leo keep their static defaults.
               create: DEFAULT_TEAMMATES.map(d => ({
                 slug: d.slug,
                 name: d.name,
-                role: d.role,
+                role: d.slug === 'mia' && trialRecommendedRole
+                  ? trialRecommendedRole
+                  : d.role,
                 isDefault: true,
               })),
             },
           },
           select: { id: true },
+        })
+
+        // EmailCapture — Leo no longer prompts for a waitlist email,
+        // so every signup writes into the marketing-list table here
+        // instead. Same transaction as the User insert so the two
+        // can't drift. `source: 'signup'` makes the origin obvious
+        // when scanning the table for analytics.
+        await tx.emailCapture.create({
+          data: { email, source: 'signup' },
         })
 
         // Inviter credit in the same transaction — atomic with the

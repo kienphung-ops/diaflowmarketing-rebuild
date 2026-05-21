@@ -4,6 +4,15 @@ import { Billboard, Text } from '@react-three/drei'
 
 export type BeaconReason = 'behind-wall' | 'off-floor' | null
 
+/** Per-line max for both name + role on the in-scene NameBadge. Beyond
+ *  this the badge overflows the 1.3-wide plane and reads as overlap
+ *  with neighbouring teammates. Names / roles longer than 20 chars are
+ *  truncated to the first 20 + "…" so the badge stays a fixed width. */
+const MAX_LABEL_LEN = 20
+function truncate(label: string): string {
+  return label.length > MAX_LABEL_LEN ? label.slice(0, MAX_LABEL_LEN) + '...' : label
+}
+
 interface NameBadgeProps {
   name: string
   role: string
@@ -86,7 +95,7 @@ export function NameBadge({
           renderOrder={1000}
           material-depthTest={!isBeacon}
         >
-          {name}
+          {truncate(name)}
         </Text>
         <Text
           fontSize={0.09}
@@ -97,7 +106,7 @@ export function NameBadge({
           renderOrder={1000}
           material-depthTest={!isBeacon}
         >
-          {role}
+          {truncate(role)}
         </Text>
 
         {isBeacon && (

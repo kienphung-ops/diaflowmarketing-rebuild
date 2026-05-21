@@ -379,6 +379,11 @@ export default function FloorVisitorClient(props: Props) {
         unlockedItemKeys={props.unlockedItemKeys}
         onFloorClick={() => {}}
         onTeammatePoke={pokeBySlug}
+        // Show the OWNER's Mia role (server-stored Diaflow recommendation)
+        // above her head when visiting their floor. Falls back to the
+        // OfficeScene default when the row isn't present (legacy
+        // accounts that pre-date the Diaflow integration).
+        miaRole={teammates.find(t => t.slug === 'mia')?.role ?? null}
       />
 
       {/* MySquad — visitor's OWN squad, not the owner's. Right-edge
