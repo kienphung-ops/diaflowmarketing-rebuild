@@ -3,19 +3,24 @@
 /**
  * MiaInfoCard — opens when the user clicks Mia in the office scene.
  *
- * Has two render modes:
+ * Render gate is the `reason` prop (User.reason on the DB row /
+ * trial.reason for anonymous users):
  *
- *   1. PERSONALISED — when the Diaflow `recommendedRole` + `reason` are
- *      both known (either from the live trial state or the signed-in
- *      User row). Surfaces the assistant-match copy collected during
- *      Mia onboarding so the user can re-read their role at any time.
+ *   - `reason` SET   → show the Diaflow-derived role + the reason
+ *                      verbatim. The upstream returns a bullet list
+ *                      separated by `\n`, so the paragraph uses
+ *                      `whitespace-pre-line` to preserve those
+ *                      newlines as real line breaks. The hard-coded
+ *                      `SKILLS` list is hidden — the personalised
+ *                      reason is meant to replace it.
  *
- *   2. DEFAULT — when neither is known (e.g. user skipped Mia step,
- *      backfill hasn't completed). Falls back to the generic skills
- *      list so the modal is never blank.
+ *   - `reason` NULL  → fall back to the generic "What I do" intro
+ *                      + the static `SKILLS` checklist so the modal
+ *                      isn't blank for users who skipped Mia
+ *                      onboarding or pre-date the feature.
  *
- * Both modes share the same chrome (close button, role label, "Got it"
- * dismiss button) so the switch is purely content.
+ * Both modes share the same chrome (close button, role label, "Got
+ * it" dismiss button) so the switch is purely content.
  */
 
 import { useEffect } from 'react'
@@ -25,10 +30,20 @@ interface Props {
   onClose: () => void
   /** Diaflow-derived role title (e.g. "Executive Strategy Chief of
    *  Staff"). Pass from `trial.recommendedRole` for anonymous users or
-   *  from the User-row column for signed-in users. */
+   *  from the User-row column for signed-in users. Shown as the
+   *  modal heading whenever set; falls back to "Hi, I'm Mia 👋" when
+   *  null. Independent from `reason` — a role without a reason still
+   *  swaps the heading. */
   recommendedRole?: string | null
-  /** Reason that pairs with `recommendedRole`. */
+  /** Diaflow-derived rationale. May include `\n` characters (the
+   *  upstream returns bullet-style lists separated by newlines). When
+   *  set, this REPLACES the default skills checklist. */
   reason?: string | null
+  /** When true AND `reason` is null, the modal renders a spinner +
+   *  "matching…" message instead of the default skills list. Used
+   *  while a backfill `POST /api/job-summary` is in flight — the
+   *  parent (TowerLanding) knows when it kicked off the call. */
+  loading?: boolean
 }
 
 const SKILLS = [
@@ -39,7 +54,7 @@ const SKILLS = [
   { icon: '🧭', label: 'Onboard new teammates with the right links' },
 ]
 
-export function MiaInfoCard({ open, onClose, recommendedRole, reason }: Props) {
+export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -50,7 +65,13 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason }: Props) {
 
   if (!open) return null
 
-  const personalised = !!(recommendedRole && reason)
+  // Render priority — same gate as MiaInfoBubble in the onboarding
+  // flow so the two surfaces stay in sync:
+  //   1. loading && !reason → spinner + "matching…"
+  //   2. reason             → personalised text (whitespace-pre-line)
+  //   3. neither            → default skills checklist
+  const hasReason = !!(reason && reason.trim())
+  const showLoading = !!loading && !hasReason
 
   return (
     <div
@@ -66,10 +87,10 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason }: Props) {
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
-              {personalised ? 'Your AI assistant match' : 'Operations Assistant'}
+              {recommendedRole ? 'Your AI assistant match' : 'Operations Assistant'}
             </div>
             <h2 className="text-2xl font-bold mt-1">
-              {personalised ? recommendedRole : 'Hi, I’m Mia 👋'}
+              {recommendedRole ?? 'Hi, I’m Mia 👋'}
             </h2>
           </div>
           <button
@@ -81,33 +102,37 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason }: Props) {
           </button>
         </div>
 
-        {personalised ? (
-          // Show the Diaflow-derived rationale verbatim — same content
-          // that powered the MiaInfoBubble during onboarding. Surfaced
-          // here so the user can revisit their role match without
-          // going back through the onboarding flow.
-          <>
-            <p className="text-sm text-tower-cream/85 leading-relaxed mb-5">
-              {reason}
-            </p>
-            <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-4 py-3 mb-5">
-              <p className="text-[11px] uppercase tracking-widest text-purple-300/80 mb-2">
-                What Mia will do for you
+        {showLoading ? (
+          // LOADING — a backfill /api/job-summary call is in flight.
+          // Show a spinner instead of the default skills list so the
+          // user knows the personalised content is on its way. The
+          // "Got it" button below stays enabled — closing the modal
+          // doesn't cancel the backfill, the next session picks up
+          // the populated DB columns.
+          <div className="flex items-start gap-3 py-4 mb-5 rounded-lg border border-purple-500/25 bg-purple-500/5 px-4">
+            <CardSpinner />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-purple-200">
+                Matching you with the right teammate…
               </p>
-              <ul className="space-y-2">
-                {SKILLS.map(s => (
-                  <li key={s.label} className="flex items-start gap-2 text-sm">
-                    <span>{s.icon}</span>
-                    <span className="text-tower-cream/85">{s.label}</span>
-                  </li>
-                ))}
-              </ul>
+              <p className="text-xs text-tower-cream/60 mt-0.5 leading-relaxed">
+                Analyzing your role to find your perfect AI teammate.
+              </p>
             </div>
-          </>
+          </div>
+        ) : hasReason ? (
+          // PERSONALISED — Diaflow returned a real rationale. The
+          // upstream returns bullet-style text separated by `\n`, so
+          // `whitespace-pre-line` preserves those newlines as real
+          // line breaks. The default skills list is suppressed; the
+          // reason text replaces it.
+          <p className="whitespace-pre-line text-sm text-tower-cream/85 leading-relaxed mb-5">
+            {reason}
+          </p>
         ) : (
-          // Default fallback — generic intro + skills list. Used when
-          // the user skipped Mia onboarding OR is a legacy account
-          // where the backfill hasn't populated yet.
+          // DEFAULT — `reason` is null. Show the generic "What I do"
+          // intro + the static skills checklist so the modal isn't
+          // blank for users who skipped onboarding.
           <>
             <p className="text-sm text-tower-cream/80 mb-4">
               I quietly remove friction from your week. Tell me what&apos;s on your plate and
@@ -137,5 +162,35 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason }: Props) {
         </button>
       </div>
     </div>
+  )
+}
+
+/** Purple loading spinner. Mirrors MiaInfoBubble's `MiaSpinner` so
+ *  the loading affordance feels identical in both Mia surfaces. */
+function CardSpinner() {
+  return (
+    <svg
+      className="animate-spin text-purple-300 shrink-0"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeOpacity="0.25"
+        strokeWidth="3"
+      />
+      <path
+        d="M22 12a10 10 0 0 1-10 10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 }

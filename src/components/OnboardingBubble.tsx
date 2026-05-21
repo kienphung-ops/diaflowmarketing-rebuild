@@ -188,31 +188,71 @@ interface MiaInfoProps {
 }
 
 export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaInfoProps) {
-  const personalised = !!(recommendedRole && reason)
+  // Render priority:
+  //   1. loading  → spinner + "matching…" — Diaflow API in flight
+  //   2. reason   → personalised heading + reason (whitespace-pre-line)
+  //   3. neither  → generic "12 hours back" pitch
+  //
+  // Showing the loading state INSTEAD of the default copy means the
+  // user doesn't see the generic pitch flash + then swap to the
+  // personalised one when the API responds — a single coherent
+  // "finding your match" experience.
+  const hasReason = !!(reason && reason.trim())
+  const showLoading = !!loading && !hasReason
   return (
     <ModalShell onClose={onNext}>
       <div>
         <div className="text-4xl mb-3" aria-hidden>💁</div>
 
-        {personalised ? (
-          // Diaflow returned a real recommendation — surface the role
-          // as the heading and the reason as the body. The generic
-          // "12 hours back" pitch is suppressed in favour of the
-          // role-specific copy.
+        {showLoading ? (
+          // Loading state — Diaflow API hasn't returned yet. Replaces
+          // both the personalised + default content so there's only
+          // ever one "phase" visible at a time. The CTA below stays
+          // enabled so the user can skip ahead if they don't want to
+          // wait (clicking advances to Leo regardless).
+          <>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80 mb-1">
+              Matching your AI teammate
+            </div>
+            <h2 className="text-xl font-bold mb-4">
+              Finding the right fit…
+            </h2>
+            <div className="flex items-start gap-3 py-4 mb-5 rounded-lg border border-purple-500/25 bg-purple-500/5 px-4">
+              <MiaSpinner />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-purple-200">
+                  Analyzing your role…
+                </p>
+                <p className="text-xs text-tower-cream/60 mt-0.5 leading-relaxed">
+                  We&apos;re picking the perfect AI teammate for what you do.
+                  This usually takes a couple of seconds.
+                </p>
+              </div>
+            </div>
+          </>
+        ) : hasReason ? (
+          // Diaflow returned a real rationale — surface the role as
+          // the heading and the reason as the body. The upstream
+          // returns bullet-style text separated by `\n`, so
+          // `whitespace-pre-line` preserves those newlines as real
+          // line breaks. The generic "12 hours back" pitch is
+          // suppressed.
           <>
             <div className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80 mb-1">
               Your AI assistant match
             </div>
-            <h2 className="text-xl font-bold mb-3">{recommendedRole}</h2>
-            <p className="text-sm text-tower-cream/80 leading-relaxed mb-5">
+            <h2 className="text-xl font-bold mb-3">
+              {recommendedRole ?? 'Hi, I’m Mia — your Assistant.'}
+            </h2>
+            <p className="whitespace-pre-line text-sm text-tower-cream/80 leading-relaxed mb-5">
               {reason}
             </p>
           </>
         ) : (
-          // Default fallback — Diaflow not configured, upstream
-          // failure, or still loading. The footer line swaps to a
-          // "Hang on…" hint while `loading` is true so the user knows
-          // the modal isn't stuck.
+          // Default fallback — Diaflow not configured / upstream
+          // failed / no loading flag. Shows the generic pitch so the
+          // modal isn't blank for users without a personalised
+          // recommendation.
           <>
             <h2 className="text-xl font-bold mb-3">
               Hi, I&apos;m Mia — your Assistant.
@@ -225,9 +265,7 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaI
             </p>
             <div className="border-t border-white/10 pt-3 mb-5">
               <p className="text-sm font-bold text-purple-300">
-                {loading
-                  ? 'Hang on — matching you with the right teammate…'
-                  : "That's 12 hours back in your week."}
+                That&apos;s 12 hours back in your week.
               </p>
             </div>
           </>
@@ -238,10 +276,41 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaI
           onClick={onNext}
           className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition"
         >
-          Meet your next teammate →
+          {showLoading ? 'Skip & meet your next teammate →' : 'Meet your next teammate →'}
         </button>
       </div>
     </ModalShell>
+  )
+}
+
+/** Purple loading spinner used by MiaInfoBubble while the Diaflow
+ *  job-summary API is in flight. Tailwind's `animate-spin` keeps the
+ *  whole svg rotating; the masked arc gives it visible motion. */
+function MiaSpinner() {
+  return (
+    <svg
+      className="animate-spin text-purple-300 shrink-0"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeOpacity="0.25"
+        strokeWidth="3"
+      />
+      <path
+        d="M22 12a10 10 0 0 1-10 10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 }
 

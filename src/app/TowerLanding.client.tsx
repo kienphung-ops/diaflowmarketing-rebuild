@@ -205,6 +205,12 @@ export default function TowerLanding(props: Props) {
     }
   }, [isTrial])
 
+  // Tracks the signed-in backfill `/api/job-summary` call below — set
+  // to true when the request fires, false on completion / abort.
+  // Threaded into MiaInfoCard so clicking Mia mid-backfill shows the
+  // loading spinner instead of the stale default skills list.
+  const [signedInBackfillLoading, setSignedInBackfillLoading] = useState(false)
+
   // Signed-in backfill — when the user has a `teamPurpose` (job text)
   // on file but no Diaflow-derived `recommendedRole` / `reason`, fire
   // a single /api/job-summary call so subsequent loads have the
@@ -216,18 +222,30 @@ export default function TowerLanding(props: Props) {
     if (!props.serverTeamPurpose) return
     if (props.serverRecommendedRole && props.serverReason) return
     const ac = new AbortController()
+    setSignedInBackfillLoading(true)
     fetch('/api/job-summary', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ job: props.serverTeamPurpose }),
       signal: ac.signal,
-    }).catch(err => {
-      // Silent — the backfill is best-effort. Next mount will retry.
-      if ((err as Error).name !== 'AbortError') {
-        /* swallow */
-      }
     })
-    return () => ac.abort()
+      .catch(err => {
+        // Silent — the backfill is best-effort. Next mount will retry.
+        if ((err as Error).name !== 'AbortError') {
+          /* swallow */
+        }
+      })
+      .finally(() => {
+        // The response landed (or failed) — flip the spinner off. If
+        // the component unmounted mid-flight, AbortController already
+        // aborted the request; this `finally` runs synchronously and
+        // setting state on an unmounted node is a no-op in StrictMode.
+        if (!ac.signal.aborted) setSignedInBackfillLoading(false)
+      })
+    return () => {
+      ac.abort()
+      setSignedInBackfillLoading(false)
+    }
   }, [props.signedIn, props.serverTeamPurpose, props.serverRecommendedRole, props.serverReason])
 
   // Floor-up celebration — SIGNED-IN ONLY. Trial / anonymous users
@@ -807,6 +825,11 @@ export default function TowerLanding(props: Props) {
           props.signedIn ? props.serverRecommendedRole : trial.recommendedRole
         }
         reason={props.signedIn ? props.serverReason : trial.reason}
+        // True while either the trial-onboarding job-summary call OR
+        // the signed-in backfill is in flight — the modal swaps to a
+        // spinner so clicking Mia mid-call shows progress instead of
+        // the stale default skills list.
+        loading={jobSummaryLoading || signedInBackfillLoading}
       />
 
       <LeoEmailDrawer
