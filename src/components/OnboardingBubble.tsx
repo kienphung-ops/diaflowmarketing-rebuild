@@ -18,34 +18,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-
-/**
- * Convert any common YouTube URL form into the embed URL the iframe
- * needs. Accepts:
- *   - https://www.youtube.com/watch?v=ID
- *   - https://youtu.be/ID
- *   - https://www.youtube-nocookie.com/embed/ID
- * Falls back to the legacy Diaflow intro video when the env var is
- * missing or malformed.
- */
-const FALLBACK_VIDEO_ID = 'KmigxFKQ3XE'
-function youtubeEmbedUrl(raw: string | undefined): { embed: string; watch: string } {
-  const fallback = {
-    embed: `https://www.youtube-nocookie.com/embed/${FALLBACK_VIDEO_ID}?rel=0&modestbranding=1`,
-    watch: `https://www.youtube.com/watch?v=${FALLBACK_VIDEO_ID}`,
-  }
-  if (!raw) return fallback
-  const m =
-    raw.match(/[?&]v=([^&]+)/) ??
-    raw.match(/youtu\.be\/([^?]+)/) ??
-    raw.match(/embed\/([^?]+)/)
-  const id = m?.[1]
-  if (!id) return fallback
-  return {
-    embed: `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`,
-    watch: `https://www.youtube.com/watch?v=${id}`,
-  }
-}
+import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
 
 /**
  * Shared card chrome. Renders the green "online" dot + X close + a

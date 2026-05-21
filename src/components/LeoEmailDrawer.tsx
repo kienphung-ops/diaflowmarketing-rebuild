@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
 
 interface Props {
   open: boolean
@@ -13,6 +14,10 @@ export function LeoEmailDrawer({ open, onClose, defaultEmail, onCaptured }: Prop
   const [email, setEmail] = useState(defaultEmail ?? '')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  // Same env-driven helper LeoBubble uses — keeps the two Leo modals
+  // in sync. Falls back to the canonical Diaflow intro when
+  // NEXT_PUBLIC_YOUTUBE_URL isn't set (see lib/youtubeUrl).
+  const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -82,7 +87,7 @@ export function LeoEmailDrawer({ open, onClose, defaultEmail, onCaptured }: Prop
 
         <div className="mb-4 rounded-md overflow-hidden border border-white/10 aspect-video bg-black">
           <iframe
-            src="https://www.youtube-nocookie.com/embed/KmigxFKQ3XE?rel=0&modestbranding=1"
+            src={video.embed}
             title="Diaflow Tower intro"
             allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
