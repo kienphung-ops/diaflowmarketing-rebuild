@@ -127,6 +127,21 @@ function DragSystem({
   return null
 }
 
+// ─── Auto-wander tuning ─────────────────────────────────────────────────
+// Every WANDER_INTERVAL_MS one random rendered character is picked and
+// nudged to a new in-bounds position. Character.tsx's useFrame already
+// lerps the character to that target at ~1.4 u/s, so we get a smooth
+// "walk over there" for free without any extra animation plumbing.
+//
+// Bounds are deliberately tighter than the actual floor extents
+// (|x| ≤ 7.15, z ∈ [-7, 7]) so the wanderer never trips the beacon
+// mode in NameBadge (off-floor or behind-wall). Adjust freely.
+const WANDER_INTERVAL_MS = 5_000
+const WANDER_X_MIN = -6
+const WANDER_X_MAX = 6
+const WANDER_Z_MIN = -2
+const WANDER_Z_MAX = 4.5
+
 const RECRUIT_POSITIONS: [number, number, number][] = [
   [-3.5, -0.05, 0.3],
   [-5.2, -0.05, 1.5],
@@ -343,6 +358,44 @@ export function OfficeScene({
   }, [resetSignal, recruitedCharacters])
 
   const isOnboarding = onboardingStep !== 'done'
+
+  // Auto-wander: every WANDER_INTERVAL_MS, pick one visible character at
+  // random and walk them to a random in-bounds position. Skipped in
+  // readonly mode (tower-view previews are static snapshots) and during
+  // onboarding (Iris/Mia/Leo are pinned to scripted positions for the
+  // narrative). The character being actively dragged by the user is
+  // also excluded so the auto-pick doesn't fight the cursor.
+  useEffect(() => {
+    if (readonly) return
+    if (isOnboarding) return
+
+    const id = window.setInterval(() => {
+      // Compose the slug pool from currently-rendered characters. Iris
+      // is always visible post-onboarding; Mia + Leo follow the same
+      // visibility gates the render path uses; recruits are 0..N-1.
+      const pool: string[] = ['iris']
+      if (showMia) pool.push('mia')
+      if (showLeo) pool.push('leo')
+      for (let i = 0; i < recruitedCharacters.length; i++) {
+        pool.push(`recruited-${i}`)
+      }
+      // Drop the currently-dragged slug (if any) so the cursor doesn't
+      // fight an autonomous nudge mid-drag.
+      const dragSlug = dragSlugRef.current
+      const eligible = dragSlug ? pool.filter(s => s !== dragSlug) : pool
+      if (eligible.length === 0) return
+
+      const slug = eligible[Math.floor(Math.random() * eligible.length)]
+      const targetX = WANDER_X_MIN + Math.random() * (WANDER_X_MAX - WANDER_X_MIN)
+      const targetZ = WANDER_Z_MIN + Math.random() * (WANDER_Z_MAX - WANDER_Z_MIN)
+      setPositions(prev => ({
+        ...prev,
+        [slug]: [targetX, prev[slug]?.[1] ?? -0.05, targetZ],
+      }))
+    }, WANDER_INTERVAL_MS)
+
+    return () => window.clearInterval(id)
+  }, [readonly, isOnboarding, showMia, showLeo, recruitedCharacters.length])
 
   return (
     <>

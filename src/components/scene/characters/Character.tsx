@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import type { CharacterConfig } from '@/types/scene'
 import { CharacterBody } from './CharacterBody'
 import { NameBadge } from './NameBadge'
+import { pickDragBubbleWord } from './dragBubbleWords'
 
 // Inject CSS animations once into the document
 if (typeof window !== 'undefined' && !document.getElementById('poke-animations')) {
@@ -77,6 +78,17 @@ export const Character = memo(function Character({
 
   // Rate-limit history (per-character, local)
   const pokeTimestamps = useRef<number[]>([])
+
+  // Drag-bubble bookkeeping. We want a fresh random word every ~1.2s
+  // while the user keeps dragging this minifigure. `lastDragBubbleAt`
+  // gates the emission inside useFrame; `wasDragging` lets us reset
+  // the gate the moment drag starts (so the first bubble pops
+  // immediately, not 1.2s into the gesture) and fires one final
+  // bubble at drop. Both kept as refs since they don't need to drive
+  // a render — the bubble itself goes through the existing `speech`
+  // state machine.
+  const lastDragBubbleAt = useRef(0)
+  const wasDraggingThisChar = useRef(false)
 
   // Spawn scale-in animation
   const spawnScaleRef = useRef(1)
@@ -203,7 +215,8 @@ export const Character = memo(function Character({
     }
 
     // Smooth movement: lerp X/Z toward target (snap instantly while dragging for responsive feel)
-    if (draggingSlugRef?.current === config.slug) {
+    const draggingThis = draggingSlugRef?.current === config.slug
+    if (draggingThis) {
       visualPosRef.current[0] = pos[0]
       visualPosRef.current[1] = pos[2]
     } else {
@@ -215,6 +228,33 @@ export const Character = memo(function Character({
         visualPosRef.current[0] += (dx / dist) * step
         visualPosRef.current[1] += (dz / dist) * step
       }
+    }
+
+    // Drag-bubble: pop a random word while this character is being
+    // dragged. The first bubble fires the instant drag starts (reset
+    // gate when wasDraggingThisChar flips from false → true), then
+    // every ~1.2s thereafter while drag is sustained. The existing
+    // `speech` state + auto-clear timeout handle teardown, so when
+    // the user drops the figure the last bubble fades out on its own.
+    if (draggingThis) {
+      if (!wasDraggingThisChar.current) {
+        // Force the next branch to fire immediately on drag start.
+        lastDragBubbleAt.current = 0
+        wasDraggingThisChar.current = true
+      }
+      const now = performance.now()
+      if (now - lastDragBubbleAt.current > 1200) {
+        lastDragBubbleAt.current = now
+        const id = ++speechIdRef.current
+        setSpeech({ text: pickDragBubbleWord(), id })
+        // Same 2.3s lifespan as poke speech bubbles so the
+        // animation matches the existing speechPop keyframes.
+        setTimeout(() => setSpeech(prev => (prev?.id === id ? null : prev)), 2_300)
+      }
+    } else if (wasDraggingThisChar.current) {
+      // Drag just ended — flag reset, no extra bubble needed (the
+      // last in-flight one is already animating out).
+      wasDraggingThisChar.current = false
     }
     groupRef.current.position.x = visualPosRef.current[0]
     groupRef.current.position.y = baseY + yOffset

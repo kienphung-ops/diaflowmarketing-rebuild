@@ -148,18 +148,23 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
             </button>
           </div>
 
-          {/* Column headers */}
+          {/* Column headers. The TEAMMATES + DECOR + REWARD columns
+              were folded into a single wider REWARD column — each row
+              now reads as one stitched sentence ("max 5 + Basic chair
+              + first desk + Free beta access") so the unlock at each
+              floor is grokable in one glance instead of three eye
+              hops across the row. */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '56px 70px 100px 1fr 100px',
+              gridTemplateColumns: '56px 80px 1fr',
               gap: 0,
               marginTop: '20px',
               borderBottom: '1px solid rgba(255,255,255,0.1)',
               paddingBottom: '8px',
             }}
           >
-            {['FLOOR', 'INVITES', 'TEAMMATES', 'DECOR', 'REWARD'].map(h => (
+            {['FLOOR', 'INVITES', 'REWARD'].map(h => (
               <p
                 key={h}
                 style={{
@@ -187,7 +192,7 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
                 key={cfg.id}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '56px 70px 100px 1fr 100px',
+                  gridTemplateColumns: '56px 80px 1fr',
                   gap: 0,
                   padding: '13px 0',
                   borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
@@ -207,22 +212,24 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
                 <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
                   {cfg.invitesRequired}
                 </p>
-                <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
-                  {cfg.maxTeammates}
-                </p>
-                <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)' }}>
-                  {isPenthouse ? '🏆 ' : ''}
-                  {cfg.label}
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: '12px',
-                    color: reward ? '#34d399' : 'rgba(255,255,255,0.3)',
-                    fontWeight: reward ? 600 : 400,
-                  }}
-                >
-                  {reward ?? '—'}
+                {/* Stitched reward line: "max N + decor [+ reward]".
+                    The product-reward suffix (e.g. "Free beta access")
+                    is rendered as a separate green span so it still
+                    visually pops, but the parts read as one
+                    continuous sentence rather than three columns. */}
+                <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>max {cfg.maxTeammates} teammates</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>+</span>
+                  <span>
+                    {isPenthouse ? '🏆 ' : ''}
+                    {cfg.label}
+                  </span>
+                  {reward && (
+                    <>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>+</span>
+                      <span style={{ color: '#34d399', fontWeight: 600 }}>{reward}</span>
+                    </>
+                  )}
                 </p>
               </div>
             )

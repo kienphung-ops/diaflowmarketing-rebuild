@@ -16,9 +16,10 @@
  * is swapped, tweak only the four CALIBRATION constants below.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFloor } from '@/lib/floorsConfigClient'
+import { ViewTransitionOverlay } from './ViewTransitionOverlay'
 
 interface TowerViewProps {
   /** Whether the visitor has a valid session. Drives YOU marker visibility. */
@@ -305,6 +306,11 @@ function Stars() {
 // ─── Floor click strips — 20 invisible buttons over the tower image ─────
 function FloorClickStrips() {
   const router = useRouter()
+  // Bumped to true the instant a strip is clicked so a spinner covers
+  // the tower while /tower-view/{floor} fetches its RSC. The page nav
+  // unmounts this component, so the overlay disappears naturally when
+  // the destination mounts — no setState(false) reset needed.
+  const [navTarget, setNavTarget] = useState<number | null>(null)
   // Use the same quadratic vertical calibration as the YOU marker so
   // each strip lines up with its labelled row on the tower image. Each
   // strip's height is the gap between its own center and the next
@@ -322,7 +328,10 @@ function FloorClickStrips() {
         return (
           <button
             key={floor}
-            onClick={() => router.push(`/tower-view/${floor}`)}
+            onClick={() => {
+              setNavTarget(floor)
+              router.push(`/tower-view/${floor}`)
+            }}
             aria-label={`Preview Floor ${floor}`}
             className="group absolute inset-x-0 cursor-pointer focus:outline-none"
             style={{
@@ -346,6 +355,12 @@ function FloorClickStrips() {
           </button>
         )
       })}
+
+      {/* Loading overlay — covers the tower view while the
+          /tower-view/{floor} RSC fetches. */}
+      {navTarget != null && (
+        <ViewTransitionOverlay label={`Loading Floor ${navTarget}…`} />
+      )}
     </div>
   )
 }
