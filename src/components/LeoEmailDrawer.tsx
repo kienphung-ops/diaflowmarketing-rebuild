@@ -14,13 +14,19 @@
 
 import { useEffect } from 'react'
 import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
+import { useAnchorPosition } from '@/lib/anchorPositions'
 
 interface Props {
   open: boolean
   onClose: () => void
+  /** When set, the card floats next to this character in the 3D
+   *  scene. Null/undefined falls back to the legacy centered modal. */
+  anchorSlug?: string | null
 }
 
-export function LeoEmailDrawer({ open, onClose }: Props) {
+export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
+  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
+  const anchored = !!anchorSlug
   // Same env-driven helper LeoBubble uses — keeps the two Leo modals
   // in sync. Falls back to the canonical Diaflow intro when
   // NEXT_PUBLIC_YOUTUBE_URL isn't set (see lib/youtubeUrl).
@@ -39,13 +45,31 @@ export function LeoEmailDrawer({ open, onClose }: Props) {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      className={
+        anchored
+          ? 'fixed inset-0 z-30'
+          : 'fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4'
+      }
       onClick={onClose}
     >
       <div
+        ref={anchored ? anchorRef : undefined}
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-xl bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl"
+        className={
+          anchored
+            ? 'absolute top-0 left-0 pointer-events-none'
+            : 'w-full max-w-xl bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
+        }
+        style={anchored ? { willChange: 'transform' } : undefined}
       >
+        <div
+          className={
+            anchored
+              ? 'pointer-events-auto w-[min(520px,calc(100vw-32px))] max-w-xl bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
+              : ''
+          }
+          style={anchored ? { transform: 'translate(28px, -50%)' } : undefined}
+        >
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
@@ -84,6 +108,7 @@ export function LeoEmailDrawer({ open, onClose }: Props) {
           >
             ▶ Watch on YouTube
           </a> */}
+        </div>
         </div>
       </div>
     </div>

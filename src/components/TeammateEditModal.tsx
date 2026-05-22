@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAnchorPosition } from '@/lib/anchorPositions'
 
 interface Teammate {
   id: string
@@ -17,9 +18,16 @@ interface Props {
   /** Resets just this teammate back to their default position — handy
    *  when the user has dragged them off-screen / behind the back wall. */
   onResetPosition?: (id: string) => void
+  /** Anchor slug — the scene character this edit modal belongs to.
+   *  Typically `recruited-{index}` for user-added teammates. When set,
+   *  the modal floats next to that character; otherwise it renders
+   *  centered like before. */
+  anchorSlug?: string | null
 }
 
-export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, onResetPosition }: Props) {
+export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, onResetPosition, anchorSlug }: Props) {
+  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
+  const anchored = !!anchorSlug
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
 
@@ -51,13 +59,28 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      className={
+        anchored
+          ? 'fixed inset-0 z-30'
+          : 'fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4'
+      }
       onClick={onClose}
     >
+      <div
+        ref={anchored ? anchorRef : undefined}
+        onClick={anchored ? e => e.stopPropagation() : undefined}
+        className={anchored ? 'absolute top-0 left-0 pointer-events-none' : 'contents'}
+        style={anchored ? { willChange: 'transform' } : undefined}
+      >
       <form
         onClick={e => e.stopPropagation()}
         onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-night-mid border border-tower-gold/40 rounded-2xl p-6 text-tower-cream shadow-2xl"
+        className={
+          anchored
+            ? 'pointer-events-auto w-[min(360px,calc(100vw-32px))] max-w-sm bg-night-mid border border-tower-gold/40 rounded-2xl p-6 text-tower-cream shadow-2xl'
+            : 'w-full max-w-sm bg-night-mid border border-tower-gold/40 rounded-2xl p-6 text-tower-cream shadow-2xl'
+        }
+        style={anchored ? { transform: 'translate(28px, -50%)' } : undefined}
       >
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-lg font-bold">Edit teammate</h2>
@@ -128,6 +151,7 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
           </div>
         )}
       </form>
+      </div>
     </div>
   )
 }

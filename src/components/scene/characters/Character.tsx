@@ -1,13 +1,14 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback, memo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useRef, useState, useEffect, useCallback, memo, useMemo } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { CharacterConfig } from '@/types/scene'
 import { CharacterBody } from './CharacterBody'
 import { NameBadge } from './NameBadge'
 import { pickDragBubbleWord } from './dragBubbleWords'
+import { setAnchorPosition } from '@/lib/anchorPositions'
 
 // Inject CSS animations once into the document
 if (typeof window !== 'undefined' && !document.getElementById('poke-animations')) {
@@ -59,6 +60,13 @@ export const Character = memo(function Character({
   onDragStart, draggingSlugRef, onPoke, pokeSignal, greetingSignal, greetingText, spawnSignal, spawnGreeting,
 }: CharacterProps) {
   const pos = positionOverride ?? config.position
+
+  // Camera + canvas — needed every frame to project the character's
+  // world-space head position into screen pixels for anchored modals
+  // (see setAnchorPosition call inside useFrame). Reused Vector3 to
+  // avoid allocating one per tick × per character.
+  const { camera, gl } = useThree()
+  const projectionVec = useMemo(() => new THREE.Vector3(), [])
 
   const groupRef = useRef<THREE.Group>(null)
   const [hovered, setHovered] = useState(false)
@@ -259,6 +267,24 @@ export const Character = memo(function Character({
     groupRef.current.position.x = visualPosRef.current[0]
     groupRef.current.position.y = baseY + yOffset
     groupRef.current.position.z = visualPosRef.current[1]
+
+    // Publish this character's screen position so anchored DOM
+    // modals (MiaInfoCard, IrisHireModal, etc.) can follow the
+    // figure as it walks / wanders. We project the HEAD of the
+    // character (y + ~1.5) so the modal sits near the eyes rather
+    // than buried under the feet. See lib/anchorPositions.ts.
+    if (camera && gl?.domElement) {
+      projectionVec.set(
+        groupRef.current.position.x,
+        groupRef.current.position.y + 1.5,
+        groupRef.current.position.z,
+      )
+      projectionVec.project(camera)
+      const rect = gl.domElement.getBoundingClientRect()
+      const screenX = (projectionVec.x * 0.5 + 0.5) * rect.width + rect.left
+      const screenY = (-projectionVec.y * 0.5 + 0.5) * rect.height + rect.top
+      setAnchorPosition(config.slug, screenX, screenY)
+    }
 
     const isSpinning = reactionRef.current?.type === 'spin'
 

@@ -23,10 +23,15 @@
  */
 
 import { useEffect } from 'react'
+import { useAnchorPosition } from '@/lib/anchorPositions'
 
 interface Props {
   open: boolean
   onClose: () => void
+  /** When set, the card floats next to this character in the 3D
+   *  scene (using lib/anchorPositions). When null/undefined the
+   *  card falls back to its legacy centered-modal layout. */
+  anchorSlug?: string | null
   /** Diaflow-derived role title (e.g. "Executive Strategy Chief of
    *  Staff"). Pass from `trial.recommendedRole` for anonymous users or
    *  from the User-row column for signed-in users. Shown as the
@@ -53,7 +58,13 @@ const SKILLS = [
   { icon: '🧭', label: 'Onboard new teammates with the right links' },
 ]
 
-export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading }: Props) {
+export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, anchorSlug }: Props) {
+  // Subscribe to the character's screen position. When `anchorSlug`
+  // is null we pass null to opt out, and the modal falls back to
+  // the legacy centered layout. See lib/anchorPositions.ts.
+  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
+  const anchored = !!anchorSlug
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -76,13 +87,49 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading }:
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      className={
+        anchored
+          ? // Anchored mode: transparent backdrop captures outside-clicks
+            // for dismissal but lets the office scene below stay visible.
+            // The card itself is positioned by `anchorRef` (ref-translated
+            // by an rAF loop in lib/anchorPositions).
+            'fixed inset-0 z-30'
+          : 'fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4'
+      }
       onClick={onClose}
     >
       <div
+        ref={anchored ? anchorRef : undefined}
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-md bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl"
+        className={
+          anchored
+            ? // Card root pinned to (0,0); transform from useAnchorPosition
+              // places it at the character's head. We then nudge it via a
+              // child wrapper (see below) so the card sits to the upper-
+              // right of the character rather than directly over them.
+              'absolute top-0 left-0 pointer-events-none'
+            : 'w-full max-w-md bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
+        }
+        style={anchored ? { willChange: 'transform' } : undefined}
       >
+        <div
+          className={
+            anchored
+              ? 'pointer-events-auto w-[min(420px,calc(100vw-32px))] max-w-md bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
+              : ''
+          }
+          style={
+            anchored
+              ? // Offset from anchor (character head): bumped up-right so
+                // the card doesn't cover the figure. translateY(-50%) +
+                // small +x pushes the card's left edge to just right of
+                // the character; -y lifts it above the head plane.
+                {
+                  transform: 'translate(28px, -50%)',
+                }
+              : undefined
+          }
+        >
         <div className="flex items-start justify-between mb-4">
           <div>
             {/* <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
@@ -175,6 +222,7 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading }:
         >
           Got it
         </button>
+        </div>
       </div>
     </div>
   )

@@ -4,10 +4,15 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { useAnchorPosition } from '@/lib/anchorPositions'
 
 interface Props {
   open: boolean
   onClose: () => void
+  /** When set, the card floats next to this character in the 3D
+   *  scene (using lib/anchorPositions). When null/undefined the
+   *  card falls back to its legacy centered layout. */
+  anchorSlug?: string | null
   /** Current floor the user is on. Used to compute the "next" floor
    *  shown in the packed-state copy ("Unlock a new slot at Floor X"). */
   currentFloor: number
@@ -48,8 +53,13 @@ export function IrisHireModal({
   slotsAvailable,
   inviteUrl,
   onAddTeammate,
+  anchorSlug,
 }: Props) {
   const [copied, setCopied] = useState(false)
+  // Anchor → character (typically 'iris'). When null we fall back to
+  // the centered modal layout. See lib/anchorPositions.ts.
+  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
+  const anchored = !!anchorSlug
   // "Next floor" copy — defaults to currentFloor+1; at the penthouse
   // we just don't bother (user can't go higher) and the share copy
   // shifts to a generic "keep growing your office" line.
@@ -104,13 +114,38 @@ export function IrisHireModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+      className={
+        anchored
+          ? 'fixed inset-0 z-40'
+          : 'fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4'
+      }
       onClick={onClose}
     >
       <div
+        ref={anchored ? anchorRef : undefined}
         onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-md bg-night-mid border border-white/10 rounded-2xl text-tower-cream shadow-2xl overflow-hidden"
+        className={
+          anchored
+            ? 'absolute top-0 left-0 pointer-events-none'
+            : 'relative w-full max-w-md bg-night-mid border border-white/10 rounded-2xl text-tower-cream shadow-2xl overflow-hidden'
+        }
+        style={anchored ? { willChange: 'transform' } : undefined}
       >
+        <div
+          className={
+            anchored
+              ? 'pointer-events-auto relative w-[min(420px,calc(100vw-32px))] max-w-md bg-night-mid border border-white/10 rounded-2xl text-tower-cream shadow-2xl overflow-hidden'
+              : ''
+          }
+          style={
+            anchored
+              ? // Offset so the card sits to the right of (and slightly
+                // above) the character's head — see MiaInfoCard for the
+                // shared rationale on these numbers.
+                { transform: 'translate(28px, -50%)' }
+              : undefined
+          }
+        >
         {/* Top status row — green dot on the left mirrors the Iris
             online-indicator from the scene, X close on the right. */}
         <div className="flex items-center justify-between px-5 pt-4">
@@ -221,6 +256,7 @@ export function IrisHireModal({
               )}
             </>
           )}
+        </div>
         </div>
       </div>
     </div>,

@@ -872,6 +872,15 @@ export default function TowerLanding(props: Props) {
         onSave={handleTeammateUpdate}
         onDelete={handleTeammateDelete}
         onResetPosition={handleResetTeammatePosition}
+        // Float next to the teammate in the scene. OfficeScene labels
+        // each recruited character with `recruited-${index}` — match
+        // that here. Falls back to centered when the teammate isn't
+        // in the customRecruits list (defensive: shouldn't happen).
+        anchorSlug={(() => {
+          if (!editingTeammate) return null
+          const idx = customRecruits.findIndex(r => r.id === editingTeammate.id)
+          return idx >= 0 ? `recruited-${idx}` : null
+        })()}
       />
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
@@ -884,6 +893,7 @@ export default function TowerLanding(props: Props) {
       <MiaInfoCard
         open={activeNpcModal === 'mia'}
         onClose={() => setActiveNpcModal(null)}
+        anchorSlug="mia"
         recommendedRole={
           props.signedIn ? props.serverRecommendedRole : trial.recommendedRole
         }
@@ -901,6 +911,7 @@ export default function TowerLanding(props: Props) {
       <LeoEmailDrawer
         open={activeNpcModal === 'leo'}
         onClose={() => setActiveNpcModal(null)}
+        anchorSlug="leo"
       />
 
       {/* Floor-upgrade celebration — never rendered for anonymous
@@ -943,6 +954,8 @@ export default function TowerLanding(props: Props) {
       <IrisHireModal
         open={irisModalOpen}
         onClose={() => setIrisModalOpen(false)}
+        // Float next to Iris in the 3D scene instead of centering.
+        anchorSlug="iris"
         currentFloor={effective.currentFloor}
         totalInvites={effective.totalInvites}
         slotsAvailable={slotsAvailable}
