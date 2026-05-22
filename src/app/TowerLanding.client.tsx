@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { CelebrationModal } from '@/components/CelebrationModal'
 import { SignupModal } from '@/components/SignupModal'
+import { IrisHireModal } from '@/components/IrisHireModal'
+import { ViewTransitionOverlay } from '@/components/ViewTransitionOverlay'
+import { useOrigin } from '@/hooks/useOrigin'
 import {
   IrisBubble,
   MiaBubble,
@@ -105,6 +108,20 @@ export default function TowerLanding(props: Props) {
   const [squadOpen, setSquadOpen] = useState(false)
   const [editingTeammate, setEditingTeammate] = useState<ServerRecruit | null>(null)
   const [bulkAddOpen, setBulkAddOpen] = useState(false)
+  // Iris recruiting popup — replaces the old MySquadDrawer-on-Iris-
+  // click behaviour. Has two states driven by slot availability;
+  // see IrisHireModal for the copy.
+  const [irisModalOpen, setIrisModalOpen] = useState(false)
+  // Browser origin (post-hydration) — needed to compose the personal
+  // invite URL that IrisHireModal's share buttons use. See useOrigin
+  // for the SSR/hydration safety.
+  const origin = useOrigin()
+  // Set true the moment the user clicks Tower view (header or mobile
+  // bottom bar) so a fullscreen spinner covers the office while the
+  // /tower RSC fetches. Page nav unmounts this whole component, so
+  // there's no setIsNavigating(false) — the overlay disappears with
+  // the rest of the page when /tower mounts.
+  const [isNavigating, setIsNavigating] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   // Reset-position signal — bumped by MySquadDrawer / TeammateEditModal
   // and consumed by OfficeScene's `resetSignal` effect.
@@ -606,11 +623,33 @@ export default function TowerLanding(props: Props) {
 
   function handleTeamNameChange(next: string) {
     if (isTrial) {
+      // Anonymous user — trial state is the source of truth, persist
+      // via localStorage. No server round-trip needed.
       persist({ ...trial, teamName: next })
-    } else {
-      setServerState(prev => ({ ...prev, teamName: next }))
-      // TODO: PATCH /api/me to persist on the User row.
+      return
     }
+    // Signed-in: optimistic local update + PATCH /api/user/team-name
+    // so the rename survives reloads. Server trims + 60-char caps the
+    // value (matching the trialTeamName treatment in /api/auth/signup)
+    // and returns the canonical persisted version, which we mirror
+    // back to local state in case the server normalised it (e.g.
+    // empty → null).
+    const previousName = serverState.teamName
+    setServerState(prev => ({ ...prev, teamName: next }))
+    fetch('/api/user/team-name', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ teamName: next }),
+    })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((j: { teamName: string | null }) => {
+        setServerState(prev => ({ ...prev, teamName: j.teamName }))
+      })
+      .catch(() => {
+        // Revert + toast so the user knows the rename didn't stick.
+        setServerState(prev => ({ ...prev, teamName: previousName }))
+        pushToast({ title: 'Could not save team name', tone: 'warn' })
+      })
   }
 
   const effective = isTrial
@@ -707,7 +746,14 @@ export default function TowerLanding(props: Props) {
         // Tower view is now a dedicated route — see /tower. Button navigates
         // there instead of toggling an overlay.
         showTower={false}
-        onToggleTower={onboardingComplete ? () => router.push('/tower') : undefined}
+        onToggleTower={
+          onboardingComplete
+            ? () => {
+                setIsNavigating(true)
+                router.push('/tower')
+              }
+            : undefined
+        }
         teammateCount={computeTeammateCount(recruits)}
         maxTeammates={maxTeammates}
         slotsAvailable={slotsAvailable}
@@ -722,7 +768,10 @@ export default function TowerLanding(props: Props) {
         unlockedItemKeys={effective.unlockedItemKeys}
         onFloorClick={() => {}}
         onNpcClick={slug => {
-          if (slug === 'iris') setSquadOpen(true)
+          // Iris used to open MySquadDrawer; now opens the dedicated
+          // hire-or-share recruiting prompt (IrisHireModal). Other
+          // NPCs (Mia, Leo) still route to their own modals.
+          if (slug === 'iris') setIrisModalOpen(true)
           else setActiveNpcModal(slug)
         }}
         onTeammateClick={idx => {
@@ -749,9 +798,15 @@ export default function TowerLanding(props: Props) {
           showTower={false}
           onOpenSquad={() => setSquadOpen(true)}
           onAddTeammates={slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
-          onToggleTower={() => router.push('/tower')}
+          onToggleTower={() => {
+            setIsNavigating(true)
+            router.push('/tower')
+          }}
         />
       )}
+
+      {/* Tower navigation overlay — see useState comment above. */}
+      {isNavigating && <ViewTransitionOverlay label="Loading tower view…" />}
 
       {/* Onboarding modals — only render once the per-step delay has
           elapsed (see `onboardingModalVisible` effect above) so the
@@ -874,7 +929,6 @@ export default function TowerLanding(props: Props) {
             }
           }}
           onOpenSignup={isTrial ? () => setShowSignupModal(true) : undefined}
-          onOpenSquad={onboardingComplete ? () => setSquadOpen(true) : undefined}
         />
       )}
 
@@ -885,6 +939,23 @@ export default function TowerLanding(props: Props) {
         onClose={() => setBulkAddOpen(false)}
         onAdd={handleBulkAdd}
       />
+
+      {/* Iris recruiting prompt — opens from `onNpcClick('iris')`
+          above. Either nudges the user to share (packed floor) or
+          opens BulkAddTeammatesModal (open slot). */}
+      <IrisHireModal
+        open={irisModalOpen}
+        onClose={() => setIrisModalOpen(false)}
+        currentFloor={effective.currentFloor}
+        slotsAvailable={slotsAvailable}
+        inviteUrl={
+          props.signedIn && props.referralCode && origin
+            ? `${origin}/floor/${props.referralCode}`
+            : null
+        }
+        onAddTeammate={() => setBulkAddOpen(true)}
+      />
+
       {showSignupModal && <SignupModal onClose={() => setShowSignupModal(false)} />}
 
       <EmailVerifyModal

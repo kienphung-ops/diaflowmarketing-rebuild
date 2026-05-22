@@ -532,31 +532,43 @@ interface Props {
 export function FloorItems({ currentFloor }: Props) {
   // PER-FLOOR semantic: each floor's row in floor_items lists exactly
   // the items that floor owns, with quantities. We trust that list
-  // verbatim — no cumulative union, no preview ghosting of next-floor
-  // items. (Old cumulative behaviour was the reported bug: at F1 every
-  // item was visible because F1's row, plus all higher floors' rows,
-  // covered everything.)
+  // verbatim for the CURRENT floor (rendered at full opacity) and
+  // peek at the NEXT floor's row so any item new to F+1 renders as
+  // a translucent "preview" — same teaser pattern the old cumulative
+  // version had, just rebuilt on top of the per-floor query.
   const floorItems = useFloorItems(currentFloor)
+  const nextFloorItems = useFloorItems(currentFloor + 1)
 
-  // itemKey → quantity for fast lookup in the layout loop below.
-  const quantityByKey = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const it of floorItems) m.set(it.key, it.quantity)
-    return m
-  }, [floorItems])
+  // itemKey → { unlocked, quantity }. Two passes:
+  //   1. CURRENT floor items → marked unlocked, render at full opacity.
+  //   2. NEXT floor items not on the current floor → marked preview,
+  //      render at LOCKED_OPACITY (the `M` helper handles the dim).
+  // The second pass `if (!info.has(it.key))` guard means items on
+  // both floors stay unlocked (current beats preview).
+  const itemInfo = useMemo(() => {
+    const info = new Map<string, { unlocked: boolean; quantity: number }>()
+    for (const it of floorItems) {
+      info.set(it.key, { unlocked: true, quantity: it.quantity })
+    }
+    for (const it of nextFloorItems) {
+      if (info.has(it.key)) continue
+      info.set(it.key, { unlocked: false, quantity: it.quantity })
+    }
+    return info
+  }, [floorItems, nextFloorItems])
 
   return (
     <group>
       {ITEMS.map(it => {
-        const quantity = quantityByKey.get(it.key)
-        // Not configured for this floor → don't render anything.
-        if (!quantity || quantity < 1) return null
+        const hit = itemInfo.get(it.key)
+        // Not configured for this floor OR the next → don't render.
+        if (!hit || hit.quantity < 1) return null
         const offset = it.offsetStep ?? [1.8, 0, 0]
         // Render `quantity` copies, each offset by `offset` from the
         // previous. Quantity 1 renders exactly one copy at the base
         // position — single-instance items behave as before.
         const copies: ReactNode[] = []
-        for (let i = 0; i < quantity; i++) {
+        for (let i = 0; i < hit.quantity; i++) {
           const pos: [number, number, number] = [
             it.position[0] + offset[0] * i,
             it.position[1] + offset[1] * i,
@@ -564,7 +576,7 @@ export function FloorItems({ currentFloor }: Props) {
           ]
           copies.push(
             <group key={`${it.key}-${i}`} position={pos}>
-              {it.render(true /* always 'unlocked' — it's on this floor */)}
+              {it.render(hit.unlocked)}
             </group>,
           )
         }

@@ -37,10 +37,20 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
   if (!open) return null
   if (typeof document === 'undefined') return null
 
-  const shareText = encodeURIComponent(
-    "Building my AI office on Diaflow Tower — climb the floors with me 🚀"
+  // X share text + URL go in separate params per the spec
+  // (requirements/share-btn.md): X auto-appends + auto-shortens the
+  // URL when passed via `&url=`, and `&hashtags=` appends a
+  // hashtag chip below the tweet text.
+  const xText = encodeURIComponent(
+    'just built my AI office at diaflow 🚀 climb the floors with me'
   )
   const encodedUrl = inviteUrl ? encodeURIComponent(inviteUrl) : ''
+  const xShareHref = inviteUrl
+    ? `https://x.com/intent/tweet?text=${xText}&url=${encodedUrl}&hashtags=DiaflowTower`
+    : undefined
+  const linkedinShareHref = inviteUrl
+    ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
+    : undefined
 
   async function handleCopy() {
     if (!inviteUrl) return
@@ -227,54 +237,16 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
             borderTop: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', margin: '0 0 12px', lineHeight: 1.5 }}>
-            Share your link to get more invites and climb to higher floors.{' '}
-            <strong style={{ color: 'white' }}>Every signup moves you up.</strong>
+          <p style={{ fontSize: '14px', color: 'white', fontWeight: 600, margin: '0 0 12px', lineHeight: 1.4 }}>
+            Share your office to move up the next floor
           </p>
 
-          {/* URL row */}
-          {inviteUrl ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: '10px',
-                padding: '10px 14px',
-                marginBottom: '10px',
-              }}
-            >
-              <span
-                style={{
-                  flex: 1,
-                  fontSize: '13px',
-                  color: 'rgba(255,255,255,0.7)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {inviteUrl}
-              </span>
-              <button
-                onClick={handleCopy}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  color: copied ? '#34d399' : '#818cf8',
-                  whiteSpace: 'nowrap',
-                  padding: 0,
-                }}
-              >
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          ) : (
+          {/* Share row — X / LinkedIn / Copy. Mirrors MySquadDrawer so
+              the affordance is consistent everywhere the invite URL
+              is offered. Threads + the standalone URL pill were
+              removed (Threads consolidated into X cross-posting, the
+              URL pill duplicated the Copy action). */}
+          {!inviteUrl && (
             <div
               style={{
                 background: 'rgba(255,255,255,0.04)',
@@ -289,16 +261,13 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
               Sign up to get your personal invite link.
             </div>
           )}
-
-          {/* Share buttons with real brand SVG icons */}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             <a
-              href={inviteUrl ? `https://twitter.com/intent/tweet?text=${shareText}&url=${encodedUrl}` : undefined}
+              href={xShareHref}
               aria-disabled={!inviteUrl}
               target="_blank"
               rel="noreferrer"
               style={{
-                flex: 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -318,15 +287,14 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="white" aria-hidden>
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
-              Share
+              X
             </a>
             <a
-              href={inviteUrl ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}` : undefined}
+              href={linkedinShareHref}
               aria-disabled={!inviteUrl}
               target="_blank"
               rel="noreferrer"
               style={{
-                flex: 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -346,36 +314,52 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="white" aria-hidden>
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
               </svg>
-              Share
+              LinkedIn
             </a>
-            <a
-              href={inviteUrl ? `https://www.threads.net/intent/post?text=${shareText}%20${encodedUrl}` : undefined}
-              aria-disabled={!inviteUrl}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={handleCopy}
+              disabled={!inviteUrl}
               style={{
-                flex: 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '7px',
-                background: 'rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.06)',
                 border: '1px solid rgba(255,255,255,0.15)',
                 borderRadius: '10px',
                 padding: '11px',
                 color: 'white',
                 fontWeight: 700,
                 fontSize: '13px',
-                textDecoration: 'none',
+                cursor: inviteUrl ? 'pointer' : 'not-allowed',
                 opacity: inviteUrl ? 1 : 0.4,
-                pointerEvents: inviteUrl ? 'auto' : 'none',
               }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="white" aria-hidden>
-                <path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.5 12.068c0-3.548.858-6.424 2.551-8.55C5.89 1.257 8.586.062 12.093.004c2.743-.044 5.048.632 6.852 2.01 1.63 1.24 2.712 2.953 3.217 5.09l-2.403.533c-.367-1.617-1.13-2.886-2.27-3.77-1.314-.999-3.09-1.497-5.28-1.46-2.75.046-4.828.882-6.169 2.483-1.347 1.61-2.03 3.96-2.03 6.988 0 3.031.675 5.373 2.007 6.96 1.323 1.578 3.383 2.383 6.115 2.402 2.354.016 4.1-.556 5.19-1.7.933-.98 1.403-2.437 1.403-4.335 0-.437-.035-.847-.107-1.22a5.02 5.02 0 00-.288-.96c-.567.29-1.19.518-1.854.677-1.174.281-2.442.346-3.77.193-1.61-.187-2.854-.745-3.697-1.659-.843-.914-1.27-2.12-1.27-3.587 0-1.536.46-2.794 1.364-3.737.929-.97 2.245-1.479 3.91-1.511 1.59-.031 2.964.449 3.974 1.385.977.905 1.553 2.188 1.713 3.817 1.05-.39 1.89-1.013 2.496-1.854a6.85 6.85 0 00.527-1.02 8.47 8.47 0 00-.38-6.62c-.72-1.48-1.843-2.607-3.337-3.351C16.16.78 14.24.338 12.093.338h-.007zm-.44 13.5c.736.086 1.46.05 2.148-.107.503-.118.97-.297 1.39-.53a6.3 6.3 0 00-.135-1.02c-.097-.481-.286-.894-.561-1.226-.51-.617-1.276-.946-2.275-.977-1.01-.032-1.79.255-2.317.852-.441.499-.664 1.149-.664 1.933 0 .794.23 1.43.683 1.89.436.444 1.07.68 1.731.756l.001-.571z" />
-              </svg>
-              Threads
-            </a>
+              {copied ? (
+                <>
+                  <span aria-hidden>✓</span>
+                  Copied
+                </>
+              ) : (
+                <>
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
+                    <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
+                  </svg>
+                  Copy
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>

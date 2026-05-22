@@ -159,48 +159,33 @@ export function MySquadDrawer({
   }
 
   /**
-   * Build the share copy + open the network's intent URL. Copy is
-   * sourced from requirements/share-btn.md so marketing controls the
-   * wording — only the dynamic `invitesToNext` count + `inviteUrl`
-   * are injected at runtime.
+   * Build the share copy + open the network's intent URL. URL format
+   * comes from requirements/share-btn.md:
    *
-   *   X         → "just built my AI office at diaflow. {N} invites
-   *                from unlocking the next floor 👀 {url}"
-   *   LinkedIn  → "Trying Diaflow's early access — you build an AI
-   *                team in a virtual office and climb a tower by
-   *                inviting people. I'm {N} invites from the next
-   *                floor. {url}"
+   *   X        → https://x.com/intent/tweet?text=<text>&url=<inviteUrl>&hashtags=DiaflowTower
+   *   LinkedIn → https://www.linkedin.com/sharing/share-offsite/?url=<inviteUrl>
    *
-   * LinkedIn's share-offsite intent only accepts a `url` param (no
-   * pre-filled `text`), so we still pass the URL — the user then
-   * pastes the suggested copy from the system clipboard which we
-   * populate at click time.
+   * Text is the marketing copy from the same spec, with dynamic
+   * `invitesToNext` injected. The invite URL is passed in `&url=`
+   * (NOT appended to text) so X auto-appends + auto-shortens the
+   * link cleanly. LinkedIn's share-offsite intent only accepts a
+   * `url` param — it pulls the title/description from the OG tags
+   * already configured on /floor/[code] (see app/floor/[code]/page.tsx
+   * generateMetadata), so no separate `text` plumbing is needed.
    */
   function handleShare(network: 'x' | 'linkedin') {
     if (!inviteUrl) return
-    const invitesPhrase = nextFloor
-      ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from`
-      : 'just reached the top floor —'
     const xText = nextFloor
-      ? `just built my AI office at diaflow. ${invitesPhrase} unlocking the next floor 👀\n${inviteUrl}`
-      : `just topped out my AI office at diaflow 🏆\n${inviteUrl}`
-    const linkedinText = nextFloor
-      ? `Trying Diaflow's early access — you build an AI team in a virtual office and climb a tower by inviting people.\nI'm ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from the next floor.\n${inviteUrl}`
-      : `Trying Diaflow's early access — you build an AI team in a virtual office and climb a tower by inviting people.\nJust reached the top floor.\n${inviteUrl}`
+      ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
+      : 'just topped out my AI office at diaflow 🏆'
 
     if (network === 'x') {
       window.open(
-        `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}`,
+        `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encodeURIComponent(inviteUrl)}&hashtags=DiaflowTower`,
         '_blank',
         'noopener,noreferrer,width=620,height=620',
       )
       return
-    }
-    // LinkedIn: drop the suggested copy on the user's clipboard so
-    // they can paste it in the share modal (the intent URL only
-    // accepts a `url` param, not pre-filled text).
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(linkedinText).catch(() => {/* best-effort */})
     }
     window.open(
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`,
@@ -317,19 +302,12 @@ export function MySquadDrawer({
             )}
           </div>
 
-          {/* Invite link */}
-          {referralCode ? (
-            <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-md bg-night-deep border border-white/10">
-              <span className="flex-1 text-sm font-mono text-tower-cream/80 truncate">{inviteUrl}</span>
-              <button
-                onClick={handleCopy}
-                className="text-tower-cream/60 hover:text-tower-gold text-sm"
-                aria-label="Copy invite link"
-              >
-                {copied ? '✓' : '⧉'}
-              </button>
-            </div>
-          ) : (
+          {/* The standalone invite-URL display + copy button used to
+              live here. It was redundant once Copy joined the share
+              row below (same Copy action, less duplicated chrome).
+              Anonymous users still need a sign-up CTA since they
+              don't have a referralCode to share. */}
+          {!referralCode && (
             <button
               onClick={onOpenSignup}
               className="mt-3 w-full px-3 py-2 rounded-md bg-night-deep border border-tower-gold/30 text-sm text-tower-gold hover:bg-night-deep/80"
@@ -346,8 +324,26 @@ export function MySquadDrawer({
         <div className="rounded-xl p-4 bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-500/30">
           <div className="flex items-baseline justify-between">
             <div className="text-[11px] uppercase tracking-widest text-tower-cream/50">Current floor</div>
-            <div className="text-right">
-              <div className="text-sm font-semibold">
+            {/* Right-aligned stack: total-invites count above, rank
+                below. Two lines so the user can see at a glance both
+                "how much have I done" (invites) and "where do I stand"
+                (rank) without leaving the drawer. The invite count
+                used to be implicit in the progress-bar caption only
+                ("N more invites → Floor X"), which hid the cumulative
+                number. */}
+            <div className="text-right space-y-0.5">
+              {/* Invite count + rank stack. The number is intentionally
+                  pumped up to text-base so the "how many invites have
+                  I racked up so far?" stat reads at a glance — the
+                  smaller text-sm version got lost next to the giant
+                  "Floor X" title and users were missing it. */}
+              <div className="text-base font-semibold text-tower-cream">
+                <strong className="tabular-nums">{totalInvites}</strong>{' '}
+                <span className="text-tower-cream/70 font-normal text-sm">
+                  {totalInvites === 1 ? 'invite' : 'invites'}
+                </span>
+              </div>
+              <div className="text-sm font-semibold text-purple-300">
                 {rank == null ? (
                   <span className="text-tower-cream/40">Rank —</span>
                 ) : rank >= 51 ? (
@@ -359,7 +355,7 @@ export function MySquadDrawer({
             </div>
           </div>
           <div className="flex items-baseline gap-2 mt-1">
-            <div className="text-5xl font-bold">{currentFloor}</div>
+            <div className="text-5xl font-bold">Floor {currentFloor}</div>
             <div className="text-base text-tower-cream/50">of {totalFloors}</div>
           </div>
           <div className="mt-3 h-1.5 rounded-full bg-night-deep/60 overflow-hidden">
@@ -367,9 +363,13 @@ export function MySquadDrawer({
           </div>
           <div className="mt-2 flex items-center justify-between text-xs">
             <span className="text-tower-cream/80">
-              {nextFloor
-                ? `${invitesToNext} more ${invitesToNext === 1 ? 'invite' : 'invites'} → Floor ${nextFloor.id}`
-                : 'You reached the top'}
+              {nextFloor ? (
+              <>
+                <span className="font-bold">{invitesToNext} more {invitesToNext === 1 ? 'invite' : 'invites'}</span> → Floor {nextFloor.id}
+              </>
+            ) : (
+              'You reached the top'
+            )}
             </span>
             {nextFloor && <span className="text-tower-cream/60">{nextFloor.label}</span>}
           </div>
@@ -396,6 +396,7 @@ export function MySquadDrawer({
                 <span className="text-tower-cream/55">
                   {visiting.totalPokes === 1 ? 'poke' : 'pokes'}
                 </span>
+                <span className="text-tower-cream/55 italic"> • just for fun</span>
               </span>
             </div>
           )}
@@ -408,16 +409,23 @@ export function MySquadDrawer({
             was clutter. Edit modal is still reachable by clicking
             teammates in the 3D scene (or via the bulk-add CTA). */}
 
-        {/* Share — two networks (X + LinkedIn). Threads was retired
-            per product decision: most users already cross-post X →
-            Threads, and our share copy reads better in tweet form. */}
+        {/* Share — three actions in one row: X, LinkedIn, Copy.
+            Copy folded in from the previous standalone URL pill above
+            so the drawer has a single share block instead of two
+            stacked panels. Threads was retired earlier (most users
+            cross-post X → Threads, copy reads better in tweet form).
+            Buttons stay rendered without a referralCode so the layout
+            doesn't shift; they're disabled with `cursor-not-allowed`
+            until the user has signed up. */}
         <div>
-          <div className="text-sm font-semibold mb-2">Share to climb faster</div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="text-sm font-semibold mb-2">
+            Share your office to move up the next floor
+          </div>
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => handleShare('x')}
               disabled={!inviteUrl}
-              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on X"
             >
               <XLogo />
@@ -426,11 +434,29 @@ export function MySquadDrawer({
             <button
               onClick={() => handleShare('linkedin')}
               disabled={!inviteUrl}
-              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on LinkedIn"
             >
               <LinkedInLogo />
               <span>LinkedIn</span>
+            </button>
+            <button
+              onClick={handleCopy}
+              disabled={!inviteUrl}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Copy invite link"
+            >
+              {copied ? (
+                <>
+                  <span aria-hidden>✓</span>
+                  <span>Copied</span>
+                </>
+              ) : (
+                <>
+                  <LinkIcon />
+                  <span>Copy</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -449,7 +475,7 @@ export function MySquadDrawer({
             BELOW the "How it works" row so it doesn't dominate the
             top of the drawer — the prompt is still findable but isn't
             the first thing the user sees. */}
-        {onVerifyEmail && emailVerified === false && (
+        {/* {onVerifyEmail && emailVerified === false && (
           <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2.5 text-sm">
             <div className="flex items-start gap-3">
               <div className="text-purple-300 text-base leading-none mt-0.5" aria-hidden>⚠</div>
@@ -471,7 +497,7 @@ export function MySquadDrawer({
               </button>
             </div>
           </div>
-        )}
+        )} */}
       </div>
 
       <HowItWorksModal
@@ -481,23 +507,6 @@ export function MySquadDrawer({
       />
 
       <div className="border-t border-white/5 p-4 mt-auto space-y-2">
-        {/* Sign out — only for signed-in users (anonymous trial has no
-            session to clear). Posted via the parent handler so any
-            client-side cleanup (cache busts, toast, redirect) is
-            centralised in TowerLanding. */}
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-md bg-night-deep/60 border border-white/10 text-tower-cream/80 hover:border-red-400/40 hover:text-red-300 hover:bg-red-500/5 font-semibold text-sm transition"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            Sign out
-          </button>
-        )}
         <a
           href={DISCORD_URL}
           target="_blank"
@@ -509,6 +518,23 @@ export function MySquadDrawer({
           </svg>
           Join us on Discord
         </a>
+
+        {/* Sign out — small text link under the Discord CTA. Demoted
+            from a full-width button (with destructive red hover) so it
+            doesn't compete visually with the primary action above.
+            Anonymous trial sessions don't pass `onLogout`, so this
+            link only renders for signed-in users. */}
+        {onLogout && (
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="text-xs text-tower-cream/45 hover:text-tower-cream/80 underline-offset-2 hover:underline transition"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -598,6 +624,27 @@ function XLogo() {
       aria-hidden
     >
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
+/** Two interlocking chain links — used on the Copy button so it
+ *  visually pairs with the X / LinkedIn buttons (icon + text). */
+function LinkIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
+      <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
     </svg>
   )
 }

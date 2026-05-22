@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { clearTrialState, readTrialState } from '@/lib/trial'
 import { PasswordInput } from '@/components/PasswordInput'
+import { InlineSpinner } from '@/components/ViewTransitionOverlay'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -124,8 +125,9 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-50"
+            className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
+            {busy && <InlineSpinner />}
             {busy ? 'Creating account…' : 'Create account'}
           </button>
           {error && <p className="text-xs text-red-300">{error}</p>}

@@ -1,9 +1,65 @@
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/auth'
 import { getUnlockedItemsForFloor } from '@/lib/floorsDb'
 import { maskEmail, type InviterInfo } from '@/lib/inviter'
 import FloorVisitorClient from './FloorVisitor.client'
+
+/**
+ * Dynamic OG / Twitter card so a shared `/floor/<code>` URL renders
+ * the room owner's team name as the social-preview title (instead of
+ * the generic "Diaflow Tower" inherited from the root layout). Lets
+ * link previews on Slack / iMessage / Discord / Twitter / LinkedIn
+ * read "Join <TeamName> on Diaflow Tower" before the user even
+ * opens the page.
+ *
+ * Image stays at the site default (`/og.png` resolved via
+ * `metadataBase`) — per-team OG image generation is a future task.
+ */
+export async function generateMetadata(
+  { params }: { params: { code: string } },
+): Promise<Metadata> {
+  const code = params.code?.toUpperCase()
+  if (!code) return {}
+  const owner = await prisma.user.findUnique({
+    where: { referralCode: code },
+    select: { teamName: true, currentFloor: true },
+  })
+  // Unknown / 404 code — fall through to root-layout defaults.
+  if (!owner) return {}
+
+  const teamName = owner.teamName?.trim() || 'A Diaflow team'
+  const title = `Join ${teamName} on Diaflow Tower`
+  const description = `${teamName} is on Floor ${owner.currentFloor} of the Diaflow Tower — peek inside their AI office and help them climb.`
+  const url = `/floor/${code}`
+
+  return {
+    title,
+    description,
+    // Next.js's metadata merge is SHALLOW — defining `openGraph` or
+    // `twitter` here REPLACES the root layout's whole block instead
+    // of patching individual fields. So we have to re-state the
+    // inherited fields (image, card type, siteName, type) alongside
+    // the per-room overrides, otherwise the image drops out of
+    // shared previews.
+    openGraph: {
+      type: 'website',
+      siteName: 'Diaflow Tower',
+      title,
+      description,
+      url,
+      images: [{ url: '/og.png', width: 1200, height: 627, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/og.png'],
+    },
+    alternates: { canonical: url },
+  }
+}
 
 /**
  * /floor/[code] — unified invite + shared-floor URL.

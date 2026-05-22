@@ -139,7 +139,7 @@ export function MiaBubble({ onSubmit, onSkip }: MiaProps) {
       <div className="text-center">
         <div className="text-4xl mb-3" aria-hidden>💁</div>
         <h2 className="text-xl font-bold mb-1">Hi, I&apos;m Mia</h2>
-        <p className="text-sm text-tower-cream/70 mb-5">What's your title/position in a company?</p>
+        <p className="text-sm text-tower-cream/70 mb-5">What do you do for work?</p>
         <form
           onSubmit={e => {
             e.preventDefault()

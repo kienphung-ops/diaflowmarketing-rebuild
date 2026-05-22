@@ -166,14 +166,19 @@ export function TowerView({
         </div>
       </div>
 
-      {/* Info card — anchored bottom-left on mobile (out of the way of
-          the tower floors) and top-left on desktop. Tighter padding +
-          shorter text on mobile so it doesn't crowd the tower image. */}
+      {/* Info card — anchored TOP-LEFT on both mobile and desktop.
+          (Was previously bottom-left on mobile, which collided with
+          the floating Office + My Squad pills sitting at bottom-right
+          and constrained the pills to a tall stack. Moving it up clears
+          the bottom strip entirely so the action pills can sit at
+          their natural bottom-5 position.) The `top-14` offset on
+          mobile / `md:top-16` on desktop matches the height of the
+          fixed Header above. */}
       {signedIn ? (
         <div
           className="absolute z-20 rounded-xl md:rounded-2xl bg-black/70 backdrop-blur-md border border-white/15 max-w-[60vw] md:max-w-[280px]
-                     bottom-4 left-3 px-3 py-2
-                     md:top-16 md:bottom-auto md:left-4 md:px-4 md:py-2.5"
+                     top-14 left-3 px-3 py-2
+                     md:top-16 md:left-4 md:px-4 md:py-2.5"
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
         >
           {teamName && (
@@ -192,8 +197,8 @@ export function TowerView({
       ) : (
         <div
           className="absolute z-20 rounded-xl md:rounded-2xl bg-black/70 backdrop-blur-md border border-white/15 max-w-[80vw] md:max-w-[280px]
-                     bottom-4 left-3 px-3 py-2
-                     md:top-16 md:bottom-auto md:left-4 md:px-4 md:py-3"
+                     top-14 left-3 px-3 py-2
+                     md:top-16 md:left-4 md:px-4 md:py-3"
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
         >
           <div className="text-[11px] md:text-sm text-white/85 mb-1.5 md:mb-2">

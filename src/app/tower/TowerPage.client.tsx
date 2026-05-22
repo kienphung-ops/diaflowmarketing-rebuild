@@ -10,6 +10,7 @@ import { LeaderboardModal } from '@/components/LeaderboardModal'
 import { EmailVerifyModal } from '@/components/EmailVerifyModal'
 import { CelebrationModal } from '@/components/CelebrationModal'
 import { Header } from '@/components/Header'
+import { ViewTransitionOverlay } from '@/components/ViewTransitionOverlay'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
 import { readTrialState } from '@/lib/trial'
 import {
@@ -50,6 +51,9 @@ export default function TowerPageClient(props: Props) {
   const [signupOpen, setSignupOpen] = useState(false)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
+  // Spinner overlay during the slow /tower → / RSC round-trip. See the
+  // TowerLanding.client.tsx note for the full rationale.
+  const [isNavigating, setIsNavigating] = useState(false)
   // Mirror server-supplied emailVerified locally so completing the
   // EmailVerifyModal flow hides the "Verify your email" banner
   // immediately (without waiting for /api/me round-trip).
@@ -231,7 +235,10 @@ export default function TowerPageClient(props: Props) {
         maxTeammates={maxTeammates}
         slotsAvailable={slotsAvailable}
         showTower={true}
-        onToggleTower={() => router.push('/')}
+        onToggleTower={() => {
+          setIsNavigating(true)
+          router.push('/')
+        }}
         onOpenSignup={!props.signedIn ? () => setSignupOpen(true) : undefined}
       />
 
@@ -240,17 +247,33 @@ export default function TowerPageClient(props: Props) {
         currentFloor={effective.currentFloor}
         totalInvites={effective.totalInvites}
         teamName={effective.teamName}
-        onClose={() => router.push('/')}
+        onClose={() => {
+          setIsNavigating(true)
+          router.push('/')
+        }}
         onSignIn={() => router.push('/login')}
       />
+
+      {/* Office navigation overlay — covers the tower while / loads. */}
+      {isNavigating && <ViewTransitionOverlay label="Loading office view…" />}
 
       {/* Leaderboard trigger — floating button visible on both
           desktop + mobile. Pinned to the right edge above MySquad. */}
       <LeaderboardButton onClick={() => setLeaderboardOpen(true)} />
 
-      {/* My Squad is always visible — desktop right-edge + mobile bottom button */}
+      {/* My Squad is always visible — desktop right-edge + mobile
+          floating pill (bottom-right). The Office toggle sits to its
+          left as a second compact pill so /tower mobile keeps a way
+          back to / without consuming a full sticky bottom bar (which
+          would cover the bottom rows of the tower image). */}
       <MySquadFloatingButton visible onClick={() => setSquadOpen(true)} />
-      <MobileSquadButton onClick={() => setSquadOpen(true)} />
+      <MobileTowerActions
+        onOpenSquad={() => setSquadOpen(true)}
+        onGoOffice={() => {
+          setIsNavigating(true)
+          router.push('/')
+        }}
+      />
 
       <MySquadDrawer
         open={squadOpen}
@@ -309,7 +332,6 @@ export default function TowerPageClient(props: Props) {
           trialMode={false}
           floorsClimbed={celebrationFloorsClimbed}
           onClose={() => setCelebrationFloor(null)}
-          onOpenSquad={() => setSquadOpen(true)}
         />
       )}
 
@@ -351,6 +373,10 @@ function LeaderboardButton({ onClick }: { onClick: () => void }) {
       </button>
       {/* Mobile pill — stacked ABOVE the bottom-right My Squad pill so
           they don't collide on narrow phones. */}
+      {/* Mobile Top-50 pill — stacked ABOVE the bottom-right Office +
+          My Squad row so they don't collide on narrow phones. The
+          TowerView info card lives at TOP-left now, so the bottom
+          strip is free for these floating pills. */}
       <button
         onClick={onClick}
         aria-label="Open leaderboard"
@@ -365,21 +391,44 @@ function LeaderboardButton({ onClick }: { onClick: () => void }) {
 }
 
 /**
- * Mobile-only square button anchored to bottom-right, mirroring the
- * floating-right-edge button on desktop. The full bottom action bar from
- * the home page would be redundant here — on /tower the only actions are
- * navigating back to office (via Header's Tower toggle) and My Squad.
+ * Two compact bottom-right pills for /tower mobile: Office (back to /)
+ * + My Squad. Kept as floating pills rather than a full sticky bottom
+ * bar so the tower image isn't covered. The Office pill sits to the
+ * LEFT of My Squad on the same baseline so both are reachable with one
+ * thumb. The TowerView info card was relocated from bottom-left to
+ * top-left specifically so this row could anchor to bottom-5 without
+ * overlapping anything.
  */
-function MobileSquadButton({ onClick }: { onClick: () => void }) {
+function MobileTowerActions({
+  onOpenSquad,
+  onGoOffice,
+}: {
+  onOpenSquad: () => void
+  onGoOffice: () => void
+}) {
   return (
-    <button
-      onClick={onClick}
-      aria-label="Open My Squad"
-      className="md:hidden fixed bottom-5 right-5 z-30 px-3.5 py-2.5 rounded-full bg-tower-gold text-night-deep font-semibold text-xs shadow-lg flex items-center gap-1.5"
-      style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+    <div
+      className="md:hidden fixed bottom-5 right-5 z-30 flex items-center gap-2"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <span aria-hidden>📋</span>
-      My Squad
-    </button>
+      <button
+        onClick={onGoOffice}
+        aria-label="Back to office view"
+        className="px-3.5 py-2.5 rounded-full bg-night-mid/95 border border-tower-gold/40 text-tower-cream font-semibold text-xs shadow-lg flex items-center gap-1.5 backdrop-blur-sm"
+        style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+      >
+        <span aria-hidden>🏠</span>
+        Office
+      </button>
+      <button
+        onClick={onOpenSquad}
+        aria-label="Open My Squad"
+        className="px-3.5 py-2.5 rounded-full bg-tower-gold text-night-deep font-semibold text-xs shadow-lg flex items-center gap-1.5"
+        style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+      >
+        <span aria-hidden>📋</span>
+        My Squad
+      </button>
+    </div>
   )
 }

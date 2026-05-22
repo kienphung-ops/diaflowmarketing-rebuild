@@ -187,12 +187,12 @@ function LeaderboardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolea
         </div>
         <div className="text-[10px] text-tower-cream/45 flex items-center gap-1.5 mt-0.5">
           <span className="font-mono">{entry.referralCode}</span>
-          {entry.country && (
+          {/* {entry.country && (
             <>
               <span className="opacity-40">·</span>
               <span>{entry.country}</span>
             </>
-          )}
+          )} */}
         </div>
       </div>
       <div className="text-right shrink-0">

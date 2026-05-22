@@ -45,25 +45,21 @@ export function Header({
       </div>
 
       <div className="pointer-events-auto flex items-center gap-2">
-        {/* Compact stats on mobile, full on desktop */}
-        <div className="text-[10px] md:text-xs text-tower-cream/80 bg-night-mid/60 px-2 md:px-3 py-1 md:py-1.5 rounded-md backdrop-blur-sm whitespace-nowrap">
-          <span className="md:hidden">
-            <span className="text-tower-gold font-semibold">F{currentFloor}</span>
-            <span className="mx-1 opacity-40">·</span>
-            <span className="text-tower-gold font-semibold">{totalInvites}</span>
-            <span className="mx-1 opacity-40">·</span>
-            <span className="text-tower-gold font-semibold">{teammateCount}/{maxTeammates}</span>
-          </span>
-          <span className="hidden md:inline">
-            Floor <span className="text-tower-gold font-semibold">{currentFloor}</span>
-            <span className="mx-2 opacity-40">·</span>
-            <span className="text-tower-gold font-semibold">{totalInvites}</span>{' '}
-            {totalInvites === 1 ? 'invite' : 'invites'}
-            <span className="mx-2 opacity-40">·</span>
-            <span className="text-tower-gold font-semibold">{teammateCount}/{maxTeammates}</span>{' '}
-            teammates
-            {!signedIn && <span className="ml-2 opacity-60">(trial)</span>}
-          </span>
+        {/* Stats pill — same long-form on every viewport. With the
+            Tower-view toggle hidden on mobile (see below), the right
+            slot has enough room to fit the full "Floor X · N invites ·
+            N/N teammates" string at text-xs without truncation. The
+            "(trial)" suffix is still desktop-only since it's the bit
+            that runs out of room first on small screens. */}
+        <div className="text-xs text-tower-cream/80 bg-night-mid/60 px-3 py-1.5 rounded-md backdrop-blur-sm whitespace-nowrap">
+          Floor <span className="text-tower-gold font-semibold">{currentFloor}</span>
+          <span className="mx-1.5 md:mx-2 opacity-40">·</span>
+          <span className="text-tower-gold font-semibold">{totalInvites}</span>{' '}
+          {totalInvites === 1 ? 'invite' : 'invites'}
+          <span className="mx-1.5 md:mx-2 opacity-40">·</span>
+          <span className="text-tower-gold font-semibold">{teammateCount}/{maxTeammates}</span>{' '}
+          teammates
+          {!signedIn && <span className="ml-2 opacity-60 hidden md:inline">(trial)</span>}
         </div>
 
         {/* Add-teammate pulse — only on desktop in header; mobile uses bottom bar */}
@@ -76,13 +72,15 @@ export function Header({
           </button>
         )}
 
-        {/* Tower toggle — visible on both desktop and mobile (was
-            previously desktop-only, but on /tower the user needs a way
-            back to / and the mobile bottom bar isn't rendered there). */}
+        {/* Tower toggle — desktop only. The header right slot on mobile
+            is too narrow to fit Tower view alongside the stats pill +
+            Claim/Copy CTA without everything shrinking to an unreadable
+            10px. Mobile users reach the tower view via the bottom bar
+            (and on /tower itself there's a back-arrow). */}
         {onToggleTower && (
           <button
             onClick={onToggleTower}
-            className="inline-flex px-2 md:px-3 py-1 md:py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-[10px] md:text-xs tracking-wide hover:bg-night-mid transition whitespace-nowrap"
+            className="hidden md:inline-flex px-3 py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-xs tracking-wide hover:bg-night-mid transition whitespace-nowrap"
           >
             {showTower ? 'Office view' : 'Tower view'}
           </button>
@@ -102,14 +100,14 @@ export function Header({
         ) : hideAuthCta ? null : onOpenSignup ? (
           <button
             onClick={onOpenSignup}
-            className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[11px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
+            className="px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
           >
             🔒 Claim your team
           </button>
         ) : (
           <Link
             href="/login"
-            className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[11px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
+            className="px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
           >
             🔒 Claim your team
           </Link>

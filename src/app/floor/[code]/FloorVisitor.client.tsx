@@ -22,6 +22,7 @@ import dynamicImport from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { SceneSkeleton } from '@/components/fallback/SceneSkeleton'
 import { Header } from '@/components/Header'
+import { ViewTransitionOverlay } from '@/components/ViewTransitionOverlay'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
 import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { SignupModal } from '@/components/SignupModal'
@@ -119,6 +120,9 @@ export default function FloorVisitorClient(props: Props) {
   const [squadOpen, setSquadOpen] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
+  // Covers the visited floor with a spinner while /tower loads. See the
+  // TowerLanding.client.tsx note for the full rationale.
+  const [isNavigating, setIsNavigating] = useState(false)
   const [emailVerified, setEmailVerified] = useState(props.visitorEmailVerified)
   const [rank, setRank] = useState<number | null>(null)
   // Live overrides for the visitor's own stats, fed by the SSE stream.
@@ -331,7 +335,10 @@ export default function FloorVisitorClient(props: Props) {
         maxTeammates={visitorMaxTeammates}
         slotsAvailable={visitorSlotsAvailable}
         showTower={false}
-        onToggleTower={() => router.push('/tower')}
+        onToggleTower={() => {
+          setIsNavigating(true)
+          router.push('/tower')
+        }}
         // No header "Claim your team" button while visiting someone
         // else's floor — the bottom-center "Build your own office"
         // CTA already funnels unlogged visitors into signup with the
@@ -440,7 +447,6 @@ export default function FloorVisitorClient(props: Props) {
           trialMode={false}
           floorsClimbed={celebrationFloorsClimbed}
           onClose={() => setCelebrationFloor(null)}
-          onOpenSquad={() => setSquadOpen(true)}
         />
       )}
 
@@ -460,6 +466,10 @@ export default function FloorVisitorClient(props: Props) {
           <span className="text-lg font-bold group-hover:translate-x-0.5 transition-transform">→</span>
         </a>
       )}
+
+      {/* Tower navigation overlay — covers the visited floor while
+          /tower's RSC loads. Unmounts naturally when the page swaps. */}
+      {isNavigating && <ViewTransitionOverlay label="Loading tower view…" />}
     </main>
   )
 }

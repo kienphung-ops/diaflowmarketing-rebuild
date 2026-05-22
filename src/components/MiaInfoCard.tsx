@@ -1,4 +1,3 @@
-'use client'
 
 /**
  * MiaInfoCard — opens when the user clicks Mia in the office scene.
@@ -86,11 +85,11 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading }:
       >
         <div className="flex items-start justify-between mb-4">
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
+            {/* <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
               {recommendedRole ? 'Your AI assistant match' : 'Operations Assistant'}
-            </div>
-            <h2 className="text-2xl font-bold mt-1">
-              {recommendedRole ?? 'Hi, I’m Mia 👋'}
+            </div> */}
+            <h2 className="text-xl font-bold mt-1">
+              {recommendedRole ? `Hi, I'm Mia — your AI ${recommendedRole}` : 'Hi, I’m Mia 👋'}
             </h2>
           </div>
           <button
@@ -129,8 +128,8 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading }:
           // characters (`-`, `•`, `·`, `*`) are stripped because we
           // supply our own purple bullet glyph for visual consistency.
           <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-4 py-3 mb-5">
-            <p className="text-[11px] uppercase tracking-widest text-purple-300/80 mb-2">
-              What Mia will do for you
+            <p className="text-[14px] tracking-widest text-purple-300/80 mb-2">
+              when ai teammate launches, mia will
             </p>
             <ul className="space-y-2">
               {reason!

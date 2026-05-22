@@ -74,24 +74,17 @@ export function LeoEmailDrawer({ open, onClose }: Props) {
 
         <div className="flex items-center justify-between gap-3 mb-4">
           <p className="text-sm text-tower-cream/80">
-            Here&apos;s a quick tour of what we&apos;re building.
+            When we launch, your AI teammates will handle the work. This is what that looks like.
           </p>
-          <a
+          {/* <a
             href={video.watch}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-deep/80 border border-white/10 text-xs text-tower-cream/80 hover:bg-night-deep hover:text-tower-cream transition whitespace-nowrap"
           >
             ▶ Watch on YouTube
-          </a>
+          </a> */}
         </div>
-
-        <button
-          onClick={onClose}
-          className="w-full px-4 py-2.5 rounded-md bg-tower-gold text-night-deep font-semibold text-sm hover:bg-tower-gold/90"
-        >
-          Back to the office
-        </button>
       </div>
     </div>
   )

@@ -12,7 +12,6 @@ interface Props {
   floorsClimbed?: number
   onClose: () => void
   onOpenSignup?: () => void
-  onOpenSquad?: () => void
 }
 
 // Decorative confetti — pure CSS dots scattered across the modal. Memoised
@@ -79,7 +78,6 @@ export function CelebrationModal({
   floorsClimbed = 1,
   onClose,
   onOpenSignup,
-  onOpenSquad,
 }: Props) {
   // Live config from /api/floors. `useFloor` returns the static fallback
   // until the API responds, so values render synchronously on first paint.
@@ -172,6 +170,18 @@ export function CelebrationModal({
             </div>
           )}
 
+          {/* CTA stack. The old layout had a primary "Share & climb to
+              floor N" button stacked above a tiny text link "See it in
+              my office". We removed the share CTA (sharing already
+              lives in the header Invite-link button + MySquad drawer
+              — a third path here was redundant and pushed users away
+              from the modal). "See it in my office" is now the
+              primary action, promoted from text-link to button, so
+              the modal has a single clear next-step.
+
+              Trial mode still surfaces "Save your progress" since
+              that's a genuinely different upsell, and the penthouse
+              ending keeps its own copy. */}
           <div className="mt-5 flex flex-col gap-2">
             {trialMode && onOpenSignup ? (
               <button
@@ -183,30 +193,21 @@ export function CelebrationModal({
               >
                 Save your progress →
               </button>
-            ) : next ? (
-              <button
-                onClick={() => {
-                  onClose()
-                  onOpenSquad?.()
-                }}
-                className="w-full px-4 py-3 rounded-md bg-tower-gold text-night-deep font-semibold text-sm hover:bg-tower-gold/90 transition"
-              >
-                Share &amp; climb to floor {next.id} →
-              </button>
-            ) : (
+            ) : !next ? (
               <button
                 onClick={onClose}
                 className="w-full px-4 py-3 rounded-md bg-tower-gold text-night-deep font-semibold text-sm hover:bg-tower-gold/90"
               >
                 Enjoy the penthouse
               </button>
+            ) : (
+              <button
+                onClick={onClose}
+                className="w-full px-4 py-3 rounded-md bg-tower-gold text-night-deep font-semibold text-sm hover:bg-tower-gold/90 transition"
+              >
+                See it in my office →
+              </button>
             )}
-            <button
-              onClick={onClose}
-              className="w-full text-xs text-tower-cream/70 hover:text-tower-cream py-2"
-            >
-              See it in my office
-            </button>
           </div>
         </div>
       </div>
