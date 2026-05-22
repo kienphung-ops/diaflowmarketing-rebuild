@@ -289,7 +289,7 @@ export function MySquadDrawer({
               </>
             ) : (
               <>
-                <div className="text-3xl font-bold lowercase">{teamName || 'untitled'}</div>
+                <div className="text-3xl font-bold">{teamName || 'untitled'}</div>
                 <button
                   onClick={() => setRenaming(true)}
                   className="text-xs px-2 py-1 rounded bg-night-deep/80 border border-white/10 text-tower-cream/60 hover:text-tower-cream"
