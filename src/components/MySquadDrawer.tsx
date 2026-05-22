@@ -5,6 +5,7 @@ import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
 import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
 import { useOrigin } from '@/hooks/useOrigin'
+import { buildShareCopyText } from '@/lib/shareCopy'
 import type { InviterInfo } from '@/lib/inviter'
 
 interface ServerRecruit {
@@ -147,8 +148,13 @@ export function MySquadDrawer({
 
   async function handleCopy() {
     if (!inviteUrl) return
+    // Paste a marketing-formatted string ("built my AI office, N invites
+    // from the next floor — <url>") instead of the bare URL — see
+    // `buildShareCopyText` for the canonical format used across all
+    // three Copy buttons (this drawer + IrisHireModal + HowItWorksModal).
+    const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
     try {
-      await navigator.clipboard.writeText(inviteUrl)
+      await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -223,51 +229,16 @@ export function MySquadDrawer({
           </div>
         )}
 
-        {/* Standalone "Visiting <name>" pill — ONLY for guests on
-            /floor/[code] (i.e. `visiting.ownerName` is set). The
-            owner-side stats are merged INTO the Current Floor card
-            below so the drawer has a single focal card instead of
-            two stacked panels. */}
-        {visiting && visiting.ownerName && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-            <div className="flex items-baseline justify-between mb-2">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/80">
-                Visiting
-              </div>
-              <div className="text-xs font-semibold text-amber-200 truncate ml-2 max-w-[160px]">
-                {visiting.ownerName}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-night-deep/60 border border-white/5">
-                <DrawerEyeIcon />
-                <div className="leading-tight">
-                  <div className="text-sm font-bold text-tower-cream tabular-nums">
-                    {visiting.viewerCount}
-                  </div>
-                  <div className="text-[9px] uppercase tracking-wider text-tower-cream/50">
-                    viewing
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-night-deep/60 border border-white/5">
-                <span className="text-amber-300 text-base leading-none" aria-hidden>★</span>
-                <div className="leading-tight">
-                  <div className="text-sm font-bold text-tower-cream tabular-nums">
-                    {visiting.totalPokes}
-                  </div>
-                  <div className="text-[9px] uppercase tracking-wider text-tower-cream/50">
-                    {visiting.totalPokes === 1 ? 'total poke' : 'total pokes'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Standalone "Visiting <name>" pill was here previously. It
+            was removed so /floor/[code] MySquad mirrors /office +
+            /tower: the viewing + total-pokes stats now live INSIDE
+            the Current Floor card (single focal panel instead of two
+            stacked ones). Whose floor we're looking at is surfaced as
+            a small "Visiting <owner>" caption next to those stats —
+            see the activity row below. */}
 
         {/* Team name */}
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-tower-cream/40 mb-2">Your squad</div>
           <div className="flex items-center gap-2">
             {renaming ? (
               <>
@@ -296,9 +267,26 @@ export function MySquadDrawer({
                 >
                   ✎ Rename
                 </button>
+                {/* Sign out — pushed to the end of the team-name row
+                    with ml-auto, red-tinted so it reads as a
+                    destructive action. Anonymous trial sessions
+                    don't pass onLogout, so this link only renders
+                    for signed-in users. */}
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="ml-auto text-xs text-red-400 hover:text-red-300 underline-offset-2 hover:underline transition"
+                  >
+                    Sign out
+                  </button>
+                )}
               </>
             )}
+
           </div>
+
+          
 
           {/* The standalone invite-URL display + copy button used to
               live here. It was redundant once Copy joined the share
@@ -369,15 +357,23 @@ export function MySquadDrawer({
               'You reached the top'
             )}
             </span>
+            {/* Next-floor decor label (e.g. "Floor lamp"). Same row,
+                right-aligned, so the user knows what the next unlock
+                actually IS without opening "How it works". Visible in
+                all three drawer contexts (office / tower / visitor)
+                so /floor/[code] doesn't lose this beat. */}
             {nextFloor && <span className="text-tower-cream/60">{nextFloor.label}</span>}
           </div>
 
-          {/* Owner floor-activity row — only rendered when the drawer
-              is mounted on the OWNER's own page (visiting present
-              without an ownerName). Sits inside the Current Floor
-              card as a thin stats row so the previous standalone
-              "Your floor" panel doesn't double the visual weight. */}
-          {visiting && !visiting.ownerName && (
+          {/* Floor-activity row — viewers + total pokes for whichever
+              floor the user is currently looking at. Rendered for
+              BOTH owner-on-own-floor (office / tower) AND visitor-on-
+              someone-else (/floor/[code]) so the drawer layout is
+              consistent across contexts. When ownerName is set we
+              also surface a small "Visiting <owner>" caption to the
+              right so the visitor still sees whose floor the stats
+              belong to. */}
+          {visiting && (
             <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-5 text-xs">
               <span className="flex items-center gap-1.5 text-tower-cream/85">
                 <DrawerEyeIcon />
@@ -394,8 +390,19 @@ export function MySquadDrawer({
                 <span className="text-tower-cream/55">
                   {visiting.totalPokes === 1 ? 'poke' : 'pokes'}
                 </span>
-                <span className="text-tower-cream/55 italic"> • just for fun</span>
+                {!visiting.ownerName && (
+                  <span className="text-tower-cream/55 italic"> • just for fun</span>
+                )}
               </span>
+              {/* Visitor-only ownership caption — pushed to the row's
+                  right edge via ml-auto so the viewing/pokes pair
+                  stays grouped on the left. Truncated to keep the
+                  row single-line even with long team names. */}
+              {visiting.ownerName && (
+                <span className="ml-auto text-amber-300/80 italic truncate max-w-[150px]">
+                  on {visiting.ownerName}&apos;s floor
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -502,6 +509,8 @@ export function MySquadDrawer({
         open={howItWorksOpen}
         onClose={() => setHowItWorksOpen(false)}
         inviteUrl={inviteUrl || null}
+        currentFloor={currentFloor}
+        totalInvites={totalInvites}
       />
 
       <div className="border-t border-white/5 p-4 mt-auto space-y-2">
@@ -516,23 +525,9 @@ export function MySquadDrawer({
           </svg>
           Join us on Discord
         </a>
-
-        {/* Sign out — small text link under the Discord CTA. Demoted
-            from a full-width button (with destructive red hover) so it
-            doesn't compete visually with the primary action above.
-            Anonymous trial sessions don't pass `onLogout`, so this
-            link only renders for signed-in users. */}
-        {onLogout && (
-          <div className="text-center pt-1">
-            <button
-              type="button"
-              onClick={onLogout}
-              className="text-xs text-tower-cream/45 hover:text-tower-cream/80 underline-offset-2 hover:underline transition"
-            >
-              Sign out
-            </button>
-          </div>
-        )}
+        {/* Sign out moved out of this footer — it now sits at the
+            end of the team-name row at the top of the drawer (red
+            text, ml-auto-aligned). */}
       </div>
     </div>
   )

@@ -283,17 +283,14 @@ export default function TowerLanding(props: Props) {
     prevTrialFloorRef.current = trial.currentFloor
   }, [trial.currentFloor, props.signedIn])
 
-  // Initial-load celebration — also gated behind signed-in. Anonymous
-  // visitors land on the page with no modal flashing on top of the
-  // scene; they only see it after authenticating.
-  useEffect(() => {
-    if (!props.signedIn) return
-    setCelebrationFloorsClimbed(0)
-    setCelebrationFloor(serverState.currentFloor)
-    // Run only on mount (for signed-in users) — subsequent floor
-    // changes are handled by the increase-detection effects above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // (Removed) Initial-load celebration. Previously this effect fired
+  // CelebrationModal on every mount for signed-in users — even on plain
+  // page refresh with no floor change — which made the modal feel like
+  // spam. Floor-up celebration now only fires from:
+  //   - trial → real-floor jumps (the effect above)
+  //   - SSE `floor-up` events (useRealtimeFloor below)
+  //   - SSE snapshot diffs where serverFloor > client floor (also below)
+  // i.e. the modal only opens when the user actually advances a floor.
 
   // Real-time updates via SSE: signed-in users get notifications pushed
   // from the server when invites verify in the background.
@@ -947,6 +944,7 @@ export default function TowerLanding(props: Props) {
         open={irisModalOpen}
         onClose={() => setIrisModalOpen(false)}
         currentFloor={effective.currentFloor}
+        totalInvites={effective.totalInvites}
         slotsAvailable={slotsAvailable}
         inviteUrl={
           props.signedIn && props.referralCode && origin

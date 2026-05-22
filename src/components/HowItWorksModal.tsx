@@ -2,12 +2,21 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useFloorsConfig } from '@/lib/floorsConfigClient'
+import { useFloorsConfig, useFloor } from '@/lib/floorsConfigClient'
+import { buildShareCopyText } from '@/lib/shareCopy'
 
 interface Props {
   open: boolean
   onClose: () => void
   inviteUrl: string | null
+  /** Current floor — used to compute next-floor delta for the Copy
+   *  button's enriched payload. Optional so legacy callers that just
+   *  want the table still work; falls back to floor 1 (the worst case
+   *  is the copy says "N invites from the next floor" with the user's
+   *  view of N being whatever the floor-1 → floor-2 threshold is). */
+  currentFloor?: number
+  /** User's cumulative invites — see currentFloor above. */
+  totalInvites?: number
 }
 
 // Per planning.md — reward strings keyed by floor.
@@ -20,11 +29,24 @@ const FLOOR_REWARDS: Record<number, string> = {
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
-export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
+export function HowItWorksModal({
+  open,
+  onClose,
+  inviteUrl,
+  currentFloor = 1,
+  totalInvites = 0,
+}: Props) {
   const [copied, setCopied] = useState(false)
   // Live floor catalogue from /api/floors. Falls back to the static
   // FLOOR_CONFIG snapshot until the first response lands.
   const floors = useFloorsConfig()
+  // Next-floor + invites-to-next mirror the math in MySquadDrawer +
+  // IrisHireModal so the Copy-button payload reads the same string in
+  // every place: "built my AI office, N invites from the next floor — <url>".
+  const nextFloor = useFloor(currentFloor + 1)
+  const invitesToNext = nextFloor
+    ? Math.max(0, nextFloor.invitesRequired - totalInvites)
+    : 0
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -54,8 +76,11 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
 
   async function handleCopy() {
     if (!inviteUrl) return
+    // Enriched payload — matches MySquadDrawer + IrisHireModal so
+    // every Copy button across the app pastes the same string.
+    const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
     try {
-      await navigator.clipboard.writeText(inviteUrl)
+      await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -218,15 +243,15 @@ export function HowItWorksModal({ open, onClose, inviteUrl }: Props) {
                     visually pops, but the parts read as one
                     continuous sentence rather than three columns. */}
                 <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>max {cfg.maxTeammates} teammates</span>
-                  <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>+</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}><b>• {cfg.maxTeammates} teammate slots</b></span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>•</span>
                   <span>
                     {isPenthouse ? '🏆 ' : ''}
                     {cfg.label}
                   </span>
                   {reward && (
                     <>
-                      <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>+</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>•</span>
                       <span style={{ color: '#34d399', fontWeight: 600 }}>{reward}</span>
                     </>
                   )}

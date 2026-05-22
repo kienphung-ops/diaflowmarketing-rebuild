@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
+import { buildShareCopyText } from '@/lib/shareCopy'
 
 interface Props {
   open: boolean
@@ -10,6 +11,10 @@ interface Props {
   /** Current floor the user is on. Used to compute the "next" floor
    *  shown in the packed-state copy ("Unlock a new slot at Floor X"). */
   currentFloor: number
+  /** User's cumulative invites — combined with next-floor threshold
+   *  to compute the "N invites from the next floor" wording inside
+   *  the Copy-button payload (see buildShareCopyText). */
+  totalInvites: number
   /** Slots still available on the current floor. Drives the two-state
    *  copy: 0 → "Need to hire another teammate?" + share; >0 → "You
    *  have an open slot." + Add-teammate button. */
@@ -39,6 +44,7 @@ export function IrisHireModal({
   open,
   onClose,
   currentFloor,
+  totalInvites,
   slotsAvailable,
   inviteUrl,
   onAddTeammate,
@@ -48,6 +54,9 @@ export function IrisHireModal({
   // we just don't bother (user can't go higher) and the share copy
   // shifts to a generic "keep growing your office" line.
   const nextFloor = useFloor(currentFloor + 1)
+  const invitesToNext = nextFloor
+    ? Math.max(0, nextFloor.invitesRequired - totalInvites)
+    : 0
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -64,8 +73,11 @@ export function IrisHireModal({
 
   async function handleCopy() {
     if (!inviteUrl) return
+    // Same enriched payload as MySquadDrawer + HowItWorksModal — see
+    // buildShareCopyText for the canonical format.
+    const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
     try {
-      await navigator.clipboard.writeText(inviteUrl)
+      await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {

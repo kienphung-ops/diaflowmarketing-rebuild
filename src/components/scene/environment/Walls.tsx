@@ -150,9 +150,15 @@ export function Walls({ companyName, currentFloor, showWindow = true }: WallsPro
         )}
       </mesh>
 
-      {/* Side walls — only on penthouse, both glass. The room is 11
-          deep along Z (front edge ≈ 5.5, back at -5.5), so left/right
-          walls are 11 long centered at z = 0. */}
+      {/* Side walls — penthouse only. We render the LEFT wall (x=-8)
+          but intentionally leave the RIGHT side (x=+8) open: from the
+          static camera's POV (placed at +z, looking toward -z) the
+          right side of the screen IS the +x side, so dropping that wall
+          gives the penthouse an open-air balcony feel — like the room
+          has been carved out of the building corner. Back wall is
+          still rendered above; the floor still extends to x=+7-ish, the
+          missing wall just means nothing is between the user and the
+          sky on the right edge. */}
       {isPenthouse && (
         <>
           <mesh position={[-8, 1.8, 0]} receiveShadow>
@@ -164,28 +170,15 @@ export function Walls({ companyName, currentFloor, showWindow = true }: WallsPro
               depthWrite={false}
             />
           </mesh>
-          <mesh position={[8, 1.8, 0]} receiveShadow>
-            <boxGeometry args={[0.18, 7, 11]} />
-            <meshLambertMaterial
-              color={glassColor}
-              transparent
-              opacity={glassOpacity}
-              depthWrite={false}
-            />
-          </mesh>
-          {/* Thin gold frame strips on each glass edge so the walls
-              read as architecture rather than vanishing entirely. */}
+          {/* Thin gold frame strips on glass edges (LEFT + back only —
+              right-side mullions removed since the right wall is gone). */}
           {[
-            // Vertical mullions at the four building corners
+            // Vertical mullions at the remaining building corners
             { p: [-7.9, 1.8, -5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
-            { p: [7.9, 1.8, -5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
             { p: [-7.9, 1.8, 5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
-            { p: [7.9, 1.8, 5.4] as [number, number, number], s: [0.06, 7, 0.06] as [number, number, number] },
-            // Top + bottom rails on the side panels
+            // Top + bottom rails on the LEFT panel only
             { p: [-7.92, 5.18, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
-            { p: [7.92, 5.18, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
             { p: [-7.92, -1.58, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
-            { p: [7.92, -1.58, 0] as [number, number, number], s: [0.05, 0.08, 11] as [number, number, number] },
           ].map((m, i) => (
             <mesh key={i} position={m.p}>
               <boxGeometry args={m.s} />
@@ -246,13 +239,11 @@ function FloorPanoramaTexture() {
       </mesh>
       {/* Left side panorama — sits just outside the left glass wall
           (x = -8) facing inward (+X). Plane is the depth of the
-          room (11 along Z) rotated 90° around Y. */}
+          room (11 along Z) rotated 90° around Y.
+          The matching right-side panorama was dropped along with the
+          right wall (see Walls() above) — no wall = no need to back
+          the empty space with a sky plane. */}
       <mesh position={[-8.1, 1.8, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[11, 7]} />
-        <meshBasicMaterial map={texture} toneMapped={false} />
-      </mesh>
-      {/* Right side panorama — mirror of the left, facing -X. */}
-      <mesh position={[8.1, 1.8, 0]} rotation={[0, -Math.PI / 2, 0]}>
         <planeGeometry args={[11, 7]} />
         <meshBasicMaterial map={texture} toneMapped={false} />
       </mesh>
