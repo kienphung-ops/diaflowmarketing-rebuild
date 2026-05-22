@@ -101,8 +101,6 @@ export function MySquadDrawer({
   inviter,
   rank,
   emailVerified,
-  userEmail,
-  onVerifyEmail,
   onLogout,
   visiting,
   // Below are still part of Props for callers but the drawer no longer
