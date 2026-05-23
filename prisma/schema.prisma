@@ -52,6 +52,13 @@ model User {
   authTokens       AuthToken[]
   inviteEvents     InviteEvent[]        @relation("InviterEvents")
   recruitedTeams   RecruitedTeammate[]
+  // Per-user item position overrides for the user's own room.
+  // Shape: Record<string, [number, number, number]> where the key
+  // is either the canonical item key (`couch`, `floor_lamp`) or
+  // `${itemKey}_${index}` for multi-instance items
+  // (`basic_chair_desk_0`, `_1`, `_2`). Null/empty = use the canonical
+  // defaults from FloorItems.tsx ITEMS array.
+  itemPositions    Json?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -111,7 +118,12 @@ model Floor {
   label           String
   maxTeammates    Int
   product_reward  String?
-  unlock_items   String?
+  // Each floor can unlock multiple items in a single beat (e.g. F1
+  // unlocks BOTH the picture frame AND the office desk). Stored as a
+  // Postgres text array so consumers can render each entry as its
+  // own badge / cell without parsing a delimiter. Empty `[]` is the
+  // valid "no special unlock copy" case.
+  unlock_items   String[]    @default([])
   items           FloorItem[]
   users           User[]
   @@map("floor")

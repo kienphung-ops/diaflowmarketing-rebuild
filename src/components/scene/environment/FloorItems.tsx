@@ -80,50 +80,215 @@ function FloorLamp({ unlocked }: { unlocked: boolean }) {
   )
 }
 
-function BasicChairDesk({ unlocked }: { unlocked: boolean }) {
+// (removed) BasicChairDesk composite mesh — the F3+ "Basic chair +
+// desk" unlock used to combine OfficeDesk + BasicChair into one
+// render group, but the chair ended up stuck to the desk and facing
+// the wrong way. Per the new spec the pair is two SEPARATE items
+// (office_desk + basic_chair) lined up via matching offsetSteps in
+// the ITEMS array — each chair sits in front of its desk at the
+// canonical orientation (chair's natural -z backrest = facing +z
+// toward its desk).
+
+/* F1 — bigger standalone "office desk" introduced in new_items.md.
+ * Standalone desk — the recruit "chair+desk" workstation is now
+ * built from a paired (office_desk, basic_chair) entry in the ITEMS
+ * array, not a composite mesh.
+ * Wider top, taller legs, more substantial silhouette. */
+function OfficeDesk({ unlocked }: { unlocked: boolean }) {
+  // Raised desk-top from y=0.55 → y=0.85 (about a standing-desk
+  // height bump). Legs lengthened to match; modesty panel and laptop
+  // shifted up so they ride on the new top surface.
   return (
     <group>
-      {/* Desk top */}
-      <mesh position={[0, 0.4, 0]}>
-        <boxGeometry args={[1.4, 0.06, 0.7]} />
-        <M color="#7a5230" unlocked={unlocked} />
+      {/* Desk top — wider and thicker; sits higher */}
+      <mesh position={[0, 0.85, 0]}>
+        <boxGeometry args={[2.0, 0.09, 0.95]} />
+        <M color="#5a3a1a" unlocked={unlocked} />
       </mesh>
-      {/* Desk legs */}
-      {([-0.6, 0.6] as number[]).flatMap(dx =>
-        ([-0.25, 0.25] as number[]).map(dz => (
-          <mesh key={`${dx}${dz}`} position={[dx, 0.18, dz]}>
-            <boxGeometry args={[0.08, 0.4, 0.08]} />
-            <M color="#4a3020" unlocked={unlocked} />
+      {/* Four sturdy legs — longer to support the raised top */}
+      {([-0.9, 0.9] as number[]).flatMap(dx =>
+        ([-0.4, 0.4] as number[]).map(dz => (
+          <mesh key={`${dx}${dz}`} position={[dx, 0.4, dz]}>
+            <boxGeometry args={[0.1, 0.85, 0.1]} />
+            <M color="#3a2a14" unlocked={unlocked} />
           </mesh>
         ))
       )}
-      {/* Chair seat */}
-      <mesh position={[0, 0.3, 0.7]}>
-        <boxGeometry args={[0.45, 0.06, 0.45]} />
-        <M color="#3a2a1a" unlocked={unlocked} />
+      {/* Front modesty panel — taller, follows the new top */}
+      <mesh position={[0, 0.55, -0.4]}>
+        <boxGeometry args={[1.9, 0.6, 0.05]} />
+        <M color="#4a3018" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0, 0.55, 0.9]}>
-        <boxGeometry args={[0.45, 0.5, 0.06]} />
-        <M color="#3a2a1a" unlocked={unlocked} />
+      {/* Laptop on top — shifted up to ride the new desk-top */}
+      <mesh position={[0, 0.93, 0.05]}>
+        <boxGeometry args={[0.55, 0.025, 0.38]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      <mesh position={[0, 1.08, -0.13]} rotation={[-Math.PI * 0.15, 0, 0]}>
+        <boxGeometry args={[0.55, 0.36, 0.025]} />
+        <M color="#0a0a0a" unlocked={unlocked} emissive="#3a5cff" emissiveIntensity={0.35} />
       </mesh>
     </group>
   )
 }
 
-function PottedPlant({ unlocked }: { unlocked: boolean }) {
+/* F6 — "+ one extra chair", per spec a high-back leather executive
+ * chair (giám đốc style). Five-arm wheeled base, padded seat, tall
+ * padded backrest with two armrests. Distinct from BasicChair so the
+ * F6 unlock reads as a real upgrade rather than just "another stool". */
+function ExecutiveChair({ unlocked }: { unlocked: boolean }) {
   return (
     <group>
-      <mesh position={[0, 0.14, 0]}>
-        <cylinderGeometry args={[0.16, 0.12, 0.28, 8]} />
+      {/* Five-arm base — radiating thin boxes from a central hub */}
+      {[0, 72, 144, 216, 288].map(deg => {
+        const rad = (deg * Math.PI) / 180
+        return (
+          <mesh
+            key={deg}
+            position={[Math.sin(rad) * 0.15, 0.04, Math.cos(rad) * 0.15]}
+            rotation={[0, rad, 0]}
+          >
+            <boxGeometry args={[0.06, 0.04, 0.3]} />
+            <M color="#0a0a0a" unlocked={unlocked} />
+          </mesh>
+        )
+      })}
+      {/* Caster wheels at each base tip */}
+      {[0, 72, 144, 216, 288].map(deg => {
+        const rad = (deg * Math.PI) / 180
+        return (
+          <mesh
+            key={`wheel-${deg}`}
+            position={[Math.sin(rad) * 0.3, 0.04, Math.cos(rad) * 0.3]}
+          >
+            <cylinderGeometry args={[0.035, 0.035, 0.04, 8]} />
+            <M color="#1a1a1a" unlocked={unlocked} />
+          </mesh>
+        )
+      })}
+      {/* Central hub */}
+      <mesh position={[0, 0.08, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 0.04, 10]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Vertical pneumatic post */}
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.035, 0.04, 0.4, 10]} />
+        <M color="#2a2a2a" unlocked={unlocked} />
+      </mesh>
+      {/* Seat cushion — wide & plush */}
+      <mesh position={[0, 0.55, 0]}>
+        <boxGeometry args={[0.55, 0.12, 0.5]} />
+        <M color="#0a0a0a" unlocked={unlocked} />
+      </mesh>
+      {/* Seat top quilted highlight (slightly lighter band) */}
+      <mesh position={[0, 0.62, 0]}>
+        <boxGeometry args={[0.5, 0.005, 0.45]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Tall backrest — high-back leather */}
+      <mesh position={[0, 0.95, -0.22]}>
+        <boxGeometry args={[0.5, 0.8, 0.12]} />
+        <M color="#0a0a0a" unlocked={unlocked} />
+      </mesh>
+      {/* Headrest cap on top of backrest */}
+      <mesh position={[0, 1.4, -0.22]}>
+        <boxGeometry args={[0.5, 0.12, 0.14]} />
+        <M color="#0a0a0a" unlocked={unlocked} />
+      </mesh>
+      {/* Vertical leather panel lines on the backrest for texture */}
+      {[-0.12, 0, 0.12].map(dx => (
+        <mesh key={`stitch-${dx}`} position={[dx, 0.95, -0.155]}>
+          <boxGeometry args={[0.012, 0.7, 0.01]} />
+          <M color="#1a1a1a" unlocked={unlocked} />
+        </mesh>
+      ))}
+      {/* Armrests — left + right padded blocks */}
+      {([-0.32, 0.32] as number[]).map(dx => (
+        <group key={`arm-${dx}`}>
+          {/* Vertical arm stem from seat */}
+          <mesh position={[dx, 0.7, -0.05]}>
+            <boxGeometry args={[0.05, 0.2, 0.08]} />
+            <M color="#1a1a1a" unlocked={unlocked} />
+          </mesh>
+          {/* Padded arm top */}
+          <mesh position={[dx, 0.82, 0.0]}>
+            <boxGeometry args={[0.07, 0.05, 0.35]} />
+            <M color="#0a0a0a" unlocked={unlocked} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+/* F2 — standalone basic chair (the "+ basic chair" unlock). Pairs
+ * 1-to-1 with office_desk via matching offsetStep in the ITEMS array
+ * so each F2/F3/F5 unlock reads as a complete "basic chair + desk"
+ * workstation. F6's extra chair is the separate ExecutiveChair item
+ * above (not another basic_chair). */
+function BasicChair({ unlocked }: { unlocked: boolean }) {
+  return (
+    <group>
+      {/* Seat */}
+      <mesh position={[0, 0.3, 0]}>
+        <boxGeometry args={[0.45, 0.06, 0.45]} />
+        <M color="#3a2a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Backrest */}
+      <mesh position={[0, 0.6, -0.2]}>
+        <boxGeometry args={[0.45, 0.55, 0.06]} />
+        <M color="#3a2a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Four legs */}
+      {([-0.18, 0.18] as number[]).flatMap(dx =>
+        ([-0.18, 0.18] as number[]).map(dz => (
+          <mesh key={`${dx}${dz}`} position={[dx, 0.15, dz]}>
+            <boxGeometry args={[0.06, 0.3, 0.06]} />
+            <M color="#2a1a0a" unlocked={unlocked} />
+          </mesh>
+        ))
+      )}
+    </group>
+  )
+}
+
+function PottedPlant({ unlocked }: { unlocked: boolean }) {
+  // Scaled ~1.8× from the original so it reads as a proper office
+  // floor plant rather than a desk succulent. Wider terracotta pot,
+  // taller layered foliage, plus a second leafy cluster spilling to
+  // the side to break up the silhouette.
+  return (
+    <group>
+      {/* Pot — wider and taller terracotta */}
+      <mesh position={[0, 0.28, 0]}>
+        <cylinderGeometry args={[0.32, 0.22, 0.56, 12]} />
         <M color="#8B4513" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0, 0.42, 0]}>
-        <sphereGeometry args={[0.26, 8, 6]} />
+      {/* Rim ring on top of pot */}
+      <mesh position={[0, 0.56, 0]}>
+        <torusGeometry args={[0.32, 0.04, 6, 16]} />
+        <M color="#6a3010" unlocked={unlocked} />
+      </mesh>
+      {/* Main foliage — large sphere */}
+      <mesh position={[0, 0.95, 0]}>
+        <sphereGeometry args={[0.5, 10, 8]} />
         <M color="#3a7a22" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0.12, 0.55, 0.08]}>
-        <sphereGeometry args={[0.18, 8, 6]} />
+      {/* Mid-tone secondary cluster */}
+      <mesh position={[0.25, 1.15, 0.18]}>
+        <sphereGeometry args={[0.36, 10, 8]} />
         <M color="#52a032" unlocked={unlocked} />
+      </mesh>
+      {/* Brighter top cluster — gives a highlight tier */}
+      <mesh position={[-0.15, 1.35, -0.05]}>
+        <sphereGeometry args={[0.3, 10, 8]} />
+        <M color="#83c45c" unlocked={unlocked} />
+      </mesh>
+      {/* A few drooping leaves spilling out of the pot */}
+      <mesh position={[-0.35, 0.7, 0.2]} rotation={[0.4, 0.2, 0.3]}>
+        <sphereGeometry args={[0.22, 8, 6]} />
+        <M color="#3a7a22" unlocked={unlocked} />
       </mesh>
     </group>
   )
@@ -175,19 +340,51 @@ function Bookshelf({ unlocked }: { unlocked: boolean }) {
 }
 
 function Printer({ unlocked }: { unlocked: boolean }) {
+  // Bigger floor-standing printer (was a tiny desk-top unit). The
+  // new silhouette is ~2× the old one in every axis and adds a paper
+  // tray + control LCD + green status LED for visual texture so it
+  // reads as a real office multi-function printer.
   return (
     <group>
-      <mesh position={[0, 0.18, 0]}>
-        <boxGeometry args={[0.6, 0.36, 0.5]} />
+      {/* Main body — wider, taller, deeper */}
+      <mesh position={[0, 0.45, 0]}>
+        <boxGeometry args={[1.0, 0.9, 0.85]} />
+        <M color="#2a2a2a" unlocked={unlocked} />
+      </mesh>
+      {/* Lid / paper-output tray on top — recessed paper landing pad */}
+      <mesh position={[0, 0.92, 0.05]}>
+        <boxGeometry args={[0.95, 0.05, 0.55]} />
         <M color="#3a3a3a" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0, 0.38, 0.05]}>
-        <boxGeometry args={[0.55, 0.04, 0.3]} />
+      {/* Paper sheet sitting in the output tray */}
+      <mesh position={[0, 0.955, 0.05]}>
+        <boxGeometry args={[0.6, 0.005, 0.42]} />
         <M color="#f5f5f5" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0.2, 0.42, 0.1]}>
-        <boxGeometry args={[0.08, 0.02, 0.05]} />
-        <M color="#22c55e" unlocked={unlocked} emissive="#22c55e" emissiveIntensity={0.6} />
+      {/* Front control panel (light strip across the front face) */}
+      <mesh position={[0, 0.78, 0.43]}>
+        <boxGeometry args={[0.9, 0.16, 0.02]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      {/* LCD display inset into the control panel */}
+      <mesh position={[-0.15, 0.78, 0.44]}>
+        <boxGeometry args={[0.32, 0.1, 0.01]} />
+        <M color="#2cc18e" unlocked={unlocked} emissive="#2cc18e" emissiveIntensity={0.55} />
+      </mesh>
+      {/* Front paper-feed tray slot (input drawer) */}
+      <mesh position={[0, 0.4, 0.44]}>
+        <boxGeometry args={[0.7, 0.18, 0.04]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Lower body / base plinth */}
+      <mesh position={[0, 0.06, 0]}>
+        <boxGeometry args={[1.02, 0.12, 0.87]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Green status LED in the top-right corner */}
+      <mesh position={[0.4, 0.85, 0.44]}>
+        <boxGeometry args={[0.06, 0.02, 0.02]} />
+        <M color="#22c55e" unlocked={unlocked} emissive="#22c55e" emissiveIntensity={0.9} />
       </mesh>
     </group>
   )
@@ -234,19 +431,34 @@ function MiniFridge({ unlocked }: { unlocked: boolean }) {
 }
 
 function Trophy({ unlocked }: { unlocked: boolean }) {
+  // Scaled ~1.5× over the original silhouette per spec — the trophy is
+  // a "Floor 11 achievement" item and was reading too small on the
+  // bookshelf next to it. Same proportions, bigger overall presence.
   return (
     <group>
-      <mesh position={[0, 0.04, 0]}>
-        <boxGeometry args={[0.32, 0.08, 0.32]} />
+      {/* Base — wider, thicker plinth */}
+      <mesh position={[0, 0.06, 0]}>
+        <boxGeometry args={[0.46, 0.12, 0.46]} />
         <M color="#4a3520" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0, 0.18, 0]}>
-        <cylinderGeometry args={[0.05, 0.05, 0.2, 8]} />
-        <M color="#c89f4a" unlocked={unlocked} emissive="#c89f4a" emissiveIntensity={0.3} />
+      {/* Stem */}
+      <mesh position={[0, 0.28, 0]}>
+        <cylinderGeometry args={[0.07, 0.07, 0.3, 8]} />
+        <M color="#c89f4a" unlocked={unlocked} emissive="#c89f4a" emissiveIntensity={0.35} />
       </mesh>
-      <mesh position={[0, 0.4, 0]}>
-        <cylinderGeometry args={[0.18, 0.12, 0.32, 12]} />
-        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.5} />
+      {/* Cup */}
+      <mesh position={[0, 0.58, 0]}>
+        <cylinderGeometry args={[0.26, 0.17, 0.46, 12]} />
+        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.55} />
+      </mesh>
+      {/* Handles (small loops on each side of the cup) */}
+      <mesh position={[-0.28, 0.58, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.12, 0.025, 6, 12, Math.PI]} />
+        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.45} />
+      </mesh>
+      <mesh position={[0.28, 0.58, 0]} rotation={[0, Math.PI, Math.PI / 2]}>
+        <torusGeometry args={[0.12, 0.025, 6, 12, Math.PI]} />
+        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.45} />
       </mesh>
     </group>
   )
@@ -275,36 +487,112 @@ function Couch({ unlocked }: { unlocked: boolean }) {
   )
 }
 
+/* F12 "Upgraded dark wood desk" — geometrically IDENTICAL to
+ * OfficeDesk (same top, apron rails, legs, laptop, and tilted
+ * screen). The only difference is wood colour: deep walnut instead
+ * of the warm brown OfficeDesk uses. Per user spec, "dark wood
+ * desk = just change colour, size + items same as office desk". */
 function UpgradedDesk({ unlocked }: { unlocked: boolean }) {
+  // Dark walnut palette — keep the relative tonal steps (top lightest,
+  // legs darkest) the same as OfficeDesk so the proportions read
+  // identically; only the absolute hue shifts toward black-brown.
+  const TOP = '#2a1a0a'
+  const APRON = '#1f1408'
+  const LEG = '#140a00'
   return (
     <group>
-      <mesh position={[0, 0.5, 0]}>
-        <boxGeometry args={[1.8, 0.08, 0.85]} />
-        <M color="#2a1a0a" unlocked={unlocked} />
+      {/* Desk top — same dimensions / Y as OfficeDesk */}
+      <mesh position={[0, 0.85, 0]}>
+        <boxGeometry args={[2.0, 0.09, 0.95]} />
+        <M color={TOP} unlocked={unlocked} />
       </mesh>
-      {([-0.8, 0.8] as number[]).flatMap(dx =>
-        ([-0.3, 0.3] as number[]).map(dz => (
-          <mesh key={`${dx}${dz}`} position={[dx, 0.23, dz]}>
-            <boxGeometry args={[0.08, 0.5, 0.08]} />
-            <M color="#1a0a00" unlocked={unlocked} />
+      {/* Four sturdy legs */}
+      {([-0.9, 0.9] as number[]).flatMap(dx =>
+        ([-0.4, 0.4] as number[]).map(dz => (
+          <mesh key={`${dx}${dz}`} position={[dx, 0.4, dz]}>
+            <boxGeometry args={[0.1, 0.85, 0.1]} />
+            <M color={LEG} unlocked={unlocked} />
           </mesh>
         ))
       )}
+      {/* Front modesty panel */}
+      <mesh position={[0, 0.55, -0.4]}>
+        <boxGeometry args={[1.9, 0.6, 0.05]} />
+        <M color={APRON} unlocked={unlocked} />
+      </mesh>
+      {/* Laptop on top — identical to OfficeDesk (laptops aren't
+          "upgraded" at F12, only the desk wood is). */}
+      <mesh position={[0, 0.93, 0.05]}>
+        <boxGeometry args={[0.55, 0.025, 0.38]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      <mesh position={[0, 1.08, -0.13]} rotation={[-Math.PI * 0.15, 0, 0]}>
+        <boxGeometry args={[0.55, 0.36, 0.025]} />
+        <M color="#0a0a0a" unlocked={unlocked} emissive="#3a5cff" emissiveIntensity={0.35} />
+      </mesh>
     </group>
   )
 }
 
 function NeonSign({ unlocked }: { unlocked: boolean }) {
+  // Per spec: "đèn led trên tường, hoạ tiết là 1 toà nhà có ánh đèn led"
+  // (LED neon on the wall, depicting a building with LED windows).
+  // Construction: a dark base plate (the sign panel) + a tall stepped
+  // building silhouette built from coloured cyan rectangles + a grid
+  // of small emissive squares acting as lit windows.
+  const winRows = 7
+  const winCols = 5
+  const windows: { x: number; y: number; lit: boolean }[] = []
+  for (let r = 0; r < winRows; r++) {
+    for (let c = 0; c < winCols; c++) {
+      const x = (c - (winCols - 1) / 2) * 0.11
+      const y = (r - (winRows - 1) / 2) * 0.11
+      // Deterministic-looking "random" lit/dim pattern so it animates
+      // visually but stays stable across renders.
+      const seed = (r * 7 + c * 13) % 11
+      windows.push({ x, y, lit: seed > 3 })
+    }
+  }
   return (
     <group>
-      <mesh>
-        <torusGeometry args={[0.35, 0.04, 8, 24]} />
-        <M color="#e879f9" unlocked={unlocked} emissive="#e879f9" emissiveIntensity={0.9} />
-      </mesh>
+      {/* Backing panel (dark sign body, mounted to wall) */}
       <mesh position={[0, 0, -0.05]}>
-        <planeGeometry args={[0.9, 0.45]} />
+        <planeGeometry args={[1.1, 1.2]} />
         <M color="#1a0030" unlocked={unlocked} />
       </mesh>
+      {/* Building outline — three stacked blocks of decreasing width
+          give the classic "stepped skyscraper" silhouette. */}
+      <mesh position={[0, -0.3, -0.02]}>
+        <planeGeometry args={[0.85, 0.32]} />
+        <M color="#06b6d4" unlocked={unlocked} emissive="#06b6d4" emissiveIntensity={0.55} />
+      </mesh>
+      <mesh position={[0, -0.02, -0.02]}>
+        <planeGeometry args={[0.65, 0.26]} />
+        <M color="#06b6d4" unlocked={unlocked} emissive="#06b6d4" emissiveIntensity={0.55} />
+      </mesh>
+      <mesh position={[0, 0.22, -0.02]}>
+        <planeGeometry args={[0.42, 0.22]} />
+        <M color="#06b6d4" unlocked={unlocked} emissive="#06b6d4" emissiveIntensity={0.55} />
+      </mesh>
+      {/* Antenna / spire on top */}
+      <mesh position={[0, 0.42, -0.02]}>
+        <planeGeometry args={[0.04, 0.18]} />
+        <M color="#22d3ee" unlocked={unlocked} emissive="#22d3ee" emissiveIntensity={0.8} />
+      </mesh>
+      {/* Grid of "LED windows" overlaid on the silhouette. Each lit
+          window is a small bright emissive square; unlit ones are
+          dimmer to read as off-hours. */}
+      {windows.map((w, i) => (
+        <mesh key={i} position={[w.x, w.y, 0]}>
+          <planeGeometry args={[0.05, 0.05]} />
+          <M
+            color={w.lit ? '#fde68a' : '#3a2050'}
+            unlocked={unlocked}
+            emissive={w.lit ? '#fde68a' : '#000000'}
+            emissiveIntensity={w.lit ? 1.0 : 0}
+          />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -377,20 +665,158 @@ function LivingWall({ unlocked }: { unlocked: boolean }) {
 }
 
 function EspressoMachine({ unlocked }: { unlocked: boolean }) {
+  // F18 "Espresso machine + coffee area" — redesigned per the
+  // reference screenshot the user provided. This is no longer a
+  // single counter-top machine: it's a TALL custom coffee bar with
+  // four visual tiers:
+  //
+  //   1. Lower cabinet      (y 0   → 1.0)  — dark wood box with two
+  //                                          glass-fronted compartments
+  //                                          showing bottles inside.
+  //   2. Mid counter        (y 1.0 → 1.1)  — wood plank with milk
+  //                                          pitcher + cups.
+  //   3. Espresso section   (y 1.1 → 1.7)  — back panel + the actual
+  //                                          espresso machine.
+  //   4. Top shelf          (y 1.9 → 2.4)  — open shelf with bottles
+  //                                          / jars, capped by a wood
+  //                                          crown.
+  //
+  // The whole footprint is 1.4 (x) × 0.6 (z) so it slots into the
+  // back-wall strip without crowding the mini fridge to its left.
+  const cabinetW = 1.4
+  const cabinetD = 0.6
   return (
     <group>
-      <mesh position={[0, 0.25, 0]}>
-        <boxGeometry args={[0.5, 0.5, 0.4]} />
+      {/* ── Tier 1: lower cabinet body ─────────────────────────── */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[cabinetW, 1.0, cabinetD]} />
+        <M color="#e8e0d4" unlocked={unlocked} />
+      </mesh>
+      {/* Two glass-fronted display compartments (panes on the front
+          face). Slightly emissive so the "lit cabinet interior" reads
+          even in low light. */}
+      {([-0.32, 0.32] as number[]).map(dx => (
+        <mesh key={`pane-${dx}`} position={[dx, 0.6, cabinetD / 2 + 0.001]}>
+          <planeGeometry args={[0.52, 0.7]} />
+          <M
+            color="#a8c8e8"
+            unlocked={unlocked}
+            emissive="#a8c8e8"
+            emissiveIntensity={0.18}
+          />
+        </mesh>
+      ))}
+      {/* Decorative bottles INSIDE the display panes (one per pane) */}
+      {([-0.4, -0.24, 0.24, 0.4] as number[]).map((dx, i) => (
+        <mesh
+          key={`bottle-${i}`}
+          position={[dx, 0.45 + (i % 2) * 0.08, cabinetD / 2 - 0.05]}
+        >
+          <cylinderGeometry args={[0.04, 0.04, 0.2 + (i % 2) * 0.05, 8]} />
+          <M
+            color={i % 2 === 0 ? '#7a3010' : '#2c5530'}
+            unlocked={unlocked}
+            emissive={i % 2 === 0 ? '#7a3010' : '#2c5530'}
+            emissiveIntensity={0.25}
+          />
+        </mesh>
+      ))}
+      {/* Vertical frame strips between the two compartments */}
+      <mesh position={[0, 0.6, cabinetD / 2 + 0.002]}>
+        <boxGeometry args={[0.04, 0.78, 0.03]} />
+        <M color="#3a2a1a" unlocked={unlocked} />
+      </mesh>
+
+      {/* ── Tier 2: mid counter top (wood plank) ──────────────── */}
+      <mesh position={[0, 1.04, 0]}>
+        <boxGeometry args={[cabinetW + 0.04, 0.07, cabinetD + 0.04]} />
+        <M color="#6a4520" unlocked={unlocked} />
+      </mesh>
+      {/* Milk pitcher (small frothing jug) on the counter */}
+      <mesh position={[-0.45, 1.18, 0.05]}>
+        <cylinderGeometry args={[0.07, 0.085, 0.18, 10]} />
+        <M color="#c8c8c8" unlocked={unlocked} />
+      </mesh>
+      <mesh position={[-0.35, 1.18, 0.05]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.04, 0.012, 6, 10, Math.PI]} />
+        <M color="#a0a0a0" unlocked={unlocked} />
+      </mesh>
+      {/* Two espresso cups on the counter */}
+      {([0.3, 0.45] as number[]).map(dx => (
+        <group key={dx} position={[dx, 1.1, 0.05]}>
+          <mesh>
+            <cylinderGeometry args={[0.04, 0.035, 0.06, 10]} />
+            <M color="#f5f0e8" unlocked={unlocked} />
+          </mesh>
+          <mesh position={[0, 0.031, 0]}>
+            <cylinderGeometry args={[0.035, 0.035, 0.005, 10]} />
+            <M color="#3a2a1a" unlocked={unlocked} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* ── Tier 3: back panel + espresso machine ─────────────── */}
+      {/* Tall back panel that the machine + shelf attach to */}
+      <mesh position={[0, 1.55, -cabinetD / 2 + 0.025]}>
+        <boxGeometry args={[cabinetW, 0.95, 0.05]} />
+        <M color="#e8e0d4" unlocked={unlocked} />
+      </mesh>
+      {/* The espresso machine itself — chrome top, dark body */}
+      <mesh position={[0, 1.35, -0.05]}>
+        <boxGeometry args={[0.55, 0.4, 0.35]} />
         <M color="#1a1a1a" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0, 0.55, 0.05]}>
-        <cylinderGeometry args={[0.06, 0.06, 0.16, 8]} />
-        <M color="#c89f4a" unlocked={unlocked} emissive="#c89f4a" emissiveIntensity={0.3} />
+      {/* Steam wand on the right side */}
+      <mesh position={[0.32, 1.4, 0.1]}>
+        <cylinderGeometry args={[0.015, 0.015, 0.18, 6]} />
+        <M color="#c0c0c0" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0, 0.15, 0.2]}>
-        <cylinderGeometry args={[0.05, 0.04, 0.1, 8]} />
-        <M color="#f5f0e8" unlocked={unlocked} />
+      {/* Portafilter (group head) on the front */}
+      <mesh position={[0, 1.32, 0.18]}>
+        <cylinderGeometry args={[0.06, 0.06, 0.08, 8]} />
+        <M color="#c89f4a" unlocked={unlocked} emissive="#c89f4a" emissiveIntensity={0.4} />
       </mesh>
+      {/* Small power/indicator LED */}
+      <mesh position={[0.18, 1.5, 0.18]}>
+        <boxGeometry args={[0.04, 0.02, 0.02]} />
+        <M color="#22c55e" unlocked={unlocked} emissive="#22c55e" emissiveIntensity={0.9} />
+      </mesh>
+
+      {/* ── Tier 4: top open shelf with bottles ────────────────── */}
+      {/* Shelf plank */}
+      <mesh position={[0, 1.92, 0]}>
+        <boxGeometry args={[cabinetW + 0.04, 0.06, cabinetD]} />
+        <M color="#6a4520" unlocked={unlocked} />
+      </mesh>
+      {/* Bottles + jars lined up on the top shelf — variety of
+          colours so it reads as a "shelf of supplies" at a glance. */}
+      {[
+        { x: -0.5, h: 0.32, c: '#3a5a8a' }, // syrup bottle
+        { x: -0.28, h: 0.26, c: '#7a3010' }, // brown jar
+        { x: -0.08, h: 0.34, c: '#c0a060' }, // amber bottle
+        { x: 0.14, h: 0.22, c: '#e8e0d4' }, // white jar
+        { x: 0.34, h: 0.3, c: '#2c5530' }, // green bottle
+        { x: 0.54, h: 0.24, c: '#a8506a' }, // pink jar
+      ].map((b, i) => (
+        <mesh key={`top-bot-${i}`} position={[b.x, 1.95 + b.h / 2, 0]}>
+          <cylinderGeometry args={[0.05, 0.06, b.h, 8]} />
+          <M color={b.c} unlocked={unlocked} />
+        </mesh>
+      ))}
+      {/* Crown plank — caps the unit so the bottles read as INSIDE a
+          shelving niche rather than just sitting on top of a board. */}
+      <mesh position={[0, 2.36, 0]}>
+        <boxGeometry args={[cabinetW + 0.08, 0.1, cabinetD + 0.04]} />
+        <M color="#5a3a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Two thin back-of-shelf vertical accents (the dark uprights
+          you can see in the reference). */}
+      {([-(cabinetW / 2 - 0.03), cabinetW / 2 - 0.03] as number[]).map(dx => (
+        <mesh key={`upr-${dx}`} position={[dx, 2.14, -cabinetD / 2 + 0.03]}>
+          <boxGeometry args={[0.04, 0.4, 0.03]} />
+          <M color="#3a2a1a" unlocked={unlocked} />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -422,24 +848,155 @@ function PingPongTable({ unlocked }: { unlocked: boolean }) {
   )
 }
 
-function RooftopTerrace({ unlocked }: { unlocked: boolean }) {
+/* F16 — Tea table. Wooden top on slim legs with a small ceramic
+ * teapot + a teacup on the surface. (The laptop variant that used
+ * to live here moved out per user feedback — this slot now reads
+ * as an actual tea-serving station.) */
+function TeaTable({ unlocked }: { unlocked: boolean }) {
   return (
     <group>
-      <mesh position={[0, 0.02, 0]}>
-        <boxGeometry args={[2.5, 0.04, 1.5]} />
+      {/* Desk top */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[1.4, 0.07, 0.7]} />
         <M color="#7a5230" unlocked={unlocked} />
       </mesh>
-      {/* String lights — small emissive bulbs */}
-      {Array.from({ length: 6 }, (_, i) => (
-        <mesh key={i} position={[(i - 2.5) * 0.45, 0.9, 0]}>
-          <sphereGeometry args={[0.06, 8, 6]} />
-          <M color="#fde68a" unlocked={unlocked} emissive="#fde68a" emissiveIntensity={0.9} />
-        </mesh>
-      ))}
-      {/* Railing */}
-      <mesh position={[0, 0.4, 0.75]}>
-        <boxGeometry args={[2.5, 0.04, 0.04]} />
+      {/* Side rails (front + back) for the "thicker apron" look */}
+      <mesh position={[0, 0.42, -0.3]}>
+        <boxGeometry args={[1.32, 0.06, 0.06]} />
+        <M color="#5a3a1a" unlocked={unlocked} />
+      </mesh>
+      <mesh position={[0, 0.42, 0.3]}>
+        <boxGeometry args={[1.32, 0.06, 0.06]} />
+        <M color="#5a3a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Four legs */}
+      {([-0.6, 0.6] as number[]).flatMap(dx =>
+        ([-0.28, 0.28] as number[]).map(dz => (
+          <mesh key={`${dx}${dz}`} position={[dx, 0.23, dz]}>
+            <boxGeometry args={[0.08, 0.5, 0.08]} />
+            <M color="#4a3020" unlocked={unlocked} />
+          </mesh>
+        ))
+      )}
+
+      {/* ── Teapot — squat ceramic body, with spout / handle / lid ── */}
+      {/* Body: short stout cylinder slightly wider at the middle */}
+      <mesh position={[-0.25, 0.62, 0]}>
+        <cylinderGeometry args={[0.13, 0.11, 0.18, 16]} />
+        <M color="#f5f0e8" unlocked={unlocked} />
+      </mesh>
+      {/* Top shoulder (cap area where lid sits) */}
+      <mesh position={[-0.25, 0.72, 0]}>
+        <cylinderGeometry args={[0.08, 0.13, 0.04, 16]} />
+        <M color="#f5f0e8" unlocked={unlocked} />
+      </mesh>
+      {/* Lid disc */}
+      <mesh position={[-0.25, 0.755, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.02, 16]} />
+        <M color="#e8d4a8" unlocked={unlocked} />
+      </mesh>
+      {/* Lid knob */}
+      <mesh position={[-0.25, 0.78, 0]}>
+        <sphereGeometry args={[0.025, 8, 6]} />
+        <M color="#5a3a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Spout — angled cone pointing forward-left */}
+      <mesh
+        position={[-0.4, 0.66, 0.04]}
+        rotation={[0, 0, Math.PI * 0.35]}
+      >
+        <cylinderGeometry args={[0.018, 0.035, 0.18, 8]} />
+        <M color="#f5f0e8" unlocked={unlocked} />
+      </mesh>
+      {/* Handle — torus arc on the back side */}
+      <mesh
+        position={[-0.1, 0.63, 0]}
+        rotation={[0, 0, Math.PI / 2]}
+      >
+        <torusGeometry args={[0.07, 0.018, 6, 14, Math.PI]} />
+        <M color="#f5f0e8" unlocked={unlocked} />
+      </mesh>
+      {/* Decorative blue rim band around the pot */}
+      <mesh position={[-0.25, 0.7, 0]}>
+        <torusGeometry args={[0.13, 0.008, 6, 16]} />
+        <M color="#3a5a8a" unlocked={unlocked} emissive="#3a5a8a" emissiveIntensity={0.2} />
+      </mesh>
+
+      {/* ── Teacup + saucer ─────────────────────────────────────── */}
+      {/* Saucer (small flat disc) */}
+      <mesh position={[0.32, 0.545, 0.05]}>
+        <cylinderGeometry args={[0.1, 0.1, 0.012, 16]} />
+        <M color="#f5f0e8" unlocked={unlocked} />
+      </mesh>
+      {/* Saucer rim ring */}
+      <mesh position={[0.32, 0.552, 0.05]}>
+        <torusGeometry args={[0.1, 0.006, 6, 16]} />
+        <M color="#3a5a8a" unlocked={unlocked} />
+      </mesh>
+      {/* Cup body */}
+      <mesh position={[0.32, 0.6, 0.05]}>
+        <cylinderGeometry args={[0.07, 0.058, 0.09, 14]} />
+        <M color="#f5f0e8" unlocked={unlocked} />
+      </mesh>
+      {/* Tea inside — dark amber disc near the top of the cup */}
+      <mesh position={[0.32, 0.64, 0.05]}>
+        <cylinderGeometry args={[0.06, 0.06, 0.005, 14]} />
+        <M color="#7a4520" unlocked={unlocked} emissive="#7a4520" emissiveIntensity={0.15} />
+      </mesh>
+      {/* Cup handle — small torus on the side */}
+      <mesh
+        position={[0.4, 0.6, 0.05]}
+        rotation={[0, 0, Math.PI / 2]}
+      >
+        <torusGeometry args={[0.035, 0.01, 6, 12, Math.PI]} />
+        <M color="#f5f0e8" unlocked={unlocked} />
+      </mesh>
+    </group>
+  )
+}
+
+/* F19 — DJ stand. Spec: replaces the old RooftopTerrace. Visual:
+ * a low control booth with two glowing decks (turntables) and a
+ * small lit display strip. */
+function DJStand({ unlocked }: { unlocked: boolean }) {
+  return (
+    <group>
+      {/* Booth body */}
+      <mesh position={[0, 0.4, 0]}>
+        <boxGeometry args={[1.6, 0.8, 0.6]} />
         <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Console top */}
+      <mesh position={[0, 0.82, 0]}>
+        <boxGeometry args={[1.7, 0.05, 0.65]} />
+        <M color="#2a2a2a" unlocked={unlocked} />
+      </mesh>
+      {/* Two turntable decks — flat discs with a small centre dot */}
+      {([-0.45, 0.45] as number[]).map(dx => (
+        <group key={dx} position={[dx, 0.86, 0]}>
+          <mesh>
+            <cylinderGeometry args={[0.22, 0.22, 0.02, 16]} />
+            <M color="#0a0a0a" unlocked={unlocked} />
+          </mesh>
+          <mesh position={[0, 0.012, 0]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.015, 12]} />
+            <M color="#e879f9" unlocked={unlocked} emissive="#e879f9" emissiveIntensity={0.8} />
+          </mesh>
+        </group>
+      ))}
+      {/* Centre mixer with glowing LED strip */}
+      <mesh position={[0, 0.86, 0]}>
+        <boxGeometry args={[0.4, 0.025, 0.5]} />
+        <M color="#1a1a1a" unlocked={unlocked} />
+      </mesh>
+      <mesh position={[0, 0.875, 0.18]}>
+        <boxGeometry args={[0.36, 0.015, 0.05]} />
+        <M color="#22d3ee" unlocked={unlocked} emissive="#22d3ee" emissiveIntensity={1.0} />
+      </mesh>
+      {/* Front "DJ" facia panel with a subtle purple glow */}
+      <mesh position={[0, 0.4, 0.31]}>
+        <planeGeometry args={[1.4, 0.6]} />
+        <M color="#2d1b4e" unlocked={unlocked} emissive="#7c3aed" emissiveIntensity={0.35} />
       </mesh>
     </group>
   )
@@ -458,7 +1015,7 @@ function PenthouseCrown({ unlocked }: { unlocked: boolean }) {
 
 /* ── Layout ───────────────────────────────────────────────────── */
 
-interface ItemSpec {
+export interface ItemSpec {
   key: string
   /** Base position for the first instance. Multi-instance items (quantity > 1)
    *  are offset along `offsetStep` per additional copy. */
@@ -483,53 +1040,96 @@ interface ItemSpec {
 //   x: [2,   5]      → WINDOW (do not place items here)
 //   x: [4.35, 5.25]  → neon_sign (above window, y > 3.7)
 //   x: [5,   7.4]    → floor_ceiling_windows decor
-const ITEMS: ItemSpec[] = [
-  // 1. company_picture_frame — drawn by Walls.CompanyFrame (always shown)
-  { key: 'floor_lamp', position: [-6.2, -0.55, -2.0], render: u => <FloorLamp unlocked={u} /> },
-  // basic_chair_desk: multi-instance via DB quantity. Each extra copy
-  // steps +1.8 along x so 3 desks at quantity:3 sit side-by-side.
+// Exported so RoomArranger can iterate the same catalogue + render
+// the same meshes. Treat as read-only at runtime.
+export const ITEMS: ItemSpec[] = [
+  // Positions below come straight out of /admin/items-editor →
+  // requirements/positons.json (user-finalised layout). Don't free-
+  // hand edit individual coordinates without going back through the
+  // editor; the whole arrangement is calibrated as a unit.
+  //
+  // company_picture_frame is drawn by Walls.CompanyFrame (always
+  // shown) and isn't listed here.
+  // office_desk: multi-instance (up to qty 3 from F5+ per the new
+  // spec). offsetStep `[1.8, 0, 0]` keeps the desks aligned along x
+  // with desk-width spacing. At F12+ the seed sets quantity to 0
+  // (desks are replaced by upgraded_desk below).
   {
-    key: 'basic_chair_desk',
-    position: [-3.2, -0.55, 1.5],
-    offsetStep: [1.8, 0, 0],
-    render: u => <BasicChairDesk unlocked={u} />,
+    key: 'office_desk',
+    position: [-4.12, -0.55, 1.43],
+    offsetStep: [2.5, 0, 0],
+    render: u => <OfficeDesk unlocked={u} />,
   },
-  { key: 'potted_plant', position: [-6.4, -0.55, -3.5], render: u => <PottedPlant unlocked={u} /> },
-  { key: 'coffee_mug', position: [-3.2, -0.13, 1.4], render: u => <CoffeeMug unlocked={u} /> },
-  { key: 'bookshelf', position: [-5.8, 0.75, -5.3], render: u => <Bookshelf unlocked={u} /> },
-  { key: 'printer', position: [-1.3, -0.55, -3.5], render: u => <Printer unlocked={u} /> },
-  // Whiteboard sits in the strip between the (now doubled) picture
-  // frame and the cityscape window. UPPER half — placed ABOVE the
-  // living wall per product spec. Centred at x = 0.6 (clears the
-  // frame's right edge at x = -0.7 with a 0.2 unit gap, and clears
-  // the window's left edge at x = 2 with a 0.3 unit gap).
-  { key: 'whiteboard', position: [0.6, 2.6, -5.34], render: u => <Whiteboard unlocked={u} /> },
-  { key: 'mini_fridge', position: [6.2, -0.55, -3.8], render: u => <MiniFridge unlocked={u} /> },
-  { key: 'trophy', position: [-5.8, 2.45, -5.18], render: u => <Trophy unlocked={u} /> },
-  { key: 'couch', position: [3.5, -0.55, 2.5], render: u => <Couch unlocked={u} /> },
-  { key: 'upgraded_desk', position: [0.5, -0.55, -2.5], render: u => <UpgradedDesk unlocked={u} /> },
-  // Neon nudged up to y=4.0 so it sits above the window (top at y≈3.5).
-  { key: 'neon_sign', position: [4.8, 4.0, -5.36], render: u => <NeonSign unlocked={u} /> },
-  { key: 'arcade_machine', position: [6.4, -0.55, -1.5], render: u => <ArcadeMachine unlocked={u} /> },
-  // Floor-ceiling-windows decor narrowed (3.5→2.4 wide) and shifted
-  // right (5.5→6.2) so its left edge clears the real window at x=5.
-  { key: 'floor_ceiling_windows', position: [6.2, 1.9, -5.4], render: u => <FloorCeilingWindows unlocked={u} /> },
-  // Living wall — LOWER half of the same strip between the frame and
-  // the window. Now sits BELOW the whiteboard (swap from the previous
-  // layout) so the order top→bottom is whiteboard then living wall.
-  // Same x = 0.6 centre as the whiteboard above.
-  { key: 'living_wall', position: [0.6, 0.5, -5.34], render: u => <LivingWall unlocked={u} /> },
-  { key: 'espresso_machine', position: [6.0, -0.55, -4.5], render: u => <EspressoMachine unlocked={u} /> },
-  { key: 'ping_pong_table', position: [2.0, -0.55, 3.0], render: u => <PingPongTable unlocked={u} /> },
-  { key: 'rooftop_terrace', position: [-2.5, -0.55, 4.0], render: u => <RooftopTerrace unlocked={u} /> },
-  { key: 'penthouse', position: [0, 4.2, -3.0], render: u => <PenthouseCrown unlocked={u} /> },
+  { key: 'floor_lamp',      position: [-5.89, -0.55, 3.69],  render: u => <FloorLamp unlocked={u} /> },
+  // basic_chair: paired 1-for-1 with each office_desk (or
+  // upgraded_desk from F12+). Same x-offsetStep so chair[N] sits
+  // directly in front of desk[N]. Position is at z=0.11, ~1.3 in
+  // front of the desks at z=1.43 — chair's natural -z backrest
+  // means the chair faces +z (toward the desk) by default, no
+  // rotation needed.
+  {
+    key: 'basic_chair',
+    position: [-4.24, -0.55, 0.11],
+    offsetStep: [2.5, 0, 0],
+    render: u => <BasicChair unlocked={u} />,
+  },
+  // executive_chair: from F6+ this REPLACES every basic_chair (chair
+  // upgrade, mirroring the F12 desk swap). Position + offsetStep
+  // match basic_chair so all 3 director chairs render in the same
+  // workstation slots the basic chairs vacate at F6.
+  {
+    key: 'executive_chair',
+    position: [-4.24, -0.55, 0.11],
+    offsetStep: [2.5, 0, 0],
+    render: u => <ExecutiveChair unlocked={u} />,
+  },
+  { key: 'potted_plant',    position: [-5.16, -0.55, 5.48],  render: u => <PottedPlant unlocked={u} /> },
+  { key: 'coffee_mug',      position: [-4.46,  0.47, 1.73],  render: u => <CoffeeMug unlocked={u} /> },
+  { key: 'bookshelf',       position: [-5.80,  0.75, -5.30], render: u => <Bookshelf unlocked={u} /> },
+  { key: 'printer',         position: [-3.30, -0.55, -4.84], render: u => <Printer unlocked={u} /> },
+  // Wall-mounted items (z ≈ -5.3/-5.4): whiteboard, trophy, neon
+  // sign, floor-ceiling windows, living wall, penthouse crown — keep
+  // their Z low so they hug the back wall.
+  { key: 'whiteboard',      position: [ 0.60,  2.60, -5.34], render: u => <Whiteboard unlocked={u} /> },
+  { key: 'mini_fridge',     position: [ 4.42, -0.55, -4.93], render: u => <MiniFridge unlocked={u} /> },
+  { key: 'trophy',          position: [-5.80,  2.45, -5.18], render: u => <Trophy unlocked={u} /> },
+  { key: 'couch',           position: [ 5.11, -0.55, 3.73],  render: u => <Couch unlocked={u} /> },
+  // upgraded_desk: takes over for office_desk at F12+ (the seed
+  // sets office_desk qty to 0 at F12 and upgraded_desk qty to 3).
+  // Same base position + offsetStep so the 3 dark-wood desks render
+  // exactly where the 3 office desks used to be — visually a "skin
+  // swap" of the workstations.
+  {
+    key: 'upgraded_desk',
+    position: [-4.12, -0.55, 1.43],
+    offsetStep: [2.5, 0, 0],
+    render: u => <UpgradedDesk unlocked={u} />,
+  },
+  { key: 'neon_sign',       position: [ 0.69,  4.20, -5.29], render: u => <NeonSign unlocked={u} /> },
+  { key: 'arcade_machine',  position: [-4.32, -0.55, -5.13], render: u => <ArcadeMachine unlocked={u} /> },
+  { key: 'floor_ceiling_windows', position: [6.20, 1.90, -5.40], render: u => <FloorCeilingWindows unlocked={u} /> },
+  { key: 'tea_table',       position: [ 3.01, -0.55, 3.75],  render: u => <TeaTable unlocked={u} /> },
+  { key: 'living_wall',     position: [ 0.60,  0.50, -5.34], render: u => <LivingWall unlocked={u} /> },
+  { key: 'espresso_machine', position: [ 6.00, -0.55, -4.50], render: u => <EspressoMachine unlocked={u} /> },
+  { key: 'ping_pong_table', position: [ 5.10, -0.55, 5.17],  render: u => <PingPongTable unlocked={u} /> },
+  { key: 'dj_stand',        position: [-2.40, -0.55, 5.57],  render: u => <DJStand unlocked={u} /> },
+  { key: 'penthouse',       position: [-2.52,  4.20, -5.16], render: u => <PenthouseCrown unlocked={u} /> },
 ]
 
 interface Props {
   currentFloor: number
+  /** Per-user position overrides for the "Arrange your room" feature.
+   *  Key shape:
+   *    - `${itemKey}` — applies to a single-instance item OR the
+   *      0-th instance of a multi-instance item if no per-instance
+   *      override is set.
+   *    - `${itemKey}_${index}` — explicit per-instance override
+   *      (used for the multi-copy `basic_chair_desk` slots).
+   *  Empty / undefined → use the canonical ITEMS positions. */
+  positionOverrides?: Record<string, [number, number, number]>
 }
 
-export function FloorItems({ currentFloor }: Props) {
+export function FloorItems({ currentFloor, positionOverrides }: Props) {
   // PER-FLOOR semantic: each floor's row in floor_items lists exactly
   // the items that floor owns, with quantities. We trust that list
   // verbatim for the CURRENT floor (rendered at full opacity) and
@@ -564,12 +1164,18 @@ export function FloorItems({ currentFloor }: Props) {
         // Not configured for this floor OR the next → don't render.
         if (!hit || hit.quantity < 1) return null
         const offset = it.offsetStep ?? [1.8, 0, 0]
-        // Render `quantity` copies, each offset by `offset` from the
-        // previous. Quantity 1 renders exactly one copy at the base
-        // position — single-instance items behave as before.
+        // Per-instance position lookup with three-tier fallback:
+        //   1. `${key}_${i}` override (multi-instance items get
+        //      their own slot per copy)
+        //   2. bare `${key}` override (single-instance items, or
+        //      the 0-th copy when no per-instance override exists)
+        //   3. defaultPosition + offsetStep × i (canonical behaviour)
         const copies: ReactNode[] = []
         for (let i = 0; i < hit.quantity; i++) {
-          const pos: [number, number, number] = [
+          const indexedKey = `${it.key}_${i}`
+          const override = positionOverrides?.[indexedKey]
+            ?? (i === 0 ? positionOverrides?.[it.key] : undefined)
+          const pos: [number, number, number] = override ?? [
             it.position[0] + offset[0] * i,
             it.position[1] + offset[1] * i,
             it.position[2] + offset[2] * i,

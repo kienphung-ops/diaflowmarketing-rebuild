@@ -21,6 +21,10 @@ export default async function TowerRoute() {
   let inviter: InviterInfo | null = null
   let userEmail: string | null = null
   let emailVerified = false
+  // Treat a JWT-valid-but-user-missing token as anonymous so the
+  // signed-in chrome (Sign-out link, etc.) doesn't leak. See
+  // src/app/page.tsx for the same fix.
+  let userResolved = false
 
   if (session) {
     const u = await prisma.user.findUnique({
@@ -43,6 +47,7 @@ export default async function TowerRoute() {
       },
     })
     if (u) {
+      userResolved = true
       userEmail = u.email
       emailVerified = !!u.emailVerified
       currentFloor = u.currentFloor
@@ -64,7 +69,7 @@ export default async function TowerRoute() {
 
   return (
     <TowerPageClient
-      signedIn={!!session}
+      signedIn={userResolved}
       currentFloor={currentFloor}
       totalInvites={totalInvites}
       teamName={teamName}

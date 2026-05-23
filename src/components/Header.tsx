@@ -38,11 +38,18 @@ export function Header({
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
-      <div className="pointer-events-auto flex items-center gap-2">
+      {/* Logo + brand → click sends user to the home route. Wrapped
+          in a Next.js <Link> so navigation goes through the client
+          router (instant, no full reload). */}
+      <Link
+        href="/"
+        aria-label="Diaflow Tower — home"
+        className="pointer-events-auto flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tower-gold/60"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md w-7 h-7 md:w-8 md:h-8" />
         <div className="hidden sm:block text-tower-cream font-semibold tracking-wide">Diaflow Tower</div>
-      </div>
+      </Link>
 
       <div className="pointer-events-auto flex items-center gap-2">
         {/* Stats pill — same long-form on every viewport. With the

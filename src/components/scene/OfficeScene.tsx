@@ -40,6 +40,9 @@ interface Props {
   showTower?: boolean
   currentFloor: number
   unlockedItemKeys: string[]
+  /** Per-user item position overrides (Arrange-your-room feature).
+   *  Plumbed down to FloorItems where the actual lookup happens. */
+  itemPositionOverrides?: Record<string, [number, number, number]>
   onFloorClick: (n: number) => void
   /** Called when an NPC character is clicked (only after onboarding is done). */
   onNpcClick?: (slug: 'iris' | 'mia' | 'leo') => void
@@ -170,6 +173,7 @@ export function OfficeScene({
   recruitedCharacters,
   currentFloor,
   unlockedItemKeys,
+  itemPositionOverrides,
   onNpcClick,
   onTeammateClick,
   onNpcPosition,
@@ -422,7 +426,7 @@ export function OfficeScene({
         <group>
             <Floor />
             <Walls companyName={companyName ?? undefined} currentFloor={currentFloor} />
-            <FloorItems currentFloor={currentFloor} />
+            <FloorItems currentFloor={currentFloor} positionOverrides={itemPositionOverrides} />
 
             {/* Desks come from FloorItems' basic_chair_desk × quantity now —
                 no per-character Desk render here. Characters stand

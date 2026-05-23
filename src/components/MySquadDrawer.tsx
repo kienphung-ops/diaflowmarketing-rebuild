@@ -59,6 +59,11 @@ interface Props {
   /** Sign-out handler — POSTs /api/auth/logout, clears session cookie,
    *  reloads to the home page. Only wired up for signed-in users. */
   onLogout?: () => void
+  /** Opens the Arrange-your-room editor. Closes the drawer + launches
+   *  a fullscreen drag interface (RoomArranger). Only wired up for
+   *  signed-in users on the home page — trial sessions don't have a
+   *  DB row to persist arrangements into. */
+  onArrangeRoom?: () => void
   /** Live floor-activity stats — viewer count + total pokes — shown
    *  as a compact pill near the top of the drawer. Used on:
    *
@@ -103,6 +108,7 @@ export function MySquadDrawer({
   rank,
   emailVerified,
   onLogout,
+  onArrangeRoom,
   visiting,
   // Below are still part of Props for callers but the drawer no longer
   // renders share-floor / teammate-list / add-teammate UI. The /floor/<code>
@@ -113,6 +119,10 @@ export function MySquadDrawer({
   const [renameValue, setRenameValue] = useState(teamName ?? '')
   const [copied, setCopied] = useState(false)
   const [howItWorksOpen, setHowItWorksOpen] = useState(false)
+  // Sign-out confirm gate — first click opens a small modal asking
+  // "are you sure?". Avoids accidental logouts (the link sits right
+  // next to the team-name row and is easy to mis-tap on mobile).
+  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
 
   useEffect(() => {
     setRenameValue(teamName ?? '')
@@ -125,6 +135,13 @@ export function MySquadDrawer({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // Auto-reset the sign-out confirm when the drawer closes — opening
+  // it later shouldn't show a stale "Sign out?" prompt the user
+  // already dismissed.
+  useEffect(() => {
+    if (!open) setSignOutConfirmOpen(false)
+  }, [open])
 
   const origin = useOrigin()
   const inviteUrl = buildInviteUrl(origin, referralCode)
@@ -275,7 +292,11 @@ export function MySquadDrawer({
                 {onLogout && (
                   <button
                     type="button"
-                    onClick={onLogout}
+                    // First click only opens the confirm modal — the
+                    // actual logout fires from the modal's Confirm
+                    // button below. This prevents accidental taps
+                    // (the link sits next to Rename on a busy row).
+                    onClick={() => setSignOutConfirmOpen(true)}
                     className="ml-auto text-xs text-red-400 hover:text-red-300 underline-offset-2 hover:underline transition"
                   >
                     Sign out
@@ -303,8 +324,10 @@ export function MySquadDrawer({
           )}
         </div>
 
-        {/* Invited-by card — only when the server has a sealed inviter row. */}
-        {inviter && <InvitedByCard inviter={inviter} />}
+        {/* Invited-by card moved BELOW "How it works" per user
+            feedback — was previously stacked at the top of the
+            drawer where it crowded the floor card. See the matching
+            placement marker further down. */}
 
         {/* Current floor card */}
         <div className="rounded-xl p-4 bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-500/30">
@@ -466,13 +489,32 @@ export function MySquadDrawer({
           </div>
         </div>
 
-        <button
-          onClick={() => setHowItWorksOpen(true)}
-          className="flex items-center justify-between w-full text-xs hover:bg-night-deep/40 rounded-md px-1 py-0.5 -mx-1 transition"
-        >
-          <span className="flex items-center gap-1 text-tower-cream/50">ⓘ How it works</span>
-          <span className="text-purple-300 hover:text-purple-200 font-semibold">Open →</span>
-        </button>
+        {/* Utility links row — "How it works" + (optional) "Arrange
+            your room". Both rendered as small text links so neither
+            dominates the drawer; Arrange sits in the corner per user
+            feedback ("chỉ cho hyperlink và cho nằm ở một góc nào đó")
+            rather than as a prominent button. */}
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <button
+            onClick={() => setHowItWorksOpen(true)}
+            className="flex items-center gap-1 text-tower-cream/50 hover:text-tower-cream/80 transition"
+          >
+            <span>ⓘ How it works</span>
+          </button>
+          {onArrangeRoom && (
+            <button
+              onClick={onArrangeRoom}
+              className="text-tower-cream/45 hover:text-tower-gold underline-offset-2 hover:underline transition whitespace-nowrap"
+            >
+              🪄 Arrange your room
+            </button>
+          )}
+        </div>
+
+        {/* Invited-by card — moved down from the top per user
+            feedback. Only renders when the server sealed an inviter
+            on signup. */}
+        {inviter && <InvitedByCard inviter={inviter} />}
 
         {/* Unverified-email CTA — signed-in user, emailVerified is false
             in the DB. Hidden once verification completes (parent re-
@@ -529,6 +571,52 @@ export function MySquadDrawer({
             end of the team-name row at the top of the drawer (red
             text, ml-auto-aligned). */}
       </div>
+
+      {/* Sign-out confirmation modal — rendered as a portal-style
+          overlay over the entire drawer so the dim backdrop reads as
+          "you need to answer this first". Lightweight (no react-dom
+          portal) since it's already mounted inside the fixed drawer
+          which has `inset-y-0` covering the viewport vertically. */}
+      {signOutConfirmOpen && onLogout && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="signout-confirm-title"
+          className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6"
+          onClick={() => setSignOutConfirmOpen(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-xs bg-night-mid border border-white/15 rounded-2xl p-5 text-tower-cream shadow-2xl"
+          >
+            <h3 id="signout-confirm-title" className="text-base font-bold mb-1">
+              Sign out?
+            </h3>
+            <p className="text-xs text-tower-cream/65 mb-4 leading-relaxed">
+              You&apos;ll need to sign back in to see your room and invites.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSignOutConfirmOpen(false)}
+                className="flex-1 px-3 py-2 rounded-md border border-white/15 text-tower-cream/80 hover:bg-night-deep hover:text-tower-cream text-sm transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSignOutConfirmOpen(false)
+                  onLogout()
+                }}
+                className="flex-1 px-3 py-2 rounded-md bg-red-500/90 hover:bg-red-500 text-white font-semibold text-sm transition"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -38,7 +38,7 @@ const FALLBACK: FloorConfigEntry[] = FLOOR_CONFIG.map(c => ({
   label: c.label,
   maxTeammates: FLOOR_MAX_TEAMMATES[c.floor] ?? 4,
   productReward: null,
-  unlockItems: null,
+  unlockItems: [],
   items: [{ key: c.unlockKey, label: c.label, quantity: 1 }],
 }))
 

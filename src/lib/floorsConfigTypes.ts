@@ -20,8 +20,12 @@ export interface FloorConfigEntry {
   maxTeammates: number
   /** Optional product reward shown in the floor-detail panel. */
   productReward: string | null
-  /** Free-form admin-supplied note about what's unlocked. */
-  unlockItems: string | null
+  /** Admin-supplied list of "what's unlocked at this floor". Each
+   *  entry is a single human-readable badge (e.g. "🖼 Company name
+   *  picture frame", "Office desk"). Most floors carry 1–2 entries;
+   *  multi-unlock floors (F1, F2, F3, F6, F7, F17, F18, F20) carry
+   *  several. Empty array = nothing special to announce. */
+  unlockItems: string[]
   /** Items configured for this floor (with quantities). */
   items: FloorItemConfig[]
 }

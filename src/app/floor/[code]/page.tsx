@@ -120,6 +120,12 @@ export default async function FloorPage({ params }: { params: { code: string } }
   let visitorInviter: InviterInfo | null = null
   let visitorEmail: string | null = null
   let visitorEmailVerified = false
+  // Track whether the visitor's session JWT actually resolves to a
+  // real DB row. A valid-but-stale token (e.g. account deleted, DB
+  // wiped) would otherwise leak signed-in chrome — most visibly the
+  // Sign-out link in MySquadDrawer — to someone the server can't
+  // actually act on. See the parallel fix in src/app/page.tsx.
+  let visitorResolved = false
 
   if (session) {
     const me = await prisma.user.findUnique({
@@ -142,6 +148,7 @@ export default async function FloorPage({ params }: { params: { code: string } }
       },
     })
     if (me) {
+      visitorResolved = true
       visitorEmail = me.email
       visitorEmailVerified = !!me.emailVerified
       visitorCurrentFloor = me.currentFloor
@@ -169,7 +176,7 @@ export default async function FloorPage({ params }: { params: { code: string } }
       totalInvites={owner.totalInvites}
       unlockedItemKeys={unlockedItemKeys}
       teammates={owner.recruitedTeams}
-      visitorSignedIn={!!session}
+      visitorSignedIn={visitorResolved}
       visitorCurrentFloor={visitorCurrentFloor}
       visitorTotalInvites={visitorTotalInvites}
       visitorTeamName={visitorTeamName}

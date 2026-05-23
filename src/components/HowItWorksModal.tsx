@@ -19,13 +19,12 @@ interface Props {
   totalInvites?: number
 }
 
-// Per planning.md — reward strings keyed by floor.
-const FLOOR_REWARDS: Record<number, string> = {
-  3: 'Free beta access',
-  6: '1 mo free',
-  15: '2 mo free',
-  20: '3-mo free + featured',
-}
+// (removed) FLOOR_REWARDS hardcoded fallback table — superseded by
+// the per-floor `productReward` column populated from the seed. The
+// fallback's values had drifted out of sync with the live DB (e.g.
+// it claimed F6 had "1 mo free" when the canonical reward sits at
+// F7 now), so the modal silently lied for those rows. Reward lookup
+// is now strictly `cfg.productReward`.
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
@@ -209,7 +208,7 @@ export function HowItWorksModal({
         {/* Scrollable table rows */}
         <div style={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
           {floors.map((cfg, i) => {
-            const reward = cfg.productReward ?? FLOOR_REWARDS[cfg.id]
+            const reward = cfg.productReward
             const isLast = i === floors.length - 1
             const isPenthouse = cfg.id === floors.length
             return (
@@ -237,17 +236,36 @@ export function HowItWorksModal({
                 <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
                   {cfg.invitesRequired}
                 </p>
-                {/* Stitched reward line: "max N + decor [+ reward]".
-                    The product-reward suffix (e.g. "Free beta access")
-                    is rendered as a separate green span so it still
-                    visually pops, but the parts read as one
-                    continuous sentence rather than three columns. */}
+                {/* Stitched reward line in three "•"-separated chunks:
+                    1. "<max> teammate slots" (white, bold)
+                    2. unlock_items joined by " + " (now reads the
+                       Postgres text[] field — each item appears as
+                       its own badge instead of a single concatenated
+                       string)
+                    3. product reward (green) when present.
+                    Falls back to `cfg.label` if unlockItems is empty
+                    (defensive — every seeded floor should have at
+                    least one item, but legacy / partially-edited
+                    rows shouldn't show a blank middle column). */}
                 <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.6)' }}><b>• {cfg.maxTeammates} teammate slots</b></span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>
+                    <b>• {cfg.maxTeammates} teammate slots</b>
+                  </span>
                   <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>•</span>
                   <span>
                     {isPenthouse ? '🏆 ' : ''}
-                    {cfg.label}
+                    {cfg.unlockItems.length > 0
+                      ? cfg.unlockItems.map((item, idx) => (
+                          <span key={idx}>
+                            {idx > 0 && (
+                              <span style={{ color: 'rgba(255,255,255,0.35)', margin: '0 4px' }}>
+                                +
+                              </span>
+                            )}
+                            <span>{item}</span>
+                          </span>
+                        ))
+                      : cfg.label}
                   </span>
                   {reward && (
                     <>

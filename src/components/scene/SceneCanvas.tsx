@@ -1,7 +1,32 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
+import { useTexture } from '@react-three/drei'
 import { OfficeScene, type OnboardingStep, type RecruitedCharacter } from './OfficeScene'
+
+// ── Texture pre-warm ────────────────────────────────────────────────
+// Drei's `useTexture` exposes a static `.preload()` that kicks off the
+// load AND populates drei's internal Three.js TextureLoader cache. By
+// calling it at module-top, the moment Next.js parses the SceneCanvas
+// chunk on the client, all six window images + the tower image start
+// downloading IN PARALLEL with chunk evaluation. By the time React
+// commits the Canvas, the textures are typically already in cache and
+// `useTexture()` inside FloorSceneryTexture / FloorPanoramaTexture
+// resolves synchronously — no per-floor texture pop-in.
+//
+// The browser will dedupe these against the `<link rel="preload">`
+// hints in src/app/layout.tsx, so a cold cache fetch happens AT MOST
+// once across both paths.
+if (typeof window !== 'undefined') {
+  useTexture.preload([
+    '/window_images/1.png',
+    '/window_images/2.png',
+    '/window_images/3.png',
+    '/window_images/4.png',
+    '/window_images/5.png',
+    '/window_images/6.png',
+  ])
+}
 
 interface Props {
   onboardingStep: OnboardingStep
@@ -24,6 +49,9 @@ interface Props {
   onTeammatePoke?: (slug: string) => void
   /** Optional override for Mia's NameBadge role label — see OfficeScene. */
   miaRole?: string | null
+  /** Per-user item position overrides (Arrange-your-room feature).
+   *  Pass-through to OfficeScene → FloorItems. */
+  itemPositionOverrides?: Record<string, [number, number, number]>
 }
 
 export function SceneCanvas(props: Props) {

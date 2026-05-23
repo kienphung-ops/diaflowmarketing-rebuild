@@ -40,26 +40,49 @@ const prisma = new PrismaClient({ adapter })
  * in MySquadDrawer; `maxTeammates` is INCLUSIVE of the 3 default NPCs.
  */
 const FLOORS = [
-  { id: 1,  invitesRequired: 0,   label: 'Company name picture frame', maxTeammates: 3, unlock_items:"Company name picture frame" },
-  { id: 2,  invitesRequired: 1,   label: 'Floor lamp',                  maxTeammates: 4, unlock_items:"Floor lamp" },
-  { id: 3,  invitesRequired: 2,   label: 'Basic chair + first desk',    maxTeammates: 5, unlock_items:"Basic chair + first desk", product_reward:"Free beta access" },
-  { id: 4,  invitesRequired: 4,   label: 'Potted plant',                maxTeammates: 5, unlock_items:"Potted plant" },
-  { id: 5,  invitesRequired: 6,   label: 'Coffee mug on desk',          maxTeammates: 6, unlock_items:"Coffee mug on desk" },
-  { id: 6,  invitesRequired: 9,   label: 'Bookshelf',                   maxTeammates: 6, unlock_items:"Bookshelf", product_reward:"1 mo free" },
-  { id: 7,  invitesRequired: 12,  label: 'Printer',                     maxTeammates: 7, unlock_items:"Printer" },
-  { id: 8,  invitesRequired: 16,  label: 'Whiteboard',                  maxTeammates: 7, unlock_items:"Whiteboard" },
-  { id: 9,  invitesRequired: 21,  label: 'Mini fridge',                 maxTeammates: 8, unlock_items:"Mini fridge" },
-  { id: 10, invitesRequired: 27,  label: 'Trophy',                      maxTeammates: 8, unlock_items:"Trophy" },
-  { id: 11, invitesRequired: 34,  label: 'Couch / lounge area',         maxTeammates: 9, unlock_items:"Couch / lounge area" },
-  { id: 12, invitesRequired: 42,  label: 'Upgraded desk (dark wood)',   maxTeammates: 9, unlock_items:"Upgraded desk (dark wood)" },
-  { id: 13, invitesRequired: 51,  label: 'Neon sign',                   maxTeammates: 10, unlock_items:"Neon sign" },
-  { id: 14, invitesRequired: 61,  label: 'Arcade machine',              maxTeammates: 10, unlock_items:"Arcade machine" },
-  { id: 15, invitesRequired: 72,  label: 'Floor-to-ceiling windows',    maxTeammates: 11, unlock_items:"Floor-to-ceiling windows", product_reward:"2 mo free" },
-  { id: 16, invitesRequired: 84,  label: 'Living wall',                 maxTeammates: 11, unlock_items:"Living wall" },
-  { id: 17, invitesRequired: 90,  label: 'Espresso machine',            maxTeammates: 12, unlock_items:"Espresso machine" },
-  { id: 18, invitesRequired: 96,  label: 'Ping pong table',             maxTeammates: 12, unlock_items:"Ping pong table" },
-  { id: 19, invitesRequired: 102, label: 'Rooftop terrace',             maxTeammates: 13, unlock_items:"Rooftop terrace" },
-  { id: 20, invitesRequired: 108, label: 'Full penthouse',              maxTeammates: 14, unlock_items:"🏆 Full penthouse", product_reward:"3-mo free + featured" },
+  // Source-of-truth: requirements/new_items.md. The renderer
+  // (FloorItems.tsx) keys off the per-item `key` strings further below,
+  // so any addition/removal here must be mirrored in the ITEMS array
+  // AND its matching mesh component in FloorItems.tsx.
+  //
+  // `unlock_items` is now a Postgres text[] — one badge per array
+  // entry. Floors that historically read "X + Y" become ['X', 'Y'].
+  { id: 1,  invitesRequired: 0,   label: 'Company name picture frame',     maxTeammates: 3,  unlock_items: ['🖼 Company name picture frame', '1 desk'] },
+  { id: 2,  invitesRequired: 1,   label: 'Floor lamp + basic chair',       maxTeammates: 4,  unlock_items: ['💡 Floor lamp', 'Basic chair'] },
+  // F3: 2nd "basic chair + desk" pair. These are 2 SEPARATE items
+  // (office_desk + basic_chair) now, not the retired composite.
+  { id: 3,  invitesRequired: 2,   label: 'Basic chair + desk',             maxTeammates: 5,  unlock_items: ['🪑 Basic chair + desk'], product_reward: 'Free beta access' },
+  { id: 4,  invitesRequired: 4,   label: 'Potted plant',                    maxTeammates: 5,  unlock_items: ['🌿 Potted plant'] },
+  // F5: 3rd "basic chair + desk" pair (cap). From here on the user
+  // has 3 office workstations.
+  { id: 5,  invitesRequired: 6,   label: 'Coffee mug + basic chair + desk', maxTeammates: 6,  unlock_items: ['☕ Coffee mug on desk', 'Basic chair + desk'] },
+  // F6: chair upgrade beat — ALL basic chairs become high-back
+  // executive (giám đốc) chairs. Same workstation slots, plusher
+  // seating. See ExecutiveChair mesh + the basic_chair → 0 /
+  // executive_chair → 3 swap in ITEMS below.
+  { id: 6,  invitesRequired: 9,   label: 'Bookshelf + upgraded chairs',     maxTeammates: 6,  unlock_items: ['📚 Bookshelf', 'Upgraded extra chair'] },
+  { id: 7,  invitesRequired: 12,  label: 'Printer',             maxTeammates: 7,  unlock_items: ['🖨 Printer'],product_reward: '🎁 1 mo free' },
+  { id: 8,  invitesRequired: 16,  label: 'Whiteboard with diagrams',        maxTeammates: 7,  unlock_items: ['📋 Whiteboard with diagrams'] },
+  { id: 9,  invitesRequired: 21,  label: 'Mini fridge',                     maxTeammates: 8,  unlock_items: ['🧃 Mini fridge'] },
+  // F10 + F11 swapped vs the old seed — spec puts the couch first
+  // (lounge area at slot-tier 8) and the trophy at the next tier (9).
+  { id: 10, invitesRequired: 27,  label: 'Couch / lounge area',             maxTeammates: 8,  unlock_items: ['🛋 Couch / lounge area'] },
+  { id: 11, invitesRequired: 34,  label: 'Trophy on shelf',                 maxTeammates: 9,  unlock_items: ['🏆 Trophy on shelf'] },
+  { id: 12, invitesRequired: 42,  label: 'Upgraded dark wood desk',         maxTeammates: 9,  unlock_items: ['🪵 Upgraded dark wood desk'] },
+  { id: 13, invitesRequired: 51,  label: 'Neon sign on wall',               maxTeammates: 10, unlock_items: ['🌟 Neon sign on wall'] },
+  // 2-mo reward moved from F15 → F14 per spec; F15 no longer carries
+  // a product reward.
+  { id: 14, invitesRequired: 61,  label: 'Arcade machine',                  maxTeammates: 10, unlock_items: ['🕹 Arcade machine'], product_reward: '🎁 2 mo free' },
+  { id: 15, invitesRequired: 72,  label: 'Floor-to-ceiling windows',        maxTeammates: 11, unlock_items: ['🪟 Floor-to-ceiling windows'] },
+  // F16 is now a tea-table beat (the simple round table). Living wall
+  // moved one floor up to share F17 with the ping-pong table.
+  { id: 16, invitesRequired: 84,  label: 'Tea table',                       maxTeammates: 11, unlock_items: ['🍵 Tea table'] },
+  { id: 17, invitesRequired: 90,  label: 'Living wall + ping pong table',   maxTeammates: 12, unlock_items: ['🌿 Living wall', 'Ping pong table'] },
+  { id: 18, invitesRequired: 96,  label: 'Espresso machine + coffee area',  maxTeammates: 12, unlock_items: ['☕ Espresso machine', 'Coffee area'] },
+  // Rooftop terrace was replaced by the DJ stand — same z=19 slot,
+  // different vibe.
+  { id: 19, invitesRequired: 102, label: 'DJ stand',                        maxTeammates: 13, unlock_items: ['🎵 DJ stand'] },
+  { id: 20, invitesRequired: 108, label: 'Full penthouse',                  maxTeammates: 14, unlock_items: ['👑 Full penthouse'], product_reward: '🏆 3-mo free + featured + team featured at launch' },
 ]
 
 const MAX_FLOOR = 20
@@ -81,33 +104,60 @@ const MAX_FLOOR = 20
  */
 const ITEMS = [
   { key: 'company_picture_frame', label: 'Company name picture frame',  unlockFloor: 1,  quantity: 1 },
-  { key: 'floor_lamp',            label: 'Floor lamp',                  unlockFloor: 2,  quantity: 1 },
+  // office_desk: present F1..F11 with a ramping count (1 → 3 across
+  // F1, F2, F3-F4=2, F5-F11=3). From F12 onward the seed sets
+  // quantity to 0 so the dark-wood upgraded_desk takes over visually.
+  // Implemented via a tight quantityByFloor map + default 0.
   {
-    key: 'basic_chair_desk',
-    label: 'Basic chair + first desk',
-    unlockFloor: 3,
-    // Default for F5..F20.
-    quantity: 3,
-    // Per-floor overrides — F3 starts the user with a single desk, F4
-    // jumps to four for a "team expansion" beat, F5+ settles at three.
-    quantityByFloor: { 3: 1, 4: 2 },
+    key: 'office_desk',
+    label: 'Office desk',
+    unlockFloor: 1,
+    quantity: 0, // default = "gone" (covers F12..F20)
+    quantityByFloor: { 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3, 7: 3, 8: 3, 9: 3, 10: 3, 11: 3 },
   },
+  { key: 'floor_lamp',            label: 'Floor lamp',                  unlockFloor: 2,  quantity: 1 },
+  // basic_chair: F2=1, F3=2, F4=2, F5=3 — paired with office_desk.
+  // At F6+ EVERY basic chair is upgraded to the executive chair, so
+  // quantity drops back to 0 (default) and executive_chair fills
+  // the same workstation slots. Same upgrade pattern the desk uses
+  // at F12 (office_desk → upgraded_desk).
+  {
+    key: 'basic_chair',
+    label: 'Basic chair',
+    unlockFloor: 2,
+    quantity: 0, // default = "gone" once chairs upgrade (covers F6..F20)
+    quantityByFloor: { 2: 1, 3: 2, 4: 2, 5: 3 },
+  },
+  // F6 onwards: ALL chairs are now executive (giám đốc / high-back
+  // leather director's chair). Quantity 3 matches the F5 basic_chair
+  // count so the F6 unlock visually swaps the 3 seats — see
+  // ExecutiveChair mesh.
+  { key: 'executive_chair',       label: 'Executive chair',             unlockFloor: 6,  quantity: 3 },
   { key: 'potted_plant',          label: 'Potted plant',                unlockFloor: 4,  quantity: 1 },
   { key: 'coffee_mug',            label: 'Coffee mug on desk',          unlockFloor: 5,  quantity: 1 },
   { key: 'bookshelf',             label: 'Bookshelf',                   unlockFloor: 6,  quantity: 1 },
   { key: 'printer',               label: 'Printer',                     unlockFloor: 7,  quantity: 1 },
-  { key: 'whiteboard',            label: 'Whiteboard',                  unlockFloor: 8,  quantity: 1 },
+  { key: 'whiteboard',            label: 'Whiteboard with diagrams',    unlockFloor: 8,  quantity: 1 },
   { key: 'mini_fridge',           label: 'Mini fridge',                 unlockFloor: 9,  quantity: 1 },
-  { key: 'trophy',                label: 'Trophy',                      unlockFloor: 10, quantity: 1 },
-  { key: 'couch',                 label: 'Couch / lounge area',         unlockFloor: 11, quantity: 1 },
-  { key: 'upgraded_desk',         label: 'Upgraded desk (dark wood)',   unlockFloor: 12, quantity: 1 },
-  { key: 'neon_sign',             label: 'Neon sign',                   unlockFloor: 13, quantity: 1 },
+  // Couch + trophy SWAPPED vs old seed — see FLOORS table above.
+  { key: 'couch',                 label: 'Couch / lounge area',         unlockFloor: 10, quantity: 1 },
+  { key: 'trophy',                label: 'Trophy on shelf',             unlockFloor: 11, quantity: 1 },
+  // upgraded_desk: replaces office_desk visually at F12+. Quantity 3
+  // matches the office_desk count at F5..F11 so the swap is
+  // 1-to-1 — same workstation slots, dark wood finish.
+  { key: 'upgraded_desk',         label: 'Upgraded dark wood desk',     unlockFloor: 12, quantity: 3 },
+  { key: 'neon_sign',             label: 'Neon sign on wall',           unlockFloor: 13, quantity: 1 },
   { key: 'arcade_machine',        label: 'Arcade machine',              unlockFloor: 14, quantity: 1 },
   { key: 'floor_ceiling_windows', label: 'Floor-to-ceiling windows',    unlockFloor: 15, quantity: 1 },
-  { key: 'living_wall',           label: 'Living wall',                 unlockFloor: 16, quantity: 1 },
-  { key: 'espresso_machine',      label: 'Espresso machine',            unlockFloor: 17, quantity: 1 },
-  { key: 'ping_pong_table',       label: 'Ping pong table',             unlockFloor: 18, quantity: 1 },
-  { key: 'rooftop_terrace',       label: 'Rooftop terrace',             unlockFloor: 19, quantity: 1 },
+  // F16 is now a tea table (new mesh); living_wall moves up to F17.
+  { key: 'tea_table',             label: 'Tea table',                   unlockFloor: 16, quantity: 1 },
+  { key: 'living_wall',           label: 'Living wall',                 unlockFloor: 17, quantity: 1 },
+  { key: 'ping_pong_table',       label: 'Ping pong table',             unlockFloor: 17, quantity: 1 },
+  { key: 'espresso_machine',      label: 'Espresso machine',            unlockFloor: 18, quantity: 1 },
+  // F19's rooftop_terrace retired in favour of the DJ stand. The
+  // rooftop_terrace mesh in FloorItems.tsx is also gone now — if you
+  // resurrect this floor, add it back in both places.
+  { key: 'dj_stand',              label: 'DJ stand',                    unlockFloor: 19, quantity: 1 },
   { key: 'penthouse',             label: 'Full penthouse',              unlockFloor: 20, quantity: 1 },
 ]
 
@@ -123,15 +173,22 @@ async function main() {
         invitesRequired: f.invitesRequired,
         label: f.label,
         maxTeammates: f.maxTeammates,
-        product_reward: f.product_reward,
-        unlock_items: f.unlock_items,
+        // Coerce `undefined` (field omitted in the FLOORS entry above)
+        // to `null` / `[]` so the upsert ALWAYS sets the column. Without
+        // this, Prisma's update path treats `undefined` as "leave this
+        // column alone", which meant prior seed runs leaked stale
+        // `product_reward` / `unlock_items` values that we'd intended
+        // to clear (e.g. moving "1 mo free" from F6 → F7 didn't clear
+        // F6's old reward).
+        product_reward: f.product_reward ?? null,
+        unlock_items: f.unlock_items ?? [],
       },
       update: {
         invitesRequired: f.invitesRequired,
         label: f.label,
         maxTeammates: f.maxTeammates,
-        product_reward: f.product_reward,
-        unlock_items: f.unlock_items,
+        product_reward: f.product_reward ?? null,
+        unlock_items: f.unlock_items ?? [],
       },
     })
   }
@@ -172,6 +229,25 @@ async function main() {
     await prisma.floorItem.createMany({ data: rows, skipDuplicates: true })
   }
   console.log(`  ✓ ${rows.length} floor↔item joins`)
+
+  // ─── 4. Bust the floors API cache ─────────────────────────────────
+  // /api/floors sits behind a 3-tier cache (in-process memo → Redis →
+  // DB). The in-process layer dies with this script naturally, but
+  // Redis would keep serving the old shape until its TTL. Wiping the
+  // canonical key here means a fresh seed is visible on the very next
+  // API request — no manual flush step.
+  // Lazy-imported so a missing REDIS_DB env doesn't crash the seed.
+  if (process.env.REDIS_DB) {
+    try {
+      const { default: Redis } = await import('ioredis')
+      const redis = new Redis(process.env.REDIS_DB, { lazyConnect: false })
+      await redis.del('floors:v1:all')
+      await redis.quit()
+      console.log('  ✓ Redis floors cache busted')
+    } catch (err) {
+      console.warn('  ⚠ Redis flush failed (non-fatal):', err.message)
+    }
+  }
 
   console.log('✔ Seed complete.')
 }

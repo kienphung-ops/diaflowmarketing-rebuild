@@ -30,6 +30,7 @@ CREATE TABLE "users" (
     "teamName" TEXT,
     "teamPurpose" TEXT,
     "publicVisible" BOOLEAN NOT NULL DEFAULT false,
+    "itemPositions" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -71,7 +72,7 @@ CREATE TABLE "floor" (
     "label" TEXT NOT NULL,
     "maxTeammates" INTEGER NOT NULL,
     "product_reward" TEXT,
-    "unlock_items" TEXT,
+    "unlock_items" TEXT[] DEFAULT ARRAY[]::TEXT[],
 
     CONSTRAINT "floor_pkey" PRIMARY KEY ("id")
 );

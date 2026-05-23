@@ -21,6 +21,18 @@ export default async function Home() {
   let emailVerified = false
   let userEmail: string | null = null
   let publicVisible = false
+  // Per-user item position overrides (Arrange-your-room feature).
+  // Empty `{}` falls through to the canonical defaults in FloorItems.
+  let serverItemPositions: Record<string, [number, number, number]> = {}
+
+  // Track whether the session JWT actually resolves to an existing
+  // user row. A valid JWT can still point to a deleted / wiped user
+  // (stale token after a DB reset, manually-deleted account). When
+  // that happens we treat the request as anonymous so the UI doesn't
+  // leak signed-in chrome — most notably the Sign-out link in the
+  // MySquadDrawer — for someone who can't actually do anything with
+  // it. (`session` alone isn't enough; we need `u` too.)
+  let userResolved = false
 
   if (session) {
     const u = await prisma.user.findUnique({
@@ -44,9 +56,13 @@ export default async function Home() {
         referredBy: {
           select: { referralCode: true, teamName: true, country: true, email: true },
         },
+        // Per-user "Arrange your room" overrides — see User.itemPositions
+        // comment in schema.prisma for the shape.
+        itemPositions: true,
       },
     })
     if (u) {
+      userResolved = true
       userEmail = u.email
       emailVerified = !!u.emailVerified
       publicVisible = u.publicVisible
@@ -70,6 +86,11 @@ export default async function Home() {
           invitedAt: u.referredAt ? u.referredAt.toISOString() : null,
         }
       }
+      // Coerce Prisma's `JsonValue` into our expected shape. Anything
+      // weird becomes an empty map (renderer falls back to defaults).
+      if (u.itemPositions && typeof u.itemPositions === 'object' && !Array.isArray(u.itemPositions)) {
+        serverItemPositions = u.itemPositions as Record<string, [number, number, number]>
+      }
     }
   }
 
@@ -79,7 +100,7 @@ export default async function Home() {
       unlockedItemKeys={unlockedItemKeys}
       referralCode={referralCode}
       totalInvites={totalInvites}
-      signedIn={!!session}
+      signedIn={userResolved}
       serverRecruits={serverRecruits}
       serverTeamName={serverTeamName}
       serverTeamPurpose={serverTeamPurpose}
@@ -89,6 +110,7 @@ export default async function Home() {
       publicVisible={publicVisible}
       serverRecommendedRole={serverRecommendedRole}
       serverReason={serverReason}
+      serverItemPositions={serverItemPositions}
     />
   )
 }

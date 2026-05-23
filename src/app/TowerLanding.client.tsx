@@ -8,6 +8,7 @@ import { CelebrationModal } from '@/components/CelebrationModal'
 import { SignupModal } from '@/components/SignupModal'
 import { IrisHireModal } from '@/components/IrisHireModal'
 import { ViewTransitionOverlay } from '@/components/ViewTransitionOverlay'
+import { RoomArranger } from '@/components/RoomArranger'
 import { useOrigin } from '@/hooks/useOrigin'
 import {
   IrisBubble,
@@ -78,6 +79,10 @@ interface Props {
   serverRecommendedRole: string | null
   /** Reason string that pairs with `serverRecommendedRole`. */
   serverReason: string | null
+  /** Per-user item position overrides from `User.itemPositions`.
+   *  Drives the rendered item positions when present; empty map
+   *  falls back to FloorItems' canonical layout. */
+  serverItemPositions: Record<string, [number, number, number]>
 }
 
 export default function TowerLanding(props: Props) {
@@ -122,6 +127,17 @@ export default function TowerLanding(props: Props) {
   // there's no setIsNavigating(false) — the overlay disappears with
   // the rest of the page when /tower mounts.
   const [isNavigating, setIsNavigating] = useState(false)
+  // Arrange-your-room feature. `itemPositions` is the live map driving
+  // the scene (initially seeded from the server, mutated by the
+  // arrange-mode drag handler). `arrangeMode` is the boolean toggle
+  // that opens the toolbar + enables item drag. `arrangeSnapshot` is
+  // the pre-edit copy so Cancel can revert cleanly.
+  const [itemPositions, setItemPositions] = useState<Record<string, [number, number, number]>>(
+    () => ({ ...props.serverItemPositions }),
+  )
+  const [arrangeMode, setArrangeMode] = useState(false)
+  const arrangeSnapshotRef = useRef<Record<string, [number, number, number]>>({})
+  const [arrangeSaving, setArrangeSaving] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   // Reset-position signal — bumped by MySquadDrawer / TeammateEditModal
   // and consumed by OfficeScene's `resetSignal` effect.
@@ -145,6 +161,45 @@ export default function TowerLanding(props: Props) {
   const dismissToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
+
+  // Arrange-your-room handlers. Order matters — these depend on
+  // pushToast above, which is declared with useCallback so it stays
+  // stable across renders.
+  const handleStartArrange = useCallback(() => {
+    if (!props.signedIn) return
+    arrangeSnapshotRef.current = { ...itemPositions }
+    setArrangeMode(true)
+    setSquadOpen(false) // close the drawer so the room is visible
+  }, [props.signedIn, itemPositions])
+
+  const handleCancelArrange = useCallback(() => {
+    setItemPositions({ ...arrangeSnapshotRef.current })
+    setArrangeMode(false)
+  }, [])
+
+  const handleSaveArrange = useCallback(async () => {
+    setArrangeSaving(true)
+    try {
+      const r = await fetch('/api/user/item-positions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ positions: itemPositions }),
+      })
+      if (!r.ok) throw new Error('save failed')
+      pushToast({ title: 'Room saved ✓', tone: 'success' })
+      setArrangeMode(false)
+    } catch {
+      // ToastMessage only supports info/warn/success — use 'warn' for
+      // a recoverable failure (we tell the user to retry).
+      pushToast({
+        title: 'Couldn’t save room layout',
+        body: 'Try again — the network rejected the request.',
+        tone: 'warn',
+      })
+    } finally {
+      setArrangeSaving(false)
+    }
+  }, [itemPositions, pushToast])
 
   const handleResetTeammatePosition = useCallback((id: string) => {
     // `id` is a recruited teammate id; map index → "recruited-N" slug
@@ -763,6 +818,7 @@ export default function TowerLanding(props: Props) {
         recruitedCharacters={customRecruits.map(r => ({ name: r.name, role: r.role }))}
         currentFloor={effective.currentFloor}
         unlockedItemKeys={effective.unlockedItemKeys}
+        itemPositionOverrides={itemPositions}
         onFloorClick={() => {}}
         onNpcClick={slug => {
           // Iris used to open MySquadDrawer; now opens the dedicated
@@ -804,6 +860,24 @@ export default function TowerLanding(props: Props) {
 
       {/* Tower navigation overlay — see useState comment above. */}
       {isNavigating && <ViewTransitionOverlay label="Loading tower view…" />}
+
+      {/* Arrange-your-room overlay — fullscreen edit mode launched
+          from the MySquadDrawer button. Persists positions via PATCH
+          /api/user/item-positions on Save; restores the pre-edit
+          snapshot on Cancel. Signed-in users only — trial sessions
+          don't have a DB row to persist into. */}
+      {props.signedIn && (
+        <RoomArranger
+          open={arrangeMode}
+          currentFloor={effective.currentFloor}
+          companyName={effective.teamName}
+          positions={itemPositions}
+          onChange={setItemPositions}
+          onSave={handleSaveArrange}
+          onCancel={handleCancelArrange}
+          saving={arrangeSaving}
+        />
+      )}
 
       {/* Onboarding modals — only render once the per-step delay has
           elapsed (see `onboardingModalVisible` effect above) so the
@@ -863,6 +937,9 @@ export default function TowerLanding(props: Props) {
         publicVisible={publicVisible}
         onTogglePublic={props.signedIn ? handleTogglePublic : undefined}
         onLogout={props.signedIn ? handleLogout : undefined}
+        // Arrange-your-room launcher — only offered for signed-in
+        // users since trial sessions can't persist to the User row.
+        onArrangeRoom={props.signedIn ? handleStartArrange : undefined}
       />
 
       <TeammateEditModal

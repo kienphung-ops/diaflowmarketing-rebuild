@@ -67,6 +67,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const gaId = process.env.NEXT_PUBLIC_GA_ID
   return (
     <html lang="en">
+      <head>
+        {/* ── Critical resource hints ─────────────────────────────────
+            The 3D scene's two biggest texture loads are the floor-1
+            window scenery (`/window_images/1.png`, ~815 KB) and the
+            full tower image (`/tower.png`, ~923 KB). Both are loaded
+            by R3F's TextureLoader downstream of React hydration —
+            without these preload hints, the browser doesn't start
+            fetching them until the SceneCanvas chunk has parsed,
+            adding ~1-2s of dead time on a cold cache.
+            `fetchpriority="high"` boosts them above other late requests.
+            Browser de-dupes preload hits with R3F's later fetches, so
+            no double-download. */}
+        <link
+          rel="preload"
+          as="image"
+          href="/window_images/1.png"
+          fetchPriority="high"
+        />
+        <link
+          rel="preload"
+          as="image"
+          href="/tower.png"
+          fetchPriority="high"
+        />
+        {/* Logo — small but blocks the header chrome. Preload so the
+            first paint has the branded mark instead of a placeholder. */}
+        <link rel="preload" as="image" href="/diaflow-logo.jpg" />
+      </head>
       <body className="antialiased">
         {/* GTM noscript fallback — per Google's install spec must be
             immediately inside <body>. Renders an invisible iframe that
