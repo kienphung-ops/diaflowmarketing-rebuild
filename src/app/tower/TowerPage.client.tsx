@@ -54,6 +54,19 @@ export default function TowerPageClient(props: Props) {
   // Spinner overlay during the slow /tower → / RSC round-trip. See the
   // TowerLanding.client.tsx note for the full rationale.
   const [isNavigating, setIsNavigating] = useState(false)
+
+  // Warm the next likely routes so Office↔Tower navigation feels
+  // instant. From /tower the user almost always either goes back
+  // home (/) or peeks into a specific floor (/tower-view/N). We
+  // prefetch the office route on mount + the user's CURRENT floor
+  // preview as a reasonable default for the floor-peek path.
+  useEffect(() => {
+    router.prefetch('/')
+    if (props.currentFloor >= 1 && props.currentFloor <= 20) {
+      router.prefetch(`/tower-view/${props.currentFloor}`)
+    }
+  }, [router, props.currentFloor])
+
   // Mirror server-supplied emailVerified locally so completing the
   // EmailVerifyModal flow hides the "Verify your email" banner
   // immediately (without waiting for /api/me round-trip).

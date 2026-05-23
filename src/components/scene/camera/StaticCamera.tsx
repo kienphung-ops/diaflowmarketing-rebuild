@@ -22,7 +22,7 @@ import * as THREE from 'three'
 //   Mobile  (aspect < 1): rotated 10° lower → flatter angle, ~11° down
 // The actual distance from origin is computed per-resize so the scene
 // fits whatever aspect we're rendering at.
-const POSITION_DIR_DESKTOP = new THREE.Vector3(10, 8, 10)
+const POSITION_DIR_DESKTOP = new THREE.Vector3(4, 8, 12)
 const POSITION_DIR_MOBILE = (() => {
   // Take the desktop direction and rotate it down 10° around the X axis,
   // which lowers the camera (smaller Y, larger Z) while keeping the same

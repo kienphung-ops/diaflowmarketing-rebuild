@@ -101,6 +101,18 @@ export default function FloorVisitorClient(props: Props) {
   const [teammates, setTeammates] = useState<Teammate[]>(props.teammates)
   const [pokingId, setPokingId] = useState<string | null>(null)
   const seenPokes = useRef(new Map<string, number>())
+
+  // Warm the routes a visitor is most likely to navigate to next:
+  //   - signed-in: their own /office (the Tower-view header button)
+  //   - anonymous: /signup (the bottom-center "Build your own office"
+  //                CTA carries the owner's ref code, points at /?ref=)
+  // /tower is also a common click from the header so prefetch it for
+  // everyone.
+  useEffect(() => {
+    router.prefetch('/')
+    router.prefetch('/tower')
+    if (!props.visitorSignedIn) router.prefetch('/signup')
+  }, [router, props.visitorSignedIn])
   // Lifecycle AbortController — pokes (user-triggered fetches) reuse
   // this signal so they abort cleanly on navigation away. The polling
   // useEffect below uses its own per-effect AbortController instead.

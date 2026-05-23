@@ -332,6 +332,12 @@ function FloorClickStrips() {
               setNavTarget(floor)
               router.push(`/tower-view/${floor}`)
             }}
+            // Hover → warm the destination route's chunks + RSC
+            // payload. By the time the user clicks the strip, the
+            // /tower-view/N transition feels instant. Cost is tiny
+            // (each prefetch dedupes; Next.js caches per-route).
+            onMouseEnter={() => router.prefetch(`/tower-view/${floor}`)}
+            onFocus={() => router.prefetch(`/tower-view/${floor}`)}
             aria-label={`Preview Floor ${floor}`}
             className="group absolute inset-x-0 cursor-pointer focus:outline-none"
             style={{

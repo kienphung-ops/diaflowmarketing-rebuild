@@ -230,6 +230,26 @@ export default function TowerLanding(props: Props) {
     window.location.href = '/'
   }, [])
 
+  // Quietly warm the next routes the user is most likely to navigate
+  // to so the transition feels instant. router.prefetch() pulls the
+  // JS chunks + RSC payload without rendering anything — Vercel's
+  // edge cache also gets a free warmup.
+  //
+  //   signed-in: /tower (the Office↔Tower toggle is the #1 click)
+  //   trial:     /signup (the "Claim your team" CTA destination)
+  //
+  // Both pages: prefetch /how-it-works since the MySquadDrawer link
+  // is a single tap away.
+  useEffect(() => {
+    router.prefetch('/how-it-works')
+    if (props.signedIn) {
+      router.prefetch('/tower')
+    } else {
+      router.prefetch('/signup')
+      router.prefetch('/login')
+    }
+  }, [router, props.signedIn])
+
   const handleTogglePublic = useCallback(async (next: boolean) => {
     // Optimistic UI — flip locally then PATCH; revert on failure.
     setPublicVisible(next)
