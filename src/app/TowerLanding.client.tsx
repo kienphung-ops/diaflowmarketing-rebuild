@@ -153,6 +153,17 @@ export default function TowerLanding(props: Props) {
   // via the toggle which PATCHes /api/user/visibility.
   const [publicVisible, setPublicVisible] = useState(props.publicVisible)
   const prevTrialFloorRef = useRef(trial.currentFloor)
+  // Highest floor we've actually observed for this user during this
+  // mount. Initialised from the SSR'd prop so the FIRST SSE snapshot
+  // — which always replays the current floor on every reconnect AND
+  // on every page remount — is treated as a baseline, not an upgrade.
+  // Only a strictly higher value than this ref fires the celebration.
+  //
+  // This guards the "office → tower → office" navigation: previously
+  // the snapshot's `prev.currentFloor` comparison could be a false
+  // positive when the closure / setState batching landed before the
+  // ref was bumped, surfacing the upgrade modal on every return trip.
+  const baselineFloorRef = useRef(props.currentFloor)
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
@@ -380,20 +391,23 @@ export default function TowerLanding(props: Props) {
   useRealtimeFloor({
     enabled: !isTrial,
     onSnapshot: data => {
+      // Celebration gate: only fire when the snapshot strictly exceeds
+      // the highest floor observed during this mount (initial baseline
+      // = props.currentFloor from SSR). This survives SSE reconnects,
+      // React StrictMode double-mounts, and Office↔Tower navigation,
+      // all of which can replay the same snapshot value.
+      if (data.currentFloor > baselineFloorRef.current) {
+        setCelebrationFloorsClimbed(data.currentFloor - baselineFloorRef.current)
+        setCelebrationFloor(data.currentFloor)
+        baselineFloorRef.current = data.currentFloor
+      }
+      // Invite toast gate: same shape — only fire when the snapshot's
+      // totalInvites strictly exceeds the prior committed value. We
+      // read `prev.totalInvites` inside the functional setter so the
+      // diff is computed against the latest committed state even if a
+      // burst of snapshots lands in the same tick.
       setServerState(prev => {
-        const floorClimbed = data.currentFloor - prev.currentFloor
         const invitesDelta = data.totalInvites - prev.totalInvites
-
-        // Floor went up while the client was reconnecting — fire the
-        // same celebration the live `floor-up` event would have.
-        if (floorClimbed > 0) {
-          setCelebrationFloorsClimbed(floorClimbed)
-          setCelebrationFloor(data.currentFloor)
-        }
-        // Invites bumped while reconnecting — fire the toast the live
-        // `invite-accepted` event would have. The `prev.totalInvites > 0
-        // || data.totalInvites > 0` gate is unnecessary; if the deltas
-        // is 0 we skip anyway.
         if (invitesDelta > 0) {
           pushToast({
             title:
@@ -413,17 +427,20 @@ export default function TowerLanding(props: Props) {
       })
     },
     onFloorUp: data => {
-      setServerState(prev => {
-        const climbed = Math.max(1, data.currentFloor - prev.currentFloor)
-        setCelebrationFloorsClimbed(climbed)
-        return {
-          ...prev,
-          currentFloor: data.currentFloor,
-          totalInvites: data.totalInvites,
-          unlockedItemKeys: data.unlockedItemKeys,
-        }
-      })
-      setCelebrationFloor(data.currentFloor)
+      // Server only emits floor-up on a strict increase, but the
+      // client gate still consults the ref so a duplicate or
+      // out-of-order event can't replay the modal.
+      if (data.currentFloor > baselineFloorRef.current) {
+        setCelebrationFloorsClimbed(data.currentFloor - baselineFloorRef.current)
+        setCelebrationFloor(data.currentFloor)
+        baselineFloorRef.current = data.currentFloor
+      }
+      setServerState(prev => ({
+        ...prev,
+        currentFloor: data.currentFloor,
+        totalInvites: data.totalInvites,
+        unlockedItemKeys: data.unlockedItemKeys,
+      }))
     },
     onInviteAccepted: data => {
       setServerState(prev => ({ ...prev, totalInvites: data.totalInvites }))

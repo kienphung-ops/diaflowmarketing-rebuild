@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from 'react'
 import * as THREE from 'three'
+import { Text } from '@react-three/drei'
 import { useFloorItems } from '@/lib/floorsConfigClient'
 
 const LOCKED_OPACITY = 0.18
@@ -391,6 +392,12 @@ function Printer({ unlocked }: { unlocked: boolean }) {
 }
 
 function Whiteboard({ unlocked }: { unlocked: boolean }) {
+  // Scribbled motto ("go unicorn this year") on the whiteboard — a
+  // little visual joke tied to the F7 unlock. We render it as two
+  // SDF text rows so the line wraps on narrow displays. `position.z`
+  // sits just in front of the white panel (z=0.04) so it doesn't
+  // z-fight with the board. Opacity follows the unlocked state so
+  // ghosted previews still dim the text along with the rest.
   return (
     <group>
       {/* Mount to back wall — slightly raised position */}
@@ -401,6 +408,27 @@ function Whiteboard({ unlocked }: { unlocked: boolean }) {
       <mesh position={[0, 0, 0.04]}>
         <planeGeometry args={[2.05, 1.25]} />
         <M color="#f8f8f0" unlocked={unlocked} />
+      </mesh>
+      <Text
+        position={[0, 0.15, 0.06]}
+        fontSize={0.22}
+        maxWidth={1.9}
+        textAlign="center"
+        color="#1a3a8a"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.005}
+        outlineColor="#0a1a4a"
+        fillOpacity={unlocked ? 1 : LOCKED_OPACITY}
+        renderOrder={1}
+      >
+        go unicorn{'\n'}this year
+      </Text>
+      {/* Decorative underline doodle in marker red, evoking a
+          handwritten emphasis stroke under the motto. */}
+      <mesh position={[0, -0.32, 0.055]}>
+        <boxGeometry args={[1.2, 0.025, 0.005]} />
+        <M color="#d33b3b" unlocked={unlocked} emissive="#d33b3b" emissiveIntensity={0.4} />
       </mesh>
       {/* Marker tray */}
       <mesh position={[0, -0.72, 0.06]}>
@@ -431,11 +459,14 @@ function MiniFridge({ unlocked }: { unlocked: boolean }) {
 }
 
 function Trophy({ unlocked }: { unlocked: boolean }) {
-  // Scaled ~1.5× over the original silhouette per spec — the trophy is
-  // a "Floor 11 achievement" item and was reading too small on the
-  // bookshelf next to it. Same proportions, bigger overall presence.
+  // Bumped another 30% over the previous size — F11 trophy is meant
+  // to read clearly as an "achievement" item from across the room,
+  // and at the old scale it was getting lost on the bookshelf right
+  // next to it. We do the bump via `<group scale>` rather than
+  // rewriting each cylinder/box, which keeps the proportions and
+  // shelf-relative anchor intact.
   return (
-    <group>
+    <group scale={1.3}>
       {/* Base — wider, thicker plinth */}
       <mesh position={[0, 0.06, 0]}>
         <boxGeometry args={[0.46, 0.12, 0.46]} />
@@ -598,19 +629,62 @@ function NeonSign({ unlocked }: { unlocked: boolean }) {
 }
 
 function ArcadeMachine({ unlocked }: { unlocked: boolean }) {
+  // Minifigure-sized arcade cabinet — ~1.7 tall (matches the
+  // minifigure silhouette from feet to top-of-hair) and ~0.85 wide,
+  // so it reads as a "stand up and play it" object, not a wall
+  // accent. The position in ITEMS has been moved from the back wall
+  // to the front-of-room lounge area so it sits alongside the couch
+  // + tea table cluster — the new arcade is closer to the camera
+  // and well clear of the workstation strip.
   return (
     <group>
-      <mesh position={[0, 0.7, 0]}>
-        <boxGeometry args={[0.6, 1.4, 0.5]} />
+      {/* Cabinet body */}
+      <mesh position={[0, 0.85, 0]}>
+        <boxGeometry args={[0.85, 1.7, 0.65]} />
         <M color="#7c3aed" unlocked={unlocked} />
       </mesh>
-      <mesh position={[0, 1.05, 0.26]}>
-        <planeGeometry args={[0.5, 0.4]} />
-        <M color="#1a0030" unlocked={unlocked} emissive="#a855f7" emissiveIntensity={0.6} />
+      {/* Marquee — glowing top band, classic arcade title-light */}
+      <mesh position={[0, 1.6, 0]}>
+        <boxGeometry args={[0.87, 0.22, 0.66]} />
+        <M color="#a855f7" unlocked={unlocked} emissive="#c084fc" emissiveIntensity={0.55} />
       </mesh>
-      <mesh position={[0, 0.7, 0.26]}>
-        <boxGeometry args={[0.5, 0.15, 0.08]} />
+      {/* Screen — recessed CRT panel near the top of the front face */}
+      <mesh position={[0, 1.15, 0.33]}>
+        <boxGeometry args={[0.72, 0.58, 0.02]} />
+        <M color="#2a1a3a" unlocked={unlocked} />
+      </mesh>
+      <mesh position={[0, 1.15, 0.345]}>
+        <planeGeometry args={[0.6, 0.5]} />
+        <M color="#1a0030" unlocked={unlocked} emissive="#a855f7" emissiveIntensity={0.85} />
+      </mesh>
+      {/* Control deck — flat slab protruding from the front face at
+          waist height (where the player stands). */}
+      <mesh position={[0, 0.78, 0.46]}>
+        <boxGeometry args={[0.78, 0.08, 0.22]} />
         <M color="#3a2a1a" unlocked={unlocked} />
+      </mesh>
+      {/* Joystick — post + red ball, left side of the deck */}
+      <mesh position={[-0.2, 0.86, 0.48]}>
+        <cylinderGeometry args={[0.018, 0.018, 0.08, 8]} />
+        <M color="#1a1a2e" unlocked={unlocked} />
+      </mesh>
+      <mesh position={[-0.2, 0.93, 0.48]}>
+        <sphereGeometry args={[0.04, 10, 10]} />
+        <M color="#d33b3b" unlocked={unlocked} emissive="#d33b3b" emissiveIntensity={0.4} />
+      </mesh>
+      {/* Two action buttons (yellow + cyan) on the right of the deck */}
+      <mesh position={[0.05, 0.83, 0.48]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.018, 12]} />
+        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.45} />
+      </mesh>
+      <mesh position={[0.18, 0.83, 0.48]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.018, 12]} />
+        <M color="#22d3ee" unlocked={unlocked} emissive="#22d3ee" emissiveIntensity={0.45} />
+      </mesh>
+      {/* Coin slot below the control deck */}
+      <mesh position={[0, 0.48, 0.33]}>
+        <boxGeometry args={[0.1, 0.04, 0.015]} />
+        <M color="#1a1a2e" unlocked={unlocked} />
       </mesh>
     </group>
   )
@@ -1106,7 +1180,11 @@ export const ITEMS: ItemSpec[] = [
     render: u => <UpgradedDesk unlocked={u} />,
   },
   { key: 'neon_sign',       position: [ 0.69,  4.20, -5.29], render: u => <NeonSign unlocked={u} /> },
-  { key: 'arcade_machine',  position: [-4.32, -0.55, -5.13], render: u => <ArcadeMachine unlocked={u} /> },
+  // Arcade was a back-wall accent at (-4.32, -0.55, -5.13). Promoted to
+  // a floor-standing minifigure-sized object in the front lounge —
+  // sits between the tea table (3.01, 3.75) and dj_stand (-2.40, 5.57),
+  // forward enough to be eye-catching when the camera frames the room.
+  { key: 'arcade_machine',  position: [ 1.70, -0.55,  4.50], render: u => <ArcadeMachine unlocked={u} /> },
   { key: 'floor_ceiling_windows', position: [6.20, 1.90, -5.40], render: u => <FloorCeilingWindows unlocked={u} /> },
   { key: 'tea_table',       position: [ 3.01, -0.55, 3.75],  render: u => <TeaTable unlocked={u} /> },
   { key: 'living_wall',     position: [ 0.60,  0.50, -5.34], render: u => <LivingWall unlocked={u} /> },

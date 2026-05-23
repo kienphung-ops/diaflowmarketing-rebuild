@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TowerView } from '@/components/TowerView'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
@@ -88,6 +88,13 @@ export default function TowerPageClient(props: Props) {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const [celebrationFloor, setCelebrationFloor] = useState<number | null>(null)
   const [celebrationFloorsClimbed, setCelebrationFloorsClimbed] = useState(0)
+  // Highest floor we've observed for this user during this mount.
+  // Initialised from the SSR prop so the first SSE snapshot (which
+  // simply replays the current floor on every reconnect AND on every
+  // page-to-page navigation) is treated as a baseline, not an
+  // upgrade — prevents the celebration modal firing when the user
+  // navigates Office → Tower → Office.
+  const baselineFloorRef = useRef(props.currentFloor)
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
@@ -140,12 +147,16 @@ export default function TowerPageClient(props: Props) {
   useRealtimeFloor({
     enabled: props.signedIn,
     onSnapshot: data => {
-      const floorClimbed = data.currentFloor - liveCurrentFloor
-      const invitesDelta = data.totalInvites - liveTotalInvites
-      if (floorClimbed > 0) {
-        setCelebrationFloorsClimbed(floorClimbed)
+      // Celebration gate via ref baseline — see comment on
+      // baselineFloorRef. Compares against the highest seen floor,
+      // NOT the closure'd liveCurrentFloor (which can be stale across
+      // SSE reconnects + page remounts).
+      if (data.currentFloor > baselineFloorRef.current) {
+        setCelebrationFloorsClimbed(data.currentFloor - baselineFloorRef.current)
         setCelebrationFloor(data.currentFloor)
+        baselineFloorRef.current = data.currentFloor
       }
+      const invitesDelta = data.totalInvites - liveTotalInvites
       if (invitesDelta > 0) {
         pushToast({
           title:
@@ -160,9 +171,14 @@ export default function TowerPageClient(props: Props) {
       setLiveTotalInvites(data.totalInvites)
     },
     onFloorUp: data => {
-      const climbed = Math.max(1, data.currentFloor - liveCurrentFloor)
-      setCelebrationFloorsClimbed(climbed)
-      setCelebrationFloor(data.currentFloor)
+      // Even though the server only emits floor-up on a strict
+      // increase, the client gate consults the ref so a duplicate or
+      // out-of-order event can't replay the modal.
+      if (data.currentFloor > baselineFloorRef.current) {
+        setCelebrationFloorsClimbed(data.currentFloor - baselineFloorRef.current)
+        setCelebrationFloor(data.currentFloor)
+        baselineFloorRef.current = data.currentFloor
+      }
       setLiveCurrentFloor(data.currentFloor)
       setLiveTotalInvites(data.totalInvites)
     },

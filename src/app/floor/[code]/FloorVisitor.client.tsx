@@ -146,6 +146,12 @@ export default function FloorVisitorClient(props: Props) {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const [celebrationFloor, setCelebrationFloor] = useState<number | null>(null)
   const [celebrationFloorsClimbed, setCelebrationFloorsClimbed] = useState(0)
+  // Highest visitor floor we've observed during this mount. See the
+  // matching comment in TowerLanding / TowerPage: initialised from
+  // the SSR prop so the first SSE snapshot — which always replays
+  // the current floor on every reconnect AND on every page-to-page
+  // remount — is a baseline, not an upgrade trigger.
+  const baselineFloorRef = useRef(props.visitorCurrentFloor)
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
@@ -197,12 +203,15 @@ export default function FloorVisitorClient(props: Props) {
   useRealtimeFloor({
     enabled: props.visitorSignedIn,
     onSnapshot: data => {
-      const floorClimbed = data.currentFloor - liveVisitorFloor
-      const invitesDelta = data.totalInvites - liveVisitorInvites
-      if (floorClimbed > 0) {
-        setCelebrationFloorsClimbed(floorClimbed)
+      // Celebration gate via ref baseline — see baselineFloorRef
+      // comment. Compares against the highest seen floor, NOT the
+      // closure'd liveVisitorFloor (stale across reconnects + remounts).
+      if (data.currentFloor > baselineFloorRef.current) {
+        setCelebrationFloorsClimbed(data.currentFloor - baselineFloorRef.current)
         setCelebrationFloor(data.currentFloor)
+        baselineFloorRef.current = data.currentFloor
       }
+      const invitesDelta = data.totalInvites - liveVisitorInvites
       if (invitesDelta > 0) {
         pushToast({
           title:
@@ -217,9 +226,14 @@ export default function FloorVisitorClient(props: Props) {
       setLiveVisitorInvites(data.totalInvites)
     },
     onFloorUp: data => {
-      const climbed = Math.max(1, data.currentFloor - liveVisitorFloor)
-      setCelebrationFloorsClimbed(climbed)
-      setCelebrationFloor(data.currentFloor)
+      // Same defensive ref-gate as onSnapshot — server only emits
+      // floor-up on strict increase, but a duplicate event from a
+      // reconnected stream shouldn't be able to replay the modal.
+      if (data.currentFloor > baselineFloorRef.current) {
+        setCelebrationFloorsClimbed(data.currentFloor - baselineFloorRef.current)
+        setCelebrationFloor(data.currentFloor)
+        baselineFloorRef.current = data.currentFloor
+      }
       setLiveVisitorFloor(data.currentFloor)
       setLiveVisitorInvites(data.totalInvites)
     },

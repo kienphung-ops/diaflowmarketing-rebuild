@@ -1,14 +1,39 @@
 'use client'
 
 import { useState } from 'react'
+import { useFloor } from '@/lib/floorsConfigClient'
+import { buildShareCopyText } from '@/lib/shareCopy'
 
-export function ReferralCopyButton({ code }: { code: string }) {
+interface Props {
+  code: string
+  /** Used to compute how many invites the user still needs to climb
+   *  to the next floor — the same enriched string MySquad,
+   *  IrisHireModal and HowItWorksModal paste. */
+  currentFloor: number
+  totalInvites: number
+}
+
+export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) {
   const [copied, setCopied] = useState(false)
+  // Next-floor invite math — `useFloor` falls back to the static
+  // config until /api/floors hydrates, so this renders synchronously
+  // on first paint without needing a loading state. `nextFloor` is
+  // null when the user has reached the penthouse (max floor).
+  const nextFloor = useFloor(currentFloor + 1)
+  const invitesToNext = nextFloor
+    ? Math.max(0, nextFloor.invitesRequired - totalInvites)
+    : 0
 
   const handleCopy = async () => {
     const url = `${window.location.origin}/?ref=${code}`
+    // Route through buildShareCopyText so the header Copy button
+    // pastes the same marketing-formatted string as the MySquad +
+    // HowItWorks + Iris drawers ("built my AI office, N invites
+    // from the next floor—<url>"). Previously this button copied
+    // the bare URL, which broke parity with the other three.
+    const payload = buildShareCopyText(url, invitesToNext, !!nextFloor)
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {

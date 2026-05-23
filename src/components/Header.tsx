@@ -103,7 +103,11 @@ export function Header({
           // Signed-in: always show the invite-link copy button, even
           // when `hideAuthCta` is set — it's not an auth CTA, it's a
           // utility for the user's own referral link.
-          <ReferralCopyButton code={referralCode} />
+          <ReferralCopyButton
+            code={referralCode}
+            currentFloor={currentFloor}
+            totalInvites={totalInvites}
+          />
         ) : hideAuthCta ? null : onOpenSignup ? (
           <button
             onClick={onOpenSignup}
