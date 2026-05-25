@@ -89,16 +89,12 @@ export function HowItWorksModal({
 
   return createPortal(
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 80,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        fontFamily: FONT,
-      }}
+      // Wrapper: bottom-aligned sheet on mobile, centered modal on
+      // desktop. Tailwind responsive `items-*` swaps the alignment
+      // at md; the rest of the chrome stays inline-styled to match
+      // the existing palette.
+      className="fixed inset-0 z-[80] flex items-end md:items-center justify-center md:p-5"
+      style={{ fontFamily: FONT }}
       role="dialog"
       aria-modal="true"
     >
@@ -114,24 +110,24 @@ export function HowItWorksModal({
         }}
       />
 
-      {/* Card */}
+      {/* Card — mobile bottom sheet (rounded top only, full-width) vs
+          desktop centered card. Max-height stays at 90vh on desktop;
+          on mobile we drop to 88dvh so the home-indicator inset isn't
+          covered. */}
       <div
         onClick={e => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          background: '#13112a',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '20px',
-          width: '100%',
-          maxWidth: '520px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          color: 'white',
-          overflow: 'hidden',
-        }}
+        className={
+          'relative z-[1] flex flex-col text-white overflow-hidden w-full ' +
+          'rounded-t-3xl md:rounded-[20px] ' +
+          'max-h-[88dvh] md:max-h-[90vh] md:max-w-[520px] ' +
+          'border-t md:border border-white/10'
+        }
+        style={{ background: '#13112a' }}
       >
+        {/* Mobile sheet grip */}
+        <div className="md:hidden flex justify-center pt-2.5" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
         {/* Header */}
         <div style={{ padding: '24px 24px 16px', flexShrink: 0 }}>
           <div

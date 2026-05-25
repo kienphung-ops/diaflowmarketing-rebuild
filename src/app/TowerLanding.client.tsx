@@ -21,8 +21,12 @@ import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { MiaInfoCard } from '@/components/MiaInfoCard'
 import { LeoEmailDrawer } from '@/components/LeoEmailDrawer'
 import { TeammateEditModal } from '@/components/TeammateEditModal'
+import { TeammateBubble } from '@/components/TeammateBubble'
 import { BulkAddTeammatesModal } from '@/components/BulkAddTeammatesModal'
-import { MobileBottomBar } from '@/components/MobileBottomBar'
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
+import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
+import { MobileProgressPill } from '@/components/mobile/MobileProgressPill'
+import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
 import { EmailVerifyModal } from '@/components/EmailVerifyModal'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
 import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
@@ -57,6 +61,10 @@ interface ServerRecruit {
   slug?: string | null
   isDefault?: boolean
   pokes?: number
+  /** "Launch-day promise" — Diaflow-API-generated sentence shown in
+   *  the speech bubble. May be null while the bulk-add background
+   *  fetch is still resolving; UI falls back to a generic line. */
+  description?: string | null
 }
 
 interface Props {
@@ -112,6 +120,17 @@ export default function TowerLanding(props: Props) {
   const [activeNpcModal, setActiveNpcModal] = useState<'iris' | 'mia' | 'leo' | null>(null)
   const [squadOpen, setSquadOpen] = useState(false)
   const [editingTeammate, setEditingTeammate] = useState<ServerRecruit | null>(null)
+  // The "Step 2" speech-bubble shown next to a recruited teammate the
+  // user just clicked. Holds the same row shape as editingTeammate so
+  // we can hand it straight to the edit modal when the pencil is
+  // clicked. Defaults (Iris/Mia/Leo) skip this and go to their own
+  // dedicated modals (IrisHireModal / MiaInfoCard / activeNpcModal).
+  const [bubbleTeammate, setBubbleTeammate] = useState<ServerRecruit | null>(null)
+  // Mobile share bottom-sheet — opened by the hero "Invite to climb"
+  // CTA on MobileBottomNav. Lives at TowerLanding level so it works
+  // whether the user taps it from Office or from anywhere else that
+  // mounts the nav.
+  const [mobileShareOpen, setMobileShareOpen] = useState(false)
   const [bulkAddOpen, setBulkAddOpen] = useState(false)
   // Iris recruiting popup — replaces the old MySquadDrawer-on-Iris-
   // click behaviour. Has two states driven by slot availability;
@@ -570,6 +589,11 @@ export default function TowerLanding(props: Props) {
   }, [trial])
 
   function handleTeammateUpdate(id: string, patch: { name?: string; role?: string }) {
+    // Optimistic local rename — apply the new name/role immediately so
+    // the scene + drawer don't lag the user's edit. The description
+    // STAYS stale until the server confirms; if the role changed the
+    // PATCH response carries the newly-resolved description (from the
+    // role cache or a fresh Diaflow API call) and we patch it in.
     setRecruits(prev =>
       prev.map(t => (t.id === id ? { ...t, name: patch.name ?? t.name, role: patch.role ?? t.role } : t))
     )
@@ -578,7 +602,19 @@ export default function TowerLanding(props: Props) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
-      }).catch(() => {})
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(j => {
+          // Reconcile with the server's canonical row — important
+          // because the role-change branch refetches the description,
+          // which the optimistic update above couldn't have known.
+          if (j?.teammate) {
+            setRecruits(prev =>
+              prev.map(t => (t.id === id ? { ...t, ...j.teammate } : t))
+            )
+          }
+        })
+        .catch(() => {})
     }
   }
 
@@ -687,27 +723,29 @@ export default function TowerLanding(props: Props) {
       })
       return
     }
-    // Signed-in: POST each in parallel.
-    Promise.all(
-      drafts.map(d =>
-        fetch('/api/recruit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(d),
-        })
-          .then(r => (r.ok ? r.json() : null))
-          .catch(() => null)
-      )
-    ).then(results => {
-      const added = results.map(r => r?.teammate).filter(Boolean) as ServerRecruit[]
-      if (added.length > 0) {
-        setRecruits(prev => [...prev, ...added])
-        pushToast({
-          title: `Added ${added.length} teammate${added.length === 1 ? '' : 's'}`,
-          tone: 'success',
-        })
-      }
+    // Signed-in: single POST to /api/recruit/bulk. That endpoint
+    // probes the role-description cache synchronously, creates every
+    // teammate in one Postgres transaction, then kicks off the upstream
+    // Diaflow API calls for any roles that missed the cache. The user
+    // sees their full team in the room immediately; the speech-bubble
+    // copy populates as background fetches resolve (next page load).
+    fetch('/api/recruit/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drafts }),
     })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => {
+        const added = (j?.teammates ?? []) as ServerRecruit[]
+        if (added.length > 0) {
+          setRecruits(prev => [...prev, ...added])
+          pushToast({
+            title: `Added ${added.length} teammate${added.length === 1 ? '' : 's'}`,
+            tone: 'success',
+          })
+        }
+      })
+      .catch(() => {})
   }
 
   function handleTeamNameChange(next: string) {
@@ -847,7 +885,27 @@ export default function TowerLanding(props: Props) {
         maxTeammates={maxTeammates}
         slotsAvailable={slotsAvailable}
         onAddTeammates={onboardingComplete && slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
+        // Mobile-only — taps on the header "Invite" pill now open
+        // the share bottom sheet instead of copying. The bottom-nav
+        // hero is reserved for My Squad.
+        onMobileInvite={
+          props.signedIn ? () => setMobileShareOpen(true) : undefined
+        }
       />
+
+      {/* Mobile-only counter chip strip. Slides in directly below the
+          header for sub-md viewports where the header's compact pill
+          was either truncating the stats or overflowing the row. */}
+      {onboardingComplete && (
+        <div className="md:hidden fixed top-[52px] inset-x-0 z-10">
+          <MobileCounterChips
+            currentFloor={effective.currentFloor}
+            totalInvites={effective.totalInvites}
+            teammateCount={computeTeammateCount(recruits)}
+            maxTeammates={maxTeammates}
+          />
+        </div>
+      )}
 
       <SceneCanvas
         onboardingStep={activeStep}
@@ -865,8 +923,13 @@ export default function TowerLanding(props: Props) {
           else setActiveNpcModal(slug)
         }}
         onTeammateClick={idx => {
+          // Click → open the speech bubble (Step 2 of the design)
+          // rather than jumping straight to the edit modal. The
+          // bubble's pencil button is what opens the edit modal
+          // (Step 3), keeping the heavier surface one extra click
+          // away.
           const t = customRecruits[idx]
-          if (t) setEditingTeammate(t)
+          if (t) setBubbleTeammate(t)
         }}
         // Drag → poke. OfficeScene fires this whenever the user drags
         // a teammate by > 0.2 units; we map the slug to the DB row
@@ -882,17 +945,56 @@ export default function TowerLanding(props: Props) {
 
       <MySquadFloatingButton visible={onboardingComplete} onClick={() => setSquadOpen(true)} />
 
+      {/* Mobile shell — replaces the old MobileBottomBar with the
+          mockup's three-slot nav + a floating progress pill that
+          surfaces the next-reward goal one tap above the nav. Both
+          render only on sub-md viewports; desktop keeps using the
+          header chrome. */}
       {onboardingComplete && (
-        <MobileBottomBar
-          slotsAvailable={slotsAvailable}
-          showTower={false}
-          onOpenSquad={() => setSquadOpen(true)}
-          onAddTeammates={slotsAvailable > 0 ? () => setBulkAddOpen(true) : undefined}
-          onToggleTower={() => {
-            setIsNavigating(true)
-            router.push('/tower')
-          }}
-        />
+        <>
+          <MobileProgressPill
+            currentFloor={effective.currentFloor}
+            totalInvites={effective.totalInvites}
+            // Suppress while sheets are open so we don't double-stack
+            // floating UI on top of the active surface.
+            hidden={
+              squadOpen ||
+              bulkAddOpen ||
+              mobileShareOpen ||
+              irisModalOpen ||
+              showSignupModal ||
+              arrangeMode
+            }
+          />
+          <MobileBottomNav
+            active="office"
+            onGoOffice={() => {
+              /* already here — close any open sheets as a gentle ack */
+              setSquadOpen(false)
+              setMobileShareOpen(false)
+            }}
+            onGoTower={() => {
+              setIsNavigating(true)
+              router.push('/tower')
+            }}
+            // Hero tab now opens the MySquadDrawer bottom sheet
+            // instead of the share sheet. The header's "Invite"
+            // pill owns the share affordance.
+            onOpenSquad={() => setSquadOpen(true)}
+          />
+          <MobileShareSheet
+            open={mobileShareOpen}
+            onClose={() => setMobileShareOpen(false)}
+            inviteUrl={
+              props.signedIn && props.referralCode && origin
+                ? `${origin}/floor/${props.referralCode}`
+                : null
+            }
+            currentFloor={effective.currentFloor}
+            totalInvites={effective.totalInvites}
+            onSignupNudge={isTrial ? () => setShowSignupModal(true) : undefined}
+          />
+        </>
       )}
 
       {/* Tower navigation overlay — see useState comment above. */}
@@ -977,6 +1079,23 @@ export default function TowerLanding(props: Props) {
         // Arrange-your-room launcher — only offered for signed-in
         // users since trial sessions can't persist to the User row.
         onArrangeRoom={props.signedIn ? handleStartArrange : undefined}
+      />
+
+      {/* Step 2 — speech bubble that appears on first click. Auto-
+          dismisses on outside click. Pencil button promotes to the
+          edit modal (Step 3). */}
+      <TeammateBubble
+        open={!!bubbleTeammate}
+        teammate={bubbleTeammate}
+        anchorSlug={(() => {
+          if (!bubbleTeammate) return null
+          const idx = customRecruits.findIndex(r => r.id === bubbleTeammate.id)
+          return idx >= 0 ? `recruited-${idx}` : null
+        })()}
+        onClose={() => setBubbleTeammate(null)}
+        onEdit={() => {
+          if (bubbleTeammate) setEditingTeammate(bubbleTeammate)
+        }}
       />
 
       <TeammateEditModal

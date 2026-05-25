@@ -287,13 +287,15 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaI
           </>
         )}
 
-        <button
-          type="button"
-          onClick={onNext}
-          className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition"
-        >
-          {showLoading ? 'Skip & meet your next teammate →' : 'Meet your next teammate →'}
-        </button>
+        {!showLoading && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition"
+          >
+            Meet your next teammate →
+          </button>
+        )}
       </div>
     </ModalShell>
   )

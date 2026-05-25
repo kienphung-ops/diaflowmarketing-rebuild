@@ -95,7 +95,7 @@ export default async function FloorPage({ params }: { params: { code: string } }
         currentFloor: true,
         totalInvites: true,
         recruitedTeams: {
-          select: { id: true, slug: true, name: true, role: true, pokes: true, isDefault: true },
+          select: { id: true, slug: true, name: true, role: true, pokes: true, isDefault: true, description: true },
           orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
         },
       },
@@ -139,7 +139,7 @@ export default async function FloorPage({ params }: { params: { code: string } }
         referralCode: true,
         referredAt: true,
         recruitedTeams: {
-          select: { id: true, name: true, role: true, slug: true, isDefault: true, pokes: true },
+          select: { id: true, name: true, role: true, slug: true, isDefault: true, pokes: true, description: true },
           orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
         },
         referredBy: {

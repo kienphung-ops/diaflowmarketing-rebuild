@@ -18,7 +18,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useFloor } from '@/lib/floorsConfigClient'
 import { ViewTransitionOverlay } from './ViewTransitionOverlay'
 
 interface TowerViewProps {
@@ -68,16 +67,15 @@ function floorToMarker(floor: number): { top: number; left: number } {
 export function TowerView({
   signedIn,
   currentFloor,
-  totalInvites,
-  teamName,
+  // totalInvites + teamName are still part of the public Props
+  // contract (callers pass them) — they powered the now-retired
+  // top-left info card. Left in the interface so external callers
+  // don't break; intentionally NOT destructured here so eslint
+  // doesn't flag them as unused locals.
   onClose,
   onSignIn,
 }: TowerViewProps) {
   const marker = useMemo(() => floorToMarker(currentFloor), [currentFloor])
-  // Live floor config from /api/floors (cached). Falls back to static
-  // FLOOR_CONFIG until the API responds.
-  const cfg = useFloor(currentFloor)
-  const floorLabel = cfg?.label ?? `Floor ${currentFloor}`
 
   // Lock body scroll while overlay is open.
   useEffect(() => {
@@ -167,35 +165,15 @@ export function TowerView({
         </div>
       </div>
 
-      {/* Info card — anchored TOP-LEFT on both mobile and desktop.
-          (Was previously bottom-left on mobile, which collided with
-          the floating Office + My Squad pills sitting at bottom-right
-          and constrained the pills to a tall stack. Moving it up clears
-          the bottom strip entirely so the action pills can sit at
-          their natural bottom-5 position.) The `top-14` offset on
-          mobile / `md:top-16` on desktop matches the height of the
-          fixed Header above. */}
-      {signedIn ? (
-        <div
-          className="absolute z-20 rounded-xl md:rounded-2xl bg-black/70 backdrop-blur-md border border-white/15 max-w-[60vw] md:max-w-[280px]
-                     top-14 left-3 px-3 py-2
-                     md:top-16 md:left-4 md:px-4 md:py-2.5"
-          style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
-        >
-          {teamName && (
-            <div className="hidden md:block text-[10px] text-white/55 uppercase tracking-[0.18em] mb-0.5">
-              {teamName}
-            </div>
-          )}
-          <div className="text-xs md:text-xl font-bold text-purple-300 leading-tight">
-            {floorLabel}
-          </div>
-          <div className="text-[10px] md:text-[11px] text-white/70 mt-0.5">
-            F{currentFloor}/{TOTAL_FLOORS} · {totalInvites} invite
-            {totalInvites === 1 ? '' : 's'}
-          </div>
-        </div>
-      ) : (
+      {/* The signed-in "current floor" info card used to live here
+          (top-left, showing Floor label + "F1/20 · 0 invites"). It
+          was retired — the same info is already surfaced by the
+          MobileCounterChips strip / the desktop header pill / the
+          YOU marker on the tower image, and a fourth duplicate just
+          added clutter on top of the tower silhouette.
+          The anon/trial CTA card is kept since it's the only way for
+          a non-signed-in visitor to get into the auth flow from here. */}
+      {!signedIn && (
         <div
           className="absolute z-20 rounded-xl md:rounded-2xl bg-black/70 backdrop-blur-md border border-white/15 max-w-[80vw] md:max-w-[280px]
                      top-14 left-3 px-3 py-2

@@ -21,6 +21,11 @@ import {
 import { useMaxTeammates } from '@/lib/floorsConfigClient'
 import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
 import { useFloorPresence } from '@/hooks/useFloorPresence'
+import { useOrigin } from '@/hooks/useOrigin'
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
+import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
+import { MobileProgressPill } from '@/components/mobile/MobileProgressPill'
+import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
 import type { InviterInfo } from '@/lib/inviter'
 
 interface ServerRecruit {
@@ -30,6 +35,10 @@ interface ServerRecruit {
   slug?: string | null
   isDefault?: boolean
   pokes?: number
+  /** "Launch-day promise" — Diaflow-API-generated sentence shown in
+   *  the speech bubble. May be null while the bulk-add background
+   *  fetch is still resolving; UI falls back to a generic line. */
+  description?: string | null
 }
 
 interface Props {
@@ -95,6 +104,11 @@ export default function TowerPageClient(props: Props) {
   // upgrade — prevents the celebration modal firing when the user
   // navigates Office → Tower → Office.
   const baselineFloorRef = useRef(props.currentFloor)
+  // Mobile share bottom-sheet — opened from the hero "Invite to climb"
+  // tab. Same component as TowerLanding.
+  const [mobileShareOpen, setMobileShareOpen] = useState(false)
+  // Origin for composing the shareable invite URL (post-hydration only).
+  const origin = useOrigin()
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
@@ -269,6 +283,10 @@ export default function TowerPageClient(props: Props) {
           router.push('/')
         }}
         onOpenSignup={!props.signedIn ? () => setSignupOpen(true) : undefined}
+        // Header "Invite" pill on mobile opens the share sheet.
+        onMobileInvite={
+          props.signedIn ? () => setMobileShareOpen(true) : undefined
+        }
       />
 
       <TowerView
@@ -296,12 +314,51 @@ export default function TowerPageClient(props: Props) {
           back to / without consuming a full sticky bottom bar (which
           would cover the bottom rows of the tower image). */}
       <MySquadFloatingButton visible onClick={() => setSquadOpen(true)} />
-      <MobileTowerActions
-        onOpenSquad={() => setSquadOpen(true)}
+
+      {/* Mobile chrome — counter chips below the header, share sheet,
+          progress pill, and the three-slot bottom nav. The "Tower" tab
+          is the active one here; tapping "Office" navigates back to /,
+          and "Invite to climb" opens the share sheet. */}
+      <div className="md:hidden fixed top-[52px] inset-x-0 z-10">
+        <MobileCounterChips
+          currentFloor={effective.currentFloor}
+          totalInvites={effective.totalInvites}
+          teammateCount={teammateCount}
+          maxTeammates={maxTeammates}
+        />
+      </div>
+      <MobileProgressPill
+        currentFloor={effective.currentFloor}
+        totalInvites={effective.totalInvites}
+        hidden={squadOpen || mobileShareOpen || signupOpen || leaderboardOpen}
+        // Tower view stacks a leaderboard / floor-info card lower
+        // in the screen; lift the progress pill so they don't collide.
+        bottomOffsetClass="bottom-[calc(82px+env(safe-area-inset-bottom))]"
+      />
+      <MobileBottomNav
+        active="tower"
         onGoOffice={() => {
           setIsNavigating(true)
           router.push('/')
         }}
+        onGoTower={() => {
+          /* already here */
+        }}
+        // Hero tab opens MySquadDrawer; share lives on the header
+        // "Invite" pill.
+        onOpenSquad={() => setSquadOpen(true)}
+      />
+      <MobileShareSheet
+        open={mobileShareOpen}
+        onClose={() => setMobileShareOpen(false)}
+        inviteUrl={
+          props.signedIn && props.referralCode && origin
+            ? `${origin}/floor/${props.referralCode}`
+            : null
+        }
+        currentFloor={effective.currentFloor}
+        totalInvites={effective.totalInvites}
+        onSignupNudge={!props.signedIn ? () => setSignupOpen(true) : undefined}
       />
 
       <MySquadDrawer
@@ -419,45 +476,7 @@ function LeaderboardButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-/**
- * Two compact bottom-right pills for /tower mobile: Office (back to /)
- * + My Squad. Kept as floating pills rather than a full sticky bottom
- * bar so the tower image isn't covered. The Office pill sits to the
- * LEFT of My Squad on the same baseline so both are reachable with one
- * thumb. The TowerView info card was relocated from bottom-left to
- * top-left specifically so this row could anchor to bottom-5 without
- * overlapping anything.
- */
-function MobileTowerActions({
-  onOpenSquad,
-  onGoOffice,
-}: {
-  onOpenSquad: () => void
-  onGoOffice: () => void
-}) {
-  return (
-    <div
-      className="md:hidden fixed bottom-5 right-5 z-30 flex items-center gap-2"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      <button
-        onClick={onGoOffice}
-        aria-label="Back to office view"
-        className="px-3.5 py-2.5 rounded-full bg-night-mid/95 border border-tower-gold/40 text-tower-cream font-semibold text-xs shadow-lg flex items-center gap-1.5 backdrop-blur-sm"
-        style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-      >
-        <span aria-hidden>🏠</span>
-        Office
-      </button>
-      <button
-        onClick={onOpenSquad}
-        aria-label="Open My Squad"
-        className="px-3.5 py-2.5 rounded-full bg-tower-gold text-night-deep font-semibold text-xs shadow-lg flex items-center gap-1.5"
-        style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-      >
-        <span aria-hidden>📋</span>
-        My Squad
-      </button>
-    </div>
-  )
-}
+// MobileTowerActions was retired in favour of MobileBottomNav +
+// MobileShareSheet. The new three-slot nav carries Office / Invite /
+// Tower as a sticky bar at the bottom of every page, replacing the
+// floating "Office + My Squad" pill row that used to live here.

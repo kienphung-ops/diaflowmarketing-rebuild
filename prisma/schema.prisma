@@ -172,6 +172,14 @@ model RecruitedTeammate {
   // True for the 3 seeded default NPCs — these rows can't be renamed
   // or deleted via /api/recruit/[id]. Enforced in the route handlers.
   isDefault  Boolean  @default(false)
+  // "Launch-day promise" — the per-role one-liner the speech bubble
+  // surfaces ("I will handle your calendar, draft emails…"). Populated
+  // by the Diaflow process API (builder a7eSxQk9eE) on create + on
+  // role-change. Stays null while the background fetch is in flight
+  // after a bulk add — the bubble falls back to a generic line in
+  // that case. Always sourced from the RoleDescription cache so two
+  // teammates with the same role share the same sentence.
+  description String?
   createdAt  DateTime @default(now())
 
   // One slug per user (defaults are unique per user; nullable slug
@@ -180,4 +188,29 @@ model RecruitedTeammate {
   @@unique([userId, slug])
   @@index([userId])
   @@map("recruited_teammates")
+}
+
+// RoleDescription — per-role cache for the "what this teammate will
+// do" sentence returned by the Diaflow process API. The Primary key
+// is the LOWERCASED role string so capitalisation variants ("CEO" vs
+// "ceo" vs "Ceo") all hit the same row — bulk adds with mixed casing
+// shouldn't billed for duplicate API calls.
+//
+// `description` stores the API output verbatim (already trimmed). The
+// only consumer is /api/recruit + /api/recruit/[id], which read the
+// row to populate RecruitedTeammate.description.
+model RoleDescription {
+  // Lowercased role text — the cache key. Always lookup with
+  // `role.trim().toLowerCase()`.
+  role        String   @id
+  // Original casing — handy for analytics + admin tooling. Not used
+  // for lookups.
+  displayRole String
+  // The Diaflow API output, e.g. "I will handle your calendar,
+  // draft emails, and chase follow-ups."
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("role_descriptions")
 }

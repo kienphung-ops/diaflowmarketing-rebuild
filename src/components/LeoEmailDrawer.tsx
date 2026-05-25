@@ -15,6 +15,7 @@
 import { useEffect } from 'react'
 import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
 import { useAnchorPosition } from '@/lib/anchorPositions'
+import { useIsDesktop } from '@/hooks/useIsDesktop'
 
 interface Props {
   open: boolean
@@ -25,8 +26,14 @@ interface Props {
 }
 
 export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
-  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
-  const anchored = !!anchorSlug
+  // Anchor follows the character ONLY on desktop. On mobile we
+  // render as a bottom sheet — the per-frame transform loop would
+  // just fight the sheet's bottom-edge position.
+  const isDesktop = useIsDesktop()
+  const anchorRef = useAnchorPosition(
+    open && isDesktop ? anchorSlug ?? null : null,
+  )
+  const anchored = !!anchorSlug && isDesktop
   // Same env-driven helper LeoBubble uses — keeps the two Leo modals
   // in sync. Falls back to the canonical Diaflow intro when
   // NEXT_PUBLIC_YOUTUBE_URL isn't set (see lib/youtubeUrl).
@@ -45,10 +52,13 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
     <div
       role="dialog"
       aria-modal="true"
+      // Mobile: bottom-sheet flex container with backdrop. Desktop:
+      // either character-anchored (transparent overlay) or centered
+      // modal (legacy fallback). Same pattern as the other Teammate-
+      // related pop-ups so the suite presents consistently.
       className={
-        anchored
-          ? 'fixed inset-0 z-30'
-          : 'fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4'
+        'fixed inset-0 z-30 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}
     >
@@ -56,20 +66,26 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
         ref={anchored ? anchorRef : undefined}
         onClick={e => e.stopPropagation()}
         className={
-          anchored
-            ? 'absolute top-0 left-0 pointer-events-none'
-            : 'w-full max-w-xl bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
+          'w-full md:w-auto ' +
+          (anchored ? 'md:absolute md:top-0 md:left-0 md:pointer-events-none' : '')
         }
         style={anchored ? { willChange: 'transform' } : undefined}
       >
         <div
           className={
-            anchored
-              ? 'pointer-events-auto w-[min(520px,calc(100vw-32px))] max-w-xl bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
-              : ''
+            'bg-night-mid border-t border-tower-gold/30 text-tower-cream shadow-2xl ' +
+            'rounded-t-3xl md:rounded-2xl md:border md:border-tower-gold/30 ' +
+            'pt-3 px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:p-6 ' +
+            (anchored
+              ? 'md:pointer-events-auto md:w-[min(520px,calc(100vw-32px))] md:max-w-xl'
+              : 'md:max-w-xl md:mx-auto')
           }
           style={anchored ? { transform: 'translate(28px, -50%)' } : undefined}
         >
+        {/* Mobile sheet grip — hidden on desktop. */}
+        <div className="md:hidden flex justify-center -mt-1 mb-3" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
         <div className="flex items-start justify-between mb-4">
           <div>
             <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">

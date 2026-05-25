@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
 import { useAnchorPosition } from '@/lib/anchorPositions'
+import { useIsDesktop } from '@/hooks/useIsDesktop'
 
 interface Props {
   open: boolean
@@ -58,8 +59,14 @@ export function IrisHireModal({
   const [copied, setCopied] = useState(false)
   // Anchor → character (typically 'iris'). When null we fall back to
   // the centered modal layout. See lib/anchorPositions.ts.
-  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
-  const anchored = !!anchorSlug
+  // Live character-anchor only on desktop. On mobile we render as a
+  // bottom sheet, where the per-frame transform would just fight the
+  // sheet's bottom-edge position.
+  const isDesktop = useIsDesktop()
+  const anchorRef = useAnchorPosition(
+    open && isDesktop ? anchorSlug ?? null : null,
+  )
+  const anchored = !!anchorSlug && isDesktop
   // "Next floor" copy — defaults to currentFloor+1; at the penthouse
   // we just don't bother (user can't go higher) and the share copy
   // shifts to a generic "keep growing your office" line.
@@ -114,10 +121,12 @@ export function IrisHireModal({
     <div
       role="dialog"
       aria-modal="true"
+      // Mobile = full-width bottom sheet anchored to the viewport's
+      // bottom edge. Desktop = either anchored to the character (when
+      // anchorSlug is set) or a centered modal (legacy fallback).
       className={
-        anchored
-          ? 'fixed inset-0 z-40'
-          : 'fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4'
+        'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/70 ' +
+        (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}
     >
@@ -125,27 +134,33 @@ export function IrisHireModal({
         ref={anchored ? anchorRef : undefined}
         onClick={e => e.stopPropagation()}
         className={
-          anchored
-            ? 'absolute top-0 left-0 pointer-events-none'
-            : 'relative w-full max-w-md bg-night-mid border border-white/10 rounded-2xl text-tower-cream shadow-2xl overflow-hidden'
+          'w-full md:w-auto ' +
+          (anchored ? 'md:absolute md:top-0 md:left-0 md:pointer-events-none' : '')
         }
         style={anchored ? { willChange: 'transform' } : undefined}
       >
         <div
           className={
-            anchored
-              ? 'pointer-events-auto relative w-[min(420px,calc(100vw-32px))] max-w-md bg-night-mid border border-white/10 rounded-2xl text-tower-cream shadow-2xl overflow-hidden'
-              : ''
+            // Card shell — bottom sheet on mobile, regular card on
+            // desktop. Mobile gets a sheet grip + safe-area padding.
+            'relative bg-night-mid border-t border-white/10 text-tower-cream shadow-2xl overflow-hidden ' +
+            'rounded-t-3xl md:rounded-2xl md:border md:border-white/10 ' +
+            'w-full md:w-[min(420px,calc(100vw-32px))] md:max-w-md ' +
+            'pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-0 ' +
+            (anchored ? 'md:pointer-events-auto' : 'md:mx-auto')
           }
           style={
             anchored
-              ? // Offset so the card sits to the right of (and slightly
-                // above) the character's head — see MiaInfoCard for the
-                // shared rationale on these numbers.
+              ? // Same translate-(28px, -50%) trick used by the other
+                // anchored pop-ups so the card sits beside the head.
                 { transform: 'translate(28px, -50%)' }
               : undefined
           }
         >
+        {/* Mobile sheet grip — hidden on desktop. */}
+        <div className="md:hidden flex justify-center pt-2.5 pb-1" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
         {/* Top status row — green dot on the left mirrors the Iris
             online-indicator from the scene, X close on the right. */}
         <div className="flex items-center justify-between px-5 pt-4">

@@ -2,13 +2,11 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ForgotPasswordModal } from '@/components/ForgotPasswordModal'
 import { PasswordInput } from '@/components/PasswordInput'
 import { InlineSpinner } from '@/components/ViewTransitionOverlay'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +33,12 @@ export default function LoginPage() {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error ?? 'Sign in failed')
-      router.replace('/')
+      // FULL page reload — `router.replace('/')` keeps the RSC
+      // payload that was rendered with the pre-auth cookie, so the
+      // home page would re-mount in trial / onboarding mode until
+      // the user manually reloaded. window.location.assign forces a
+      // fresh server render with the just-set session cookie.
+      window.location.assign('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -44,8 +47,22 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="fixed inset-0 flex items-center justify-center bg-night-deep px-4">
-      <div className="w-full max-w-sm bg-night-mid/80 backdrop-blur-md rounded-2xl border border-white/10 p-8 text-tower-cream">
+    <main className="fixed inset-0 flex items-end md:items-center justify-center bg-night-deep md:px-4">
+      <div
+        className={
+          // Card shell — bottom sheet on mobile, centered card on
+          // desktop. Same pattern as SignupModal so the inline
+          // (modal) and dedicated (page) signup flows share a shape.
+          'w-full bg-night-mid/80 backdrop-blur-md text-tower-cream ' +
+          'rounded-t-3xl md:rounded-2xl ' +
+          'border-t md:border border-white/10 ' +
+          'pt-6 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-8 md:max-w-sm'
+        }
+      >
+        {/* Mobile sheet grip — hidden on desktop. */}
+        <div className="md:hidden flex justify-center -mt-3 mb-3" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
         <div className="flex items-center gap-2 mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md" />

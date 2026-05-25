@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: { code: string } 
       currentFloor: true,
       totalInvites: true,
       recruitedTeams: {
-        select: { id: true, slug: true, name: true, role: true, pokes: true, isDefault: true },
+        select: { id: true, slug: true, name: true, role: true, pokes: true, isDefault: true, description: true },
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
       },
     },

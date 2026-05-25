@@ -15,6 +15,7 @@ interface ServerRecruit {
   slug?: string | null
   isDefault?: boolean
   pokes?: number
+  description?: string | null
 }
 
 interface Props {
@@ -217,17 +218,57 @@ export function MySquadDrawer({
 
 
   return (
-    <div
-      className={`fixed inset-y-0 right-0 z-30 w-full md:w-[440px] max-w-full bg-night-mid/95 border-l border-white/10 backdrop-blur-md shadow-2xl flex flex-col text-tower-cream transition-transform duration-300 ${
-        open ? 'translate-x-0' : 'translate-x-full'
-      }`}
-    >
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-        <h2 className="text-2xl font-bold">My Squad</h2>
-        <button onClick={onClose} className="text-tower-cream/50 hover:text-tower-cream text-xl" aria-label="Close">
-          ×
-        </button>
-      </div>
+    <>
+      {/* Mobile-only backdrop — fades in when the sheet is open and
+          tap-to-close so the user can dismiss without hunting for
+          the × button. Hidden on desktop where the drawer occupies a
+          fixed right strip and the rest of the page remains usable. */}
+      <div
+        className={`md:hidden fixed inset-0 z-20 bg-black/60 transition-opacity duration-300 ${
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        /* Responsive geometry — bottom sheet on mobile, right drawer
+           on desktop. Closed states match the sheet direction:
+             mobile  closed → translate-y-full (slides off the bottom)
+             desktop closed → translate-x-full (slides off the right)
+           Both axes are reset to 0 at md+ so the slide direction
+           never compounds with the opposite axis. */
+        className={
+          // Base sheet card.
+          'fixed z-30 flex flex-col text-tower-cream ' +
+          'bg-night-mid/95 backdrop-blur-md shadow-2xl ' +
+          // Mobile shape: bottom sheet anchored to the bottom edge,
+          // 88% of the viewport tall, with a rounded top + grip.
+          'bottom-0 left-0 right-0 top-auto h-[88vh] max-h-[calc(100dvh-3rem)] ' +
+          'rounded-t-3xl border-t border-white/10 ' +
+          // Desktop shape: full-height drawer on the right edge.
+          'md:top-0 md:bottom-0 md:right-0 md:left-auto md:h-full md:max-h-none ' +
+          'md:w-[440px] md:max-w-full md:rounded-none md:border-t-0 md:border-l md:border-white/10 ' +
+          // Transform-driven open/close — see the multi-axis trick
+          // above. Mobile slides vertically; desktop horizontally.
+          'transition-transform duration-300 ' +
+          (open
+            ? 'translate-y-0 md:translate-x-0'
+            : 'translate-y-full md:translate-y-0 md:translate-x-full')
+        }
+      >
+        {/* Mobile grip — visual touch-affordance that this is a
+            sheet. Hidden on desktop where the drawer reads as a
+            side panel and a grip would look out of place. */}
+        <div className="md:hidden flex justify-center pt-2.5" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
+
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+          <h2 className="text-2xl font-bold">My Squad</h2>
+          <button onClick={onClose} className="text-tower-cream/50 hover:text-tower-cream text-xl" aria-label="Close">
+            ×
+          </button>
+        </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
         {/* "You're in" banner only shows when we DON'T have explicit
@@ -380,12 +421,6 @@ export function MySquadDrawer({
               'You reached the top'
             )}
             </span>
-            {/* Next-floor decor label (e.g. "Floor lamp"). Same row,
-                right-aligned, so the user knows what the next unlock
-                actually IS without opening "How it works". Visible in
-                all three drawer contexts (office / tower / visitor)
-                so /floor/[code] doesn't lose this beat. */}
-            {nextFloor && <span className="text-tower-cream/60">{nextFloor.label}</span>}
           </div>
 
           {/* Floor-activity row — viewers + total pokes for whichever
@@ -617,7 +652,8 @@ export function MySquadDrawer({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
 
