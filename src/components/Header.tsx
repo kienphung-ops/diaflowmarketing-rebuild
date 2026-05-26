@@ -56,7 +56,16 @@ export function Header({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md w-7 h-7 md:w-8 md:h-8" />
-        <div className="hidden sm:block text-tower-cream font-semibold tracking-wide">Diaflow Tower</div>
+        {/* Brand text — "Diaflow" on mobile (where the right slot is
+            now empty so the brand has room to breathe), full
+            "Diaflow Tower" wordmark on sm+ where the right slot
+            carries the stats pill + CTAs. */}
+        <span className="text-tower-cream font-bold tracking-wide sm:hidden">
+          Diaflow
+        </span>
+        <span className="hidden sm:block text-tower-cream font-semibold tracking-wide">
+          Diaflow Tower
+        </span>
       </Link>
 
       {/* Mobile leaves the middle of the header empty by design —
@@ -134,7 +143,12 @@ export function Header({
               <button
                 onClick={onMobileInvite}
                 aria-label="Open invite sheet"
-                className="md:hidden flex items-center gap-1 px-2.5 py-1 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[10px] tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
+                // Mobile header right slot is now empty per the new
+                // brand-only design — the same "Invite to climb"
+                // action is reachable from MobileBottomNav's hero CTA,
+                // so this header pill became redundant. Hidden on all
+                // sizes (`hidden`) to drop it cleanly.
+                className="hidden items-center gap-1 px-2.5 py-1 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[10px] tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
               >
                 <svg 
                   xmlns="http://www.w3.org/2000/svg" 
@@ -165,18 +179,21 @@ export function Header({
             </span>
           </>
         ) : hideAuthCta ? null : onOpenSignup ? (
+          // Desktop only — mobile reaches the same signup flow via
+          // MobileBottomNav's "Save my team" hero CTA, so the header
+          // pill was a redundant duplicate eating the limited row.
           <button
             onClick={onOpenSignup}
-            className="px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
+            className="hidden md:inline-flex px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
           >
-            🔒 Claim your team
+            🔒 Save Your Team
           </button>
         ) : (
           <Link
             href="/login"
-            className="px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
+            className="hidden md:inline-flex px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
           >
-            🔒 Claim your team
+            🔒 Save Your Team
           </Link>
         )}
       </div>

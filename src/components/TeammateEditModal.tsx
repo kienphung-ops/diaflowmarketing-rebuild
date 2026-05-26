@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
+import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
 
 interface Teammate {
   id: string
@@ -54,6 +55,10 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Press-origin + time-gated backdrop dismiss. See
+  // useBackdropDismissGuard for the full writeup.
+  const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
+
   if (!open || !teammate) return null
 
   function handleSubmit(e: React.FormEvent) {
@@ -76,17 +81,16 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
       //                    floats next to the character).
       //   anchored=false → the form is centered in the viewport with
       //                    the same backdrop the original modal used.
-      // z-40 so the bottom-sheet form on mobile paints over the
-      // MobileBottomNav (z-30). `pb-[…]` on mobile lifts the form
-      // up off the bottom edge by the nav's height so both surfaces
-      // are visible + tappable; on desktop `md:pb-0` removes the
-      // lift since the form is centred there.
+      // Sheet's z-40 already paints over the z-30 MobileBottomNav
+      // while open, so the previous +72px lift just left a dead
+      // backdrop band below the content. Drop the lift — the form
+      // sits flush with the viewport bottom (its own
+      // env(safe-area-inset-bottom) padding handles iOS).
       className={
         'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
-        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
-      onClick={onClose}
+      {...backdropDismissHandlers}
     >
       <div
         ref={anchored ? anchorRef : undefined}

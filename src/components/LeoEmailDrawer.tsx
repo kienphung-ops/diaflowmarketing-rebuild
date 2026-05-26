@@ -16,6 +16,7 @@ import { useEffect } from 'react'
 import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
+import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
 
 interface Props {
   open: boolean
@@ -47,6 +48,13 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Press-origin + time-gated backdrop dismiss. The synthetic click
+  // that follows the opening tap never produces a matching
+  // pointerdown on the backdrop, so it harmlessly no-ops here. ESC +
+  // the × button call `onClose` directly so explicit dismissal stays
+  // instant. See useBackdropDismissGuard for the full root-cause writeup.
+  const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
+
   if (!open) return null
   return (
     <div
@@ -57,15 +65,17 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
       // modal (legacy fallback). Same pattern as the other Teammate-
       // related pop-ups so the suite presents consistently.
       className={
-        // Same lift pattern as MiaInfoCard / IrisHireModal — keeps
-        // the mobile bottom sheet above MobileBottomNav (z-30, ≈72px
-        // tall at the bottom edge). z-40 so the sheet paints over
-        // the nav even where they would otherwise stack-tie.
+        // The sheet's z-40 already paints over the z-30 bottom nav
+        // while open, so we no longer lift it ~72px above the
+        // viewport edge — that lift was producing a dead band of
+        // backdrop between the sheet's last line and the nav. Now
+        // the sheet sits flush with the viewport bottom (its own
+        // env(safe-area-inset-bottom) padding handles the iOS home
+        // indicator).
         'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
-        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
-      onClick={onClose}
+      {...backdropDismissHandlers}
     >
       <div
         ref={anchored ? anchorRef : undefined}

@@ -186,13 +186,13 @@ export function TowerView({
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
         >
           <div className="text-sm text-white/85 mb-2">
-            🔒 Claim your team
+            🔒 Save Your Team
           </div>
           <button
             onClick={onSignIn}
             className="px-4 py-1.5 rounded-md bg-purple-300 text-[#1a1a2e] font-semibold text-xs tracking-wide hover:bg-purple-200 transition"
           >
-            Go To Your Team
+            Save Your Team
           </button>
         </div>
       )}

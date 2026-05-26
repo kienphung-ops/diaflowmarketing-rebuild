@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
+import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
 
 interface Teammate {
   id: string
@@ -66,6 +67,13 @@ export function TeammateBubble({ open, teammate, anchorSlug, onClose, onEdit }: 
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Press-origin + time-gated backdrop dismiss. Must run BEFORE the
+  // early return so the hook order stays stable across renders.
+  // This was the source of the flash-and-close bug on custom recruits
+  // dragged onto the wall — same root cause as the default-NPC modals
+  // (see useBackdropDismissGuard for the writeup).
+  const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
+
   if (!open || !teammate) return null
   if (typeof document === 'undefined') return null
 
@@ -123,33 +131,25 @@ export function TeammateBubble({ open, teammate, anchorSlug, onClose, onEdit }: 
       role="dialog"
       aria-modal="false"
       aria-label={`${teammate.name} — ${teammate.role}`}
-      // z-40 so the mobile sheet paints over the MobileBottomNav
-      // (z-30) AND the MobileCounterChips (z-10). On desktop the
-      // anchored card sits inside the scene's pointer-events strip
-      // so the z bump is harmless there.
-      className="fixed inset-0 z-40"
-      onClick={onClose}
+      // Outer div carries the mobile dim backdrop directly (instead of
+      // a child div) so a tap on the dim area lands with
+      // `e.target === e.currentTarget` — required by the press-origin
+      // dismiss guard. Flex anchors the mobile sheet to the bottom
+      // edge of the viewport. z-40 paints over the MobileBottomNav
+      // (z-30) and the MobileCounterChips (z-10).
+      className="fixed inset-0 z-40 flex items-end justify-center md:bg-transparent md:backdrop-blur-0 md:items-stretch md:justify-start bg-black/55"
+      {...backdropDismissHandlers}
     >
-      {/* Mobile-only dim backdrop — gives the sheet visual separation
-          from the busy 3D scene behind it. Hidden at md+ where the
-          anchored card sits next to the character and the scene
-          stays interactive. */}
-      <div className="md:hidden absolute inset-0 bg-black/55" aria-hidden />
-
-      {/* MOBILE: bottom sheet anchored ABOVE the MobileBottomNav so
-          both surfaces stay visible + tappable. The sheet keeps its
-          own rounded top so it reads as a sheet floating over the
-          nav rather than tucked behind it. */}
+      {/* MOBILE: bottom sheet flush with the viewport bottom edge.
+          The sheet's own padding handles the iOS home indicator;
+          z-40 puts it above the MobileBottomNav (z-30) so the user
+          can dismiss by tapping anywhere above the sheet. */}
       <div
         onClick={e => e.stopPropagation()}
-        className="md:hidden absolute inset-x-0 bg-night-mid border-t border-white/10 rounded-t-3xl shadow-[0_-16px_40px_rgba(0,0,0,0.5)] text-tower-cream"
+        onPointerDown={e => e.stopPropagation()}
+        className="md:hidden w-full bg-night-mid border-t border-white/10 rounded-t-3xl shadow-[0_-16px_40px_rgba(0,0,0,0.5)] text-tower-cream"
         style={{
-          // 72px ≈ MobileBottomNav height; safe-area-inset adds the
-          // iOS home indicator clearance. Matches the offset used by
-          // MobileProgressPill so floating chrome on top of the nav
-          // is consistent across sheets.
-          bottom: 'calc(72px + env(safe-area-inset-bottom))',
-          paddingBottom: '0.75rem',
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
         }}
       >
         <div className="flex justify-center pt-2.5 pb-1" aria-hidden>

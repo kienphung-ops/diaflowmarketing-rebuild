@@ -114,15 +114,20 @@ export function TowerTourModal({
             full penthouse + 3 months of Pro free + featured at launch.
           </strong>
         </p>
-        <div className="flex flex-wrap gap-1.5">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-400/40 text-purple-200 text-[10.5px] font-bold">
-            👑 Penthouse
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-400/40 text-purple-200 text-[10.5px] font-bold">
-            3-mo Pro
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-400/15 border border-amber-400/40 text-amber-300 text-[10.5px] font-bold">
-            ⭐ Featured
+        {/* Combined reward pill — single purple-tinted capsule listing
+            all three rewards together. Per user feedback the previous
+            three separate tags read as visual clutter; the unified
+            pill keeps the same info but reads as one statement of the
+            penthouse bundle. */}
+        <div className="flex justify-center">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-purple-500/15 border border-purple-400/40 text-purple-200 text-[11.5px] font-bold whitespace-nowrap">
+            <span aria-hidden>👑</span>
+            <span>Penthouse</span>
+            <span className="text-purple-300/50" aria-hidden>·</span>
+            <span>3-mo Pro</span>
+            <span className="text-purple-300/50" aria-hidden>·</span>
+            <span className="text-amber-300" aria-hidden>⭐</span>
+            <span>Featured</span>
           </span>
         </div>
       </>
@@ -224,14 +229,14 @@ export function TowerTourModal({
               type="button"
               onClick={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3 | 4) : 1))}
               disabled={step === 1}
-              className="px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 text-tower-cream/85 font-semibold text-[14px] transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 text-tower-cream/85 font-semibold text-[12px] transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               ← Back
             </button>
             <button
               type="button"
               onClick={() => setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : 4))}
-              className="px-4 py-3 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[14px] shadow-[0_6px_16px_rgba(168,117,255,0.35)] hover:shadow-[0_10px_22px_rgba(168,117,255,0.45)] transition"
+              className="px-4 py-3 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[12px] shadow-[0_6px_16px_rgba(168,117,255,0.35)] hover:shadow-[0_10px_22px_rgba(168,117,255,0.45)] transition"
             >
               {step === 1 && 'Next: Floor 3 →'}
               {step === 2 && 'Next: penthouse →'}
@@ -246,98 +251,197 @@ export function TowerTourModal({
 }
 
 /**
- * Lightweight tower illustration — 20 stacked orange "floor" bars in
- * a centered column. Highlights are layered overlays:
+ * Tower illustration — renders the canonical `/public/tower.png`
+ * bitmap (same asset used by /tower) and overlays per-step highlight
+ * markers on top.
  *
- *   - Floor `currentFloor` always glows purple with a "📍 You" pill
- *   - Step 2 adds a gold ring around Floor 3 + "🎁 Free beta" tag
- *   - Step 3 adds gold ring around Floor 14 + purple ring around
- *     Floor 20 + "👑 Penthouse" pill
- *   - Step 4 returns to the Floor-1 focus from step 1
+ * Per-step markers:
+ *   - Step 1: 📍 You at currentFloor.
+ *   - Step 2: gold ring + "🎁 Free beta" tag at Floor 3, plus the
+ *             current-floor You marker.
+ *   - Step 3: gold ring at Floor 14, purple ring + "👑 Penthouse"
+ *             tag at Floor 20, plus the current-floor You marker.
+ *   - Step 4: 📍 You at currentFloor (Floor 3 milestone still glows
+ *             so the user keeps their bearings).
  *
- * Built from divs (not SVG) so the highlights can use Tailwind colours
- * + shadow utilities directly.
+ * Floor positions are computed from the same linear interpolation
+ * TowerView uses, so the markers land on the exact same bitmap rows
+ * as the YOU pin on /tower.
  */
 function TowerIllustration({ step, currentFloor }: { step: 1 | 2 | 3 | 4; currentFloor: number }) {
-  const totalFloors = 20
-  // Render top-to-bottom (floor 20 on top, floor 1 on the bottom) so
-  // the visual hierarchy matches a real building.
-  const floors = Array.from({ length: totalFloors }, (_, i) => totalFloors - i)
-  const showMilestone = step === 2 || step === 3
+  // Same calibration constants as components/TowerView.tsx — the
+  // /tower.png bitmap has Floor 1's label at ~90% from the top and
+  // Floor 20's at ~12%. The tower also tilts very slightly to the
+  // right as it climbs, so left% slides from 50 → 54.
+  const BOTTOM_TOP_PCT = 90
+  const TOP_TOP_PCT = 12
+  const BOTTOM_LEFT_PCT = 50
+  const TOP_LEFT_PCT = 54
+  const TOTAL = 20
+  const floorPos = (f: number) => {
+    const t = (Math.max(1, Math.min(TOTAL, f)) - 1) / (TOTAL - 1)
+    return {
+      top: BOTTOM_TOP_PCT - t * (BOTTOM_TOP_PCT - TOP_TOP_PCT),
+      left: BOTTOM_LEFT_PCT + t * (TOP_LEFT_PCT - BOTTOM_LEFT_PCT),
+    }
+  }
+
+  // Decide which markers to render based on the current step.
+  //   Step 2 — Floor 3 "Free beta" highlight (focal point of the beat)
+  //   Step 3 — Floor 20 "Penthouse" highlight ONLY (no Floor 3 / 14
+  //            distractions — the bottom-sheet copy already lists
+  //            penthouse + 3-mo Pro + featured, so extra rings on
+  //            mid-floors just added visual noise)
+  const showMilestone = step === 2
   const showPenthouse = step === 3
+
+  const youPos = floorPos(currentFloor)
+  const milestonePos = floorPos(3)
+  const penthousePos = floorPos(TOTAL)
+
   return (
     <div
-      className="absolute inset-0 flex items-end justify-center pb-6 pt-6"
+      className="absolute inset-0 flex items-center justify-center overflow-hidden"
       style={{
         background:
-          'radial-gradient(circle at 50% 70%, rgba(168,117,255,0.18), transparent 65%)',
+          'radial-gradient(ellipse 80% 60% at 50% 40%, #1d1b46 0%, #0a0a22 55%, #04040d 100%)',
       }}
     >
-      {/* Faint star backdrop — pure cosmetic, matches the mockup */}
+      {/* Faint star backdrop — same cosmetic treatment the /tower
+          page uses so the tour reads as a continuation of that view. */}
       <div
         aria-hidden
         className="absolute inset-0"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 18% 22%, rgba(255,255,255,0.45) 0px, transparent 1.2px), radial-gradient(circle at 82% 14%, rgba(255,255,255,0.4) 0px, transparent 1px), radial-gradient(circle at 36% 60%, rgba(255,255,255,0.3) 0px, transparent 1px), radial-gradient(circle at 70% 75%, rgba(255,255,255,0.35) 0px, transparent 1px)',
+            'radial-gradient(circle at 18% 22%, rgba(255,255,255,0.5) 0px, transparent 1.4px), radial-gradient(circle at 82% 14%, rgba(255,255,255,0.45) 0px, transparent 1.2px), radial-gradient(circle at 36% 60%, rgba(255,255,255,0.35) 0px, transparent 1px), radial-gradient(circle at 70% 75%, rgba(255,255,255,0.4) 0px, transparent 1px), radial-gradient(circle at 12% 80%, rgba(255,255,255,0.3) 0px, transparent 1px)',
         }}
       />
 
-      <div className="relative flex flex-col items-center gap-[3px] w-[140px]">
-        {floors.map((floorId) => {
-          const isCurrent = floorId === currentFloor
-          const isMilestone = showMilestone && floorId === 3
-          const isMidMilestone = showPenthouse && floorId === 14
-          const isPenthouse = showPenthouse && floorId === totalFloors
+      {/* Tower bitmap wrapper. inline-block so the wrapper rect
+          matches the image's intrinsic bounds → per-floor markers
+          positioned in % land on the right pixels regardless of how
+          the image scales to fit the viewport. */}
+      <div className="relative inline-block h-full max-h-full">
+        {/* Soft golden halo behind the tower (same as TowerView). */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse 40% 50% at 50% 38%, rgba(251, 191, 36, 0.18) 0%, transparent 65%)',
+          }}
+        />
 
-          // Per-floor ring colour. Multiple highlights stack at once
-          // because each floor only ever matches one branch (3 / 14 /
-          // 20 / currentFloor are distinct).
-          let ringClass = ''
-          if (isPenthouse) ringClass = 'ring-2 ring-purple-300 shadow-[0_0_24px_rgba(168,117,255,0.55)]'
-          else if (isMidMilestone) ringClass = 'ring-2 ring-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.4)]'
-          else if (isMilestone) ringClass = 'ring-2 ring-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.4)]'
-          else if (isCurrent) ringClass = 'ring-2 ring-purple-400 shadow-[0_0_22px_rgba(168,117,255,0.55)]'
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/tower.png"
+          alt="Diaflow Tower"
+          className="block select-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
+          draggable={false}
+          style={{
+            maxHeight: '100%',
+            maxWidth: '100%',
+            height: 'auto',
+            width: 'auto',
+          }}
+        />
 
-          return (
-            <div key={floorId} className="relative w-full">
-              <div
-                className={
-                  'h-[14px] w-full rounded-[3px] ' +
-                  (isCurrent || isMilestone || isMidMilestone || isPenthouse
-                    ? 'bg-gradient-to-b from-[#d28a45] to-[#b8702f] '
-                    : 'bg-gradient-to-b from-[#c4793b] to-[#9d5c24] ') +
-                  ringClass
-                }
-              />
+        {/* Penthouse marker (step 3) — purple ring + "👑 Penthouse"
+            tag on the right of the floor row. Step 3 deliberately
+            shows ONLY this + the You marker so the user's attention
+            is funnelled to the top reward. */}
+        {showPenthouse && (
+          <FloorMarker
+            pos={penthousePos}
+            ringClass="ring-2 ring-purple-300 shadow-[0_0_24px_rgba(168,117,255,0.55)]"
+            label="👑 Penthouse"
+            labelSide="right"
+            labelTone="purple"
+          />
+        )}
 
-              {/* Side labels — only appear when the relevant step
-                  activates them. Positioned absolutely so they don't
-                  push the tower column wider. */}
-              {isCurrent && step !== 4 && step !== 3 && (
-                <span className="absolute -right-[68px] top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-night-mid border border-white/10 text-[10.5px] font-bold text-tower-cream">
-                  📍 You
-                </span>
-              )}
-              {isCurrent && (step === 4) && (
-                <span className="absolute -right-[68px] top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-night-mid border border-white/10 text-[10.5px] font-bold text-tower-cream">
-                  📍 You
-                </span>
-              )}
-              {isMilestone && (
-                <span className="absolute -left-[80px] top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-400/15 border border-amber-400/40 text-amber-300 text-[10.5px] font-extrabold whitespace-nowrap">
-                  🎁 Free beta
-                </span>
-              )}
-              {isPenthouse && (
-                <span className="absolute -right-[88px] top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-night-mid border border-white/10 text-[10.5px] font-bold text-tower-cream whitespace-nowrap">
-                  👑 Penthouse
-                </span>
-              )}
-            </div>
-          )
-        })}
+        {/* Milestone marker (step 2 only) — gold ring around Floor 3
+            with "🎁 Free beta" tag on the left. Step 3 drops it so
+            the penthouse beat reads clean. */}
+        {showMilestone && (
+          <FloorMarker
+            pos={milestonePos}
+            ringClass="ring-2 ring-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.4)]"
+            label="🎁 Free beta"
+            labelSide="left"
+            labelTone="gold"
+          />
+        )}
+
+        {/* "📍 You" marker — always shows the user's current floor
+            so they keep their bearings as the tour scrolls through
+            future milestones. */}
+        <FloorMarker
+          pos={youPos}
+          ringClass="ring-2 ring-purple-400 shadow-[0_0_22px_rgba(168,117,255,0.55)]"
+          label="📍 You"
+          labelSide="right"
+          labelTone="neutral"
+        />
       </div>
+    </div>
+  )
+}
+
+/**
+ * One floor highlight overlay — a ringed pill positioned absolutely
+ * over the tower bitmap at the given (top%, left%) using TowerView's
+ * calibration. The ring's width is fixed at ~38% of the bitmap so it
+ * spans the floor visually; the label floats to the configured side.
+ */
+function FloorMarker({
+  pos,
+  ringClass,
+  label,
+  labelSide = 'right',
+  labelTone = 'neutral',
+}: {
+  pos: { top: number; left: number }
+  ringClass: string
+  label?: string
+  labelSide?: 'left' | 'right'
+  labelTone?: 'neutral' | 'purple' | 'gold'
+}) {
+  const labelClasses =
+    labelTone === 'purple'
+      ? 'bg-purple-500/20 border-purple-400/50 text-purple-200'
+      : labelTone === 'gold'
+      ? 'bg-amber-400/15 border-amber-400/40 text-amber-300'
+      : 'bg-night-mid/95 border-white/15 text-tower-cream'
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{
+        top: `${pos.top}%`,
+        left: `${pos.left}%`,
+        transform: 'translate(-50%, -50%)',
+      }}
+    >
+      {/* Ring — sized to ~38% of the bitmap width so it spans the
+          floor row at the typical aspect ratio. h-[14px] keeps the
+          ring crisp at any image scale. */}
+      <div
+        className={`rounded-[3px] ${ringClass}`}
+        style={{ width: '40px', height: '14px' }}
+      />
+
+      {label && (
+        <span
+          className={
+            'absolute top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10.5px] font-bold whitespace-nowrap ' +
+            labelClasses +
+            (labelSide === 'right' ? ' left-full ml-2' : ' right-full mr-2')
+          }
+        >
+          {label}
+        </span>
+      )}
     </div>
   )
 }

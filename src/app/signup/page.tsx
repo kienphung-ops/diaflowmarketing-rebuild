@@ -144,7 +144,7 @@ export default function SignupPage() {
             className="w-full px-3 py-2 rounded-md bg-tower-gold text-night-deep font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {busy && <InlineSpinner />}
-            {busy ? 'Creating account…' : 'Create account'}
+            {busy ? 'Saving your team…' : 'Save Your Team →'}
           </button>
           {error && <p className="text-xs text-red-300">{error}</p>}
         </form>

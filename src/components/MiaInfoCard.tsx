@@ -25,6 +25,7 @@
 import { useEffect } from 'react'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
+import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
 
 interface Props {
   open: boolean
@@ -80,6 +81,11 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Press-origin + time-gated backdrop dismiss. Must run BEFORE the
+  // `if (!open)` early return so the hook order stays stable across
+  // renders. See useBackdropDismissGuard for the full writeup.
+  const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
+
   if (!open) return null
 
   // Render priority — same gate as MiaInfoBubble in the onboarding
@@ -102,15 +108,16 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
       //   anchored=false → centered modal with a dim backdrop (legacy
       //                    fallback when the character slug isn't set).
       className={
-        // z-40 + bottom-padding lift so the mobile bottom-sheet
-        // doesn't render directly underneath MobileBottomNav (z-30,
-        // ≈72px tall at the bottom edge). Desktop loses the lift
-        // since the card is centred there.
+        // Sheet's z-40 already paints over the z-30 MobileBottomNav
+        // while open. The previous +72px bottom lift was just leaving
+        // a dead backdrop band between the sheet's content and the
+        // nav — drop it so the sheet sits flush with the viewport
+        // bottom edge (its own env(safe-area-inset-bottom) padding
+        // still respects the iOS home indicator).
         'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
-        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
-      onClick={onClose}
+      {...backdropDismissHandlers}
     >
       <div
         ref={anchored ? anchorRef : undefined}

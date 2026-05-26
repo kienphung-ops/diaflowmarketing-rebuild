@@ -217,7 +217,7 @@ export function MobileShareSheet({
               }}
               className="w-full min-h-[50px] rounded-xl bg-tower-gold text-night-deep font-bold text-[14px] shadow-[0_8px_20px_rgba(251,191,36,0.35)]"
             >
-              🔒 Claim your team to get my invite link →
+              🔒 Save Your Team to get my invite link →
             </button>
           </div>
         )}

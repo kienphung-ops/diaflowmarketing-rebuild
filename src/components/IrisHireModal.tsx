@@ -6,6 +6,7 @@ import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
+import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
 
 interface Props {
   open: boolean
@@ -83,6 +84,13 @@ export function IrisHireModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Press-origin + time-gated backdrop dismiss. Must run BEFORE any
+  // early return so the hook order stays stable across renders. The
+  // synthetic click that follows the opening tap never produces a
+  // matching pointerdown on the backdrop, so it harmlessly no-ops
+  // here. See useBackdropDismissGuard for the full writeup.
+  const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
+
   if (!open) return null
   if (typeof document === 'undefined') return null
 
@@ -125,15 +133,15 @@ export function IrisHireModal({
       // bottom edge. Desktop = either anchored to the character (when
       // anchorSlug is set) or a centered modal (legacy fallback).
       className={
-        // Mobile lift — push the bottom sheet up by the
-        // MobileBottomNav height so the card doesn't slide UNDER
-        // the nav. Desktop loses the lift via md:pb-0 since the
-        // card is centred there.
+        // Sheet's z-40 already paints over the z-30 MobileBottomNav
+        // while open, so the previous +72px lift was just leaving a
+        // dead backdrop band below the content. Drop the lift — the
+        // card sits flush with the viewport bottom on mobile (its own
+        // env(safe-area-inset-bottom) padding handles iOS).
         'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/70 ' +
-        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
-      onClick={onClose}
+      {...backdropDismissHandlers}
     >
       <div
         ref={anchored ? anchorRef : undefined}
