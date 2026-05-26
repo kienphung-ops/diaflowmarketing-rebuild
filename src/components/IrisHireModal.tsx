@@ -125,7 +125,12 @@ export function IrisHireModal({
       // bottom edge. Desktop = either anchored to the character (when
       // anchorSlug is set) or a centered modal (legacy fallback).
       className={
+        // Mobile lift — push the bottom sheet up by the
+        // MobileBottomNav height so the card doesn't slide UNDER
+        // the nav. Desktop loses the lift via md:pb-0 since the
+        // card is centred there.
         'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/70 ' +
+        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}

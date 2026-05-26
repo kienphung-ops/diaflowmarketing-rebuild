@@ -57,7 +57,12 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
       // modal (legacy fallback). Same pattern as the other Teammate-
       // related pop-ups so the suite presents consistently.
       className={
-        'fixed inset-0 z-30 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        // Same lift pattern as MiaInfoCard / IrisHireModal — keeps
+        // the mobile bottom sheet above MobileBottomNav (z-30, ≈72px
+        // tall at the bottom edge). z-40 so the sheet paints over
+        // the nav even where they would otherwise stack-tie.
+        'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}

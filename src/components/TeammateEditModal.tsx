@@ -76,8 +76,14 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
       //                    floats next to the character).
       //   anchored=false → the form is centered in the viewport with
       //                    the same backdrop the original modal used.
+      // z-40 so the bottom-sheet form on mobile paints over the
+      // MobileBottomNav (z-30). `pb-[…]` on mobile lifts the form
+      // up off the bottom edge by the nav's height so both surfaces
+      // are visible + tappable; on desktop `md:pb-0` removes the
+      // lift since the form is centred there.
       className={
-        'fixed inset-0 z-30 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}

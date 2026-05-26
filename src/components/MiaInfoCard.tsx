@@ -102,7 +102,12 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
       //   anchored=false → centered modal with a dim backdrop (legacy
       //                    fallback when the character slug isn't set).
       className={
-        'fixed inset-0 z-30 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        // z-40 + bottom-padding lift so the mobile bottom-sheet
+        // doesn't render directly underneath MobileBottomNav (z-30,
+        // ≈72px tall at the bottom edge). Desktop loses the lift
+        // since the card is centred there.
+        'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
         (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}

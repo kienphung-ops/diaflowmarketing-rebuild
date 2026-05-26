@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { SceneSkeleton } from '@/components/fallback/SceneSkeleton'
+import { Mobile2DScene } from '@/components/scene2d/Mobile2DScene'
 import type { FloorPreview } from '@/lib/towerFloorPreview'
 
 const SceneCanvas = dynamic(
@@ -79,15 +80,30 @@ export default function TowerFloorViewClient({ preview }: Props) {
         </div>
       </div>
 
-      {/* The actual scene — readonly, no drag, no clicks */}
-      <SceneCanvas
-        onboardingStep="done"
+      {/* Desktop: 3D React Three Fiber preview. Hidden on mobile —
+          touch interaction on the 3D canvas is awkward and the
+          floor preview is a read-only surface anyway. Mobile gets
+          the 2D Mobile2DScene below. */}
+      <div className="hidden md:block">
+        <SceneCanvas
+          onboardingStep="done"
+          companyName={preview.companyName}
+          recruitedCharacters={preview.teammates}
+          currentFloor={preview.floor}
+          unlockedItemKeys={preview.unlockedItemKeys}
+          onFloorClick={() => {}}
+          readonly
+        />
+      </div>
+
+      {/* Mobile: lightweight 2D front-elevation preview. No click
+          handlers — the preview route is read-only; a visitor's
+          taps shouldn't open MySquad-style modals on someone else's
+          floor. */}
+      <Mobile2DScene
         companyName={preview.companyName}
         recruitedCharacters={preview.teammates}
         currentFloor={preview.floor}
-        unlockedItemKeys={preview.unlockedItemKeys}
-        onFloorClick={() => {}}
-        readonly
       />
     </main>
   )

@@ -33,6 +33,11 @@ interface Props {
   /** Slot cap for the user's current floor — drives the denominator
    *  on the teammates chip. */
   maxTeammates: number
+  /** Server-computed leaderboard rank. `null` for anonymous or
+   *  while loading; `51` represents "outside top 50". Drives the
+   *  optional "🏆 #rank" gold chip per the Section 2 mockup (Floor
+   *  6 example). Suppressed when null. */
+  rank?: number | null
 }
 
 export function MobileCounterChips({
@@ -40,6 +45,7 @@ export function MobileCounterChips({
   totalInvites,
   teammateCount,
   maxTeammates,
+  rank,
 }: Props) {
   // Live floor config for the "Next reward" copy. `useFloor` returns
   // the static fallback until /api/floors hydrates so we render
@@ -74,6 +80,12 @@ export function MobileCounterChips({
         </strong>{' '}
         teammates
       </Chip>
+      {/* Leaderboard rank chip — only when we have a value. "51"
+          means outside top 50; render as "50+" per the existing
+          leaderboard convention. */}
+      {typeof rank === 'number' && (
+        <Chip tone="gold">🏆 #{rank >= 51 ? '50+' : rank}</Chip>
+      )}
       {nextReward ? (
         <Chip tone="purple">
           Next: <strong className="text-tower-cream">{nextReward}</strong>

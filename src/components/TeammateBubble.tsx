@@ -123,7 +123,11 @@ export function TeammateBubble({ open, teammate, anchorSlug, onClose, onEdit }: 
       role="dialog"
       aria-modal="false"
       aria-label={`${teammate.name} — ${teammate.role}`}
-      className="fixed inset-0 z-30"
+      // z-40 so the mobile sheet paints over the MobileBottomNav
+      // (z-30) AND the MobileCounterChips (z-10). On desktop the
+      // anchored card sits inside the scene's pointer-events strip
+      // so the z bump is harmless there.
+      className="fixed inset-0 z-40"
       onClick={onClose}
     >
       {/* Mobile-only dim backdrop — gives the sheet visual separation
@@ -132,13 +136,21 @@ export function TeammateBubble({ open, teammate, anchorSlug, onClose, onEdit }: 
           stays interactive. */}
       <div className="md:hidden absolute inset-0 bg-black/55" aria-hidden />
 
-      {/* MOBILE: bottom sheet. Full-width, rounded top, grip handle,
-          safe-area-padded so the body never tucks under the iOS home
-          indicator. */}
+      {/* MOBILE: bottom sheet anchored ABOVE the MobileBottomNav so
+          both surfaces stay visible + tappable. The sheet keeps its
+          own rounded top so it reads as a sheet floating over the
+          nav rather than tucked behind it. */}
       <div
         onClick={e => e.stopPropagation()}
-        className="md:hidden absolute inset-x-0 bottom-0 bg-night-mid border-t border-white/10 rounded-t-3xl shadow-[0_-16px_40px_rgba(0,0,0,0.5)] text-tower-cream"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        className="md:hidden absolute inset-x-0 bg-night-mid border-t border-white/10 rounded-t-3xl shadow-[0_-16px_40px_rgba(0,0,0,0.5)] text-tower-cream"
+        style={{
+          // 72px ≈ MobileBottomNav height; safe-area-inset adds the
+          // iOS home indicator clearance. Matches the offset used by
+          // MobileProgressPill so floating chrome on top of the nav
+          // is consistent across sheets.
+          bottom: 'calc(72px + env(safe-area-inset-bottom))',
+          paddingBottom: '0.75rem',
+        }}
       >
         <div className="flex justify-center pt-2.5 pb-1" aria-hidden>
           <div className="w-9 h-1 rounded-full bg-white/20" />

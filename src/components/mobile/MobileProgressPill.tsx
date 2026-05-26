@@ -69,21 +69,45 @@ export function MobileProgressPill({
     nextFloor.unlockItems?.find(s => s && s.trim().length > 0) ??
     nextFloor.label
 
+  // Layout (Section 2 mockup, screen 6):
+  //
+  //   [🎁 in gold circle]   1 month of Pro free          [3]
+  //                         Floor 7 · 3 invites away
+  //
+  // Reward headline is the primary content (text-tower-cream + bold);
+  // the floor + invite-count subtitle reads faint. The gold circle on
+  // the left anchors the icon visually and matches the gold accent
+  // used by the Save/Invite hero CTA below.
   return (
     <div
       className={`md:hidden fixed inset-x-3 ${bottomOffsetClass} z-20 pointer-events-none`}
       aria-live="polite"
     >
-      <div className="pointer-events-auto bg-night-mid/95 border border-white/10 backdrop-blur-md rounded-2xl px-3.5 py-2.5 flex items-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+      <div className="pointer-events-auto bg-night-mid/95 border border-white/10 backdrop-blur-md rounded-2xl px-3 py-2.5 flex items-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+        {/* Gold gift circle — replaces the all-caps "NEXT REWARD"
+            label, since the iconography says the same thing in less
+            space. */}
+        <div
+          className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-base bg-tower-gold/15 border border-tower-gold/30"
+          aria-hidden
+        >
+          🎁
+        </div>
+
         <div className="flex-1 min-w-0">
-          <div className="text-[9px] tracking-[0.08em] uppercase text-tower-cream/40 font-bold">
-            Next reward
+          <div className="text-[12px] text-tower-cream font-bold leading-tight truncate">
+            {reward}
           </div>
-          <div className="text-[12px] text-tower-cream font-semibold leading-tight truncate">
-            🎁 Floor {nextFloor.id} — {reward}
+          <div className="text-[10.5px] text-tower-cream/55 mt-0.5 truncate">
+            Floor {nextFloor.id} · {invitesToNext}{' '}
+            {invitesToNext === 1 ? 'invite' : 'invites'} away
           </div>
         </div>
-        <div className="text-tower-gold font-extrabold text-base leading-none shrink-0">
+
+        {/* Invite count badge — purple-tinted pill on the right
+            matching the mockup. Mirrors the share-sheet's invite
+            counter colour. */}
+        <div className="shrink-0 rounded-md bg-purple-500/15 px-2 py-1 text-[11px] font-extrabold text-purple-200 leading-none">
           {invitesToNext}
         </div>
       </div>

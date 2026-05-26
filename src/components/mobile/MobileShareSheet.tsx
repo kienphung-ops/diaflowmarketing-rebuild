@@ -2,29 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
+import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
 
 /**
  * Bottom-sheet share surface for mobile, opened from the
  * MobileBottomNav's hero "Invite to climb" CTA.
  *
- * Sections (top → bottom, per the mockup):
+ * Section 2 / Screen 7 layout (top → bottom):
  *
- *   1. Header           — "Floor N · M invites to go" + headline +
- *                         subcopy.
- *   2. Reward chips     — horizontally scrolling cards for the next
- *                         floor, an aspirational mid-tower goal, and
- *                         the penthouse.
- *   3. Share grid       — 2-column 50px tall buttons for X, LinkedIn,
- *                         WhatsApp, Email. Plus a full-width Copy.
- *   4. Copy preview     — the literal string the user will paste.
+ *   1. Header           — "Share to reach Floor N" + small invite-count
+ *                         badge on the right.
+ *   2. Reward line      — "🎁 Next unlock: <reward>"
+ *   3. URL pill         — "Your link" eyebrow + truncated URL with an
+ *                         inline Copy button.
+ *   4. Share grid       — 3 equal-width buttons (X / LinkedIn / Copy).
  *
- * The share intent URLs mirror MySquadDrawer's `handleShare` exactly
- * so anything that worked there works here (same X / LinkedIn copy,
- * same WhatsApp share URL, same mailto, same buildShareCopyText
- * payload). One source of truth for the share text lives in
- * lib/shareCopy.ts.
+ * Share-intent URLs mirror MySquadDrawer.handleShare exactly so anything
+ * that worked there works here. One source of truth for share text
+ * lives in lib/shareCopy.ts.
  *
  * Hidden on md+ — desktop users go through MySquadDrawer's share row.
  */
@@ -37,8 +33,7 @@ interface Props {
   totalInvites: number
   /** Used by trial users — fired when share is attempted without a
    *  real invite link so we can route them through signup instead of
-   *  silently disabling everything. Null = no upsell route (logged-in
-   *  user without a referralCode, which shouldn't happen in practice). */
+   *  silently disabling everything. */
   onSignupNudge?: () => void
 }
 
@@ -51,15 +46,12 @@ export function MobileShareSheet({
   onSignupNudge,
 }: Props) {
   const [copied, setCopied] = useState(false)
-  // Auto-dismiss the "Copied!" pill 1.5s after a successful copy so
-  // the user doesn't see a stale check next time they open the sheet.
   useEffect(() => {
     if (!copied) return
     const t = setTimeout(() => setCopied(false), 1500)
     return () => clearTimeout(t)
   }, [copied])
 
-  // ESC closes — same UX convention as the rest of the modal stack.
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -70,14 +62,12 @@ export function MobileShareSheet({
   }, [open, onClose])
 
   const nextFloor = useFloor(currentFloor + 1)
-  const maxFloor = useFloorCount()
-  const penthouse = useFloor(maxFloor)
-  // Mid-tower aspiration — Floor 10 by convention since it sits ~50%
-  // up the ladder. Falls back gracefully if the floor doesn't exist.
-  const midFloor = useFloor(Math.min(maxFloor - 1, 10))
   const invitesToNext = nextFloor
     ? Math.max(0, nextFloor.invitesRequired - totalInvites)
     : 0
+  const reward = nextFloor
+    ? nextFloor.unlockItems?.find(s => s && s.trim().length > 0) ?? nextFloor.label
+    : 'Penthouse — keep sharing'
 
   if (!open) return null
   if (typeof document === 'undefined') return null
@@ -93,19 +83,14 @@ export function MobileShareSheet({
   const liHref = inviteUrl
     ? `https://www.linkedin.com/sharing/share-offsite/?url=${encoded}`
     : undefined
-  // WhatsApp uses a single `text` query param with the URL inlined —
-  // wa.me works on both mobile + desktop and falls back to web.
-  const waText = inviteUrl ? `${xText} ${inviteUrl}` : ''
-  const waHref = inviteUrl
-    ? `https://wa.me/?text=${encodeURIComponent(waText)}`
-    : undefined
-  // Plain mailto — subject + body. Browsers handle the URL-encode of
-  // the body internally but we do it explicitly anyway for safety.
-  const mailtoHref = inviteUrl
-    ? `mailto:?subject=${encodeURIComponent('I just hired my AI team on Diaflow')}&body=${encodeURIComponent(waText)}`
-    : undefined
 
   const copyPayload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
+
+  // Display-only version of the URL — strip the protocol so the pill
+  // can show more of the meaningful path on narrow screens.
+  const displayUrl = inviteUrl
+    ? inviteUrl.replace(/^https?:\/\//, '')
+    : 'sign up to get your link'
 
   async function handleCopy() {
     if (!copyPayload) {
@@ -125,8 +110,6 @@ export function MobileShareSheet({
       onSignupNudge?.()
       return
     }
-    // Open in a new tab/window. On mobile this hands off to the
-    // installed app where possible (X, WhatsApp).
     window.open(href, '_blank', 'noopener,noreferrer')
   }
 
@@ -141,71 +124,62 @@ export function MobileShareSheet({
       <div
         onClick={e => e.stopPropagation()}
         className="w-full bg-night-mid border-t border-white/10 rounded-t-3xl text-tower-cream shadow-[0_-16px_40px_rgba(0,0,0,0.5)]"
-        // The sheet eats its own bottom safe-area inset so the
-        // grid + preview never hide behind the iOS home indicator.
         style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
       >
-        {/* Grip — touch-affordance hint that this is a sheet */}
+        {/* Grip */}
         <div className="flex justify-center pt-2.5 pb-3" aria-hidden>
           <div className="w-9 h-1 rounded-full bg-white/20" />
         </div>
 
-        <div className="px-5 pb-2">
-          <div className="text-[10px] tracking-[0.08em] uppercase text-tower-cream/40 font-bold">
-            {nextFloor
-              ? `Floor ${nextFloor.id} — ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} to go`
-              : 'Penthouse — keep sharing'}
+        {/* Header row — title on the left, invite-count badge on the right */}
+        <div className="px-5 pb-1 flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[18px] font-extrabold leading-tight">
+              {nextFloor ? `Share to reach Floor ${nextFloor.id}` : 'Share the tower'}
+            </h2>
+            <p className="text-[12.5px] text-tower-cream/70 leading-snug mt-1">
+              <span aria-hidden>🎁 </span>
+              <span className="text-tower-cream/55">Next unlock:</span>{' '}
+              <span className="text-tower-cream font-semibold">{reward}</span>
+            </p>
           </div>
-          <h2 className="text-[18px] font-extrabold leading-tight mt-1">
-            Share to unlock<br />
-            the rest of your team
-          </h2>
-          <p className="text-[12px] text-tower-cream/65 leading-relaxed mt-1.5">
-            Every invite brings a real teammate to your launch-day workspace.
-          </p>
-        </div>
-
-        {/* Horizontally scrolling reward chips */}
-        <div
-          className="flex gap-2 px-5 py-3 overflow-x-auto"
-          style={{ scrollbarWidth: 'none' }}
-        >
           {nextFloor && (
-            <RewardChip
-              tone="hot"
-              floor={nextFloor.id}
-              icon="🎁"
-              reward={
-                nextFloor.unlockItems?.find(s => s) ?? nextFloor.label ?? '—'
-              }
-              cost={`${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'}`}
-            />
-          )}
-          {midFloor && midFloor.id !== nextFloor?.id && midFloor.id !== maxFloor && (
-            <RewardChip
-              floor={midFloor.id}
-              icon="🛋"
-              reward={
-                midFloor.unlockItems?.find(s => s) ?? midFloor.label ?? '—'
-              }
-              cost={`${Math.max(0, midFloor.invitesRequired - totalInvites)} invites`}
-            />
-          )}
-          {penthouse && (
-            <RewardChip
-              tone="gold"
-              floor={penthouse.id}
-              icon="👑"
-              reward={
-                penthouse.unlockItems?.find(s => s) ?? penthouse.label ?? '—'
-              }
-              cost={`${Math.max(0, penthouse.invitesRequired - totalInvites)} invites`}
-            />
+            <div
+              className="shrink-0 rounded-md bg-purple-500/15 border border-purple-400/30 px-2 py-1 text-center min-w-[58px]"
+              aria-label={`${invitesToNext} invites to go`}
+            >
+              <div className="text-[15px] font-extrabold text-purple-200 leading-none">
+                {invitesToNext}
+              </div>
+              <div className="text-[8.5px] tracking-[0.06em] uppercase text-purple-200/70 font-bold mt-0.5">
+                {invitesToNext === 1 ? 'invite' : 'invites'}
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Share grid — 2 cols × 2 rows + full-width Copy */}
-        <div className="px-5 pt-1 pb-3 grid grid-cols-2 gap-2">
+        {/* Inline URL + Copy pill */}
+        <div className="px-5 pt-3">
+          <div className="text-[9.5px] tracking-[0.08em] uppercase text-tower-cream/40 font-bold mb-1.5">
+            Your link
+          </div>
+          <div className="flex items-stretch gap-2">
+            <div className="flex-1 min-w-0 rounded-xl bg-night-deep/60 border border-white/10 px-3 py-2.5 font-mono text-[12px] text-tower-cream/85 truncate">
+              {displayUrl}
+            </div>
+            <button
+              onClick={handleCopy}
+              disabled={!inviteUrl && !onSignupNudge}
+              className="shrink-0 rounded-xl bg-tower-gold/15 border border-tower-gold/30 px-3.5 text-[12px] font-bold text-tower-gold hover:bg-tower-gold/25 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              aria-label="Copy invite link"
+            >
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        {/* 3-column share grid — X / LinkedIn / Copy */}
+        <div className="px-5 pt-3 pb-3 grid grid-cols-3 gap-2">
           <ShareBtn
             label="X"
             badge={<span className="font-bold">𝕏</span>}
@@ -223,52 +197,17 @@ export function MobileShareSheet({
             onClick={() => openIntent(liHref)}
           />
           <ShareBtn
-            label="WhatsApp"
-            badge={<span>💬</span>}
-            badgeBg="#25d366"
-            badgeColor="#fff"
-            disabled={!inviteUrl}
-            onClick={() => openIntent(waHref)}
-          />
-          <ShareBtn
-            label="Email"
-            badge={<span>✉</span>}
-            badgeBg="#4b5563"
-            badgeColor="#fff"
-            disabled={!inviteUrl}
-            onClick={() => openIntent(mailtoHref)}
-          />
-          <button
-            onClick={handleCopy}
+            label={copied ? 'Copied' : 'Copy'}
+            badge={<span aria-hidden>{copied ? '✓' : '🔗'}</span>}
+            badgeBg="rgba(255,255,255,0.08)"
+            badgeColor="#f5f1e8"
             disabled={!inviteUrl && !onSignupNudge}
-            className="col-span-2 min-h-[50px] flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-transparent text-[13px] font-semibold text-tower-cream/90 hover:bg-night-deep/40 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            {copied ? (
-              <>
-                <span aria-hidden>✓</span>
-                <span>Copied!</span>
-              </>
-            ) : (
-              <>
-                <span aria-hidden>🔗</span>
-                <span>Copy invite link</span>
-              </>
-            )}
-          </button>
+            onClick={handleCopy}
+          />
         </div>
 
-        {/* Copy preview — the literal paste output, so the user knows
-            what their followers will see. */}
-        {copyPayload && (
-          <div className="px-5 pb-4">
-            <div className="rounded-xl border border-dashed border-white/10 bg-night-deep/40 px-3 py-2.5 text-[11px] text-tower-cream/65 italic leading-snug">
-              “{copyPayload}”
-            </div>
-          </div>
-        )}
-
-        {/* Trial users see a nudge to sign up — share buttons are
-            disabled until they have a real referralCode. */}
+        {/* Trial users — single nudge replaces the disabled share buttons
+            with an actionable claim CTA. */}
         {!inviteUrl && onSignupNudge && (
           <div className="px-5 pb-2">
             <button
@@ -307,56 +246,17 @@ function ShareBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="min-h-[50px] flex items-center gap-2.5 rounded-xl bg-night-deep/60 border border-white/10 px-3 py-2 text-[13px] font-semibold text-tower-cream hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
+      className="min-h-[52px] flex flex-col items-center justify-center gap-1 rounded-xl bg-night-deep/60 border border-white/10 px-2 py-2 text-[11.5px] font-semibold text-tower-cream hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
       aria-label={`Share on ${label}`}
     >
       <span
-        className="w-7 h-7 rounded-md inline-flex items-center justify-center text-sm shrink-0"
+        className="w-6 h-6 rounded-md inline-flex items-center justify-center text-[12px] shrink-0"
         style={{ background: badgeBg, color: badgeColor }}
         aria-hidden
       >
         {badge}
       </span>
-      <span>{label}</span>
+      <span className="leading-none">{label}</span>
     </button>
-  )
-}
-
-function RewardChip({
-  floor,
-  icon,
-  reward,
-  cost,
-  tone,
-}: {
-  floor: number
-  icon: string
-  reward: string
-  cost: string
-  tone?: 'hot' | 'gold'
-}) {
-  const base =
-    'shrink-0 w-[120px] rounded-2xl border px-2.5 py-2.5 text-center'
-  const palette =
-    tone === 'hot'
-      ? 'border-tower-gold/40 bg-gradient-to-b from-tower-gold/15 to-tower-gold/5'
-      : tone === 'gold'
-      ? 'border-purple-400/40 bg-gradient-to-b from-purple-500/20 to-purple-500/5'
-      : 'border-white/10 bg-night-deep/60'
-  const rewardColor =
-    tone === 'hot' ? 'text-tower-gold font-bold' : 'text-tower-cream font-medium'
-  return (
-    <div className={`${base} ${palette}`}>
-      <div className="text-[9.5px] tracking-[0.08em] uppercase text-tower-cream/40 font-bold">
-        Floor {floor}
-      </div>
-      <div className="text-xl my-0.5" aria-hidden>
-        {icon}
-      </div>
-      <div className={`text-[10.5px] leading-tight ${rewardColor}`}>
-        {reward}
-      </div>
-      <div className="text-[9.5px] text-tower-cream/40 mt-1">{cost}</div>
-    </div>
   )
 }

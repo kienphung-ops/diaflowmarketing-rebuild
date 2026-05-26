@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
+import { computeTeammateCount } from '@/lib/floors'
 import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
 import { useOrigin } from '@/hooks/useOrigin'
@@ -111,10 +113,13 @@ export function MySquadDrawer({
   onLogout,
   onArrangeRoom,
   visiting,
+  teammates,
   // Below are still part of Props for callers but the drawer no longer
-  // renders share-floor / teammate-list / add-teammate UI. The /floor/<code>
+  // renders share-floor list / add-teammate UI. The /floor/<code>
   // route is the canonical share + invite URL, and per-teammate
-  // interactions happen via the 3D scene + bulk-add modal.
+  // interactions happen via the 3D scene + bulk-add modal. `teammates`
+  // is still consumed to render the "N teammates locked in" pill above
+  // the floor card (Section 2, screen 9).
 }: Props) {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(teamName ?? '')
@@ -256,14 +261,26 @@ export function MySquadDrawer({
             : 'translate-y-full md:translate-y-0 md:translate-x-full')
         }
       >
-        {/* Mobile grip — visual touch-affordance that this is a
-            sheet. Hidden on desktop where the drawer reads as a
-            side panel and a grip would look out of place. */}
-        <div className="md:hidden flex justify-center pt-2.5" aria-hidden>
-          <div className="w-9 h-1 rounded-full bg-white/20" />
+        {/* Mobile grip + floating close — touch-affordance that
+            this is a sheet, plus a small × so the user can dismiss
+            without dragging. Hidden on desktop. */}
+        <div className="md:hidden relative pt-2.5">
+          <div className="flex justify-center" aria-hidden>
+            <div className="w-9 h-1 rounded-full bg-white/20" />
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-1 text-tower-cream/50 hover:text-tower-cream text-xl leading-none px-2 py-1"
+          >
+            ×
+          </button>
         </div>
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+        {/* Desktop-only title bar — the mobile mockup (Section 2,
+            screen 9) drops the redundant "My Squad" header since the
+            team name below already serves as the visual title. */}
+        <div className="hidden md:flex items-center justify-between px-6 py-4 border-b border-white/5">
           <h2 className="text-2xl font-bold">My Squad</h2>
           <button onClick={onClose} className="text-tower-cream/50 hover:text-tower-cream text-xl" aria-label="Close">
             ×
@@ -271,6 +288,17 @@ export function MySquadDrawer({
         </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        {/* Mobile-only small "My Squad" label — only shown in the
+            pre-login state (Section 2, screen 8). The post-login
+            view leans on the team name as the visual header so the
+            extra label would just add noise. Desktop always has the
+            full title bar above. */}
+        {!referralCode && (
+          <div className="md:hidden text-center text-[13px] font-bold text-tower-cream/70 tracking-wide">
+            My Squad
+          </div>
+        )}
+
         {/* "You're in" banner only shows when we DON'T have explicit
             verification state (trial captures + legacy flow). For
             signed-in users we route through the verify-email banner
@@ -295,107 +323,205 @@ export function MySquadDrawer({
             a small "Visiting <owner>" caption next to those stats —
             see the activity row below. */}
 
-        {/* Team name */}
-        <div>
+        {/* Team name — pre-login centers the name (screen 8);
+            post-login renders the full row with Rename + Sign-out
+            (screen 9). Two separate sub-trees instead of one
+            conditionally-classed row keeps the parser simple. */}
+        {!referralCode ? (
+          renaming ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value.slice(0, 40))}
+                className="flex-1 px-2 py-1 rounded bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-2xl font-bold"
+              />
+              <button
+                onClick={() => {
+                  onTeamNameChange?.(renameValue.trim())
+                  setRenaming(false)
+                }}
+                className="text-xs text-tower-gold hover:underline"
+              >
+                Save
+              </button>
+            </div>
+          ) : (
+            <div className="text-center text-3xl font-bold">
+              {teamName || 'untitled'}
+            </div>
+          )
+        ) : renaming ? (
           <div className="flex items-center gap-2">
-            {renaming ? (
-              <>
-                <input
-                  autoFocus
-                  value={renameValue}
-                  onChange={e => setRenameValue(e.target.value.slice(0, 40))}
-                  className="flex-1 px-2 py-1 rounded bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-2xl font-bold"
-                />
-                <button
-                  onClick={() => {
-                    onTeamNameChange?.(renameValue.trim())
-                    setRenaming(false)
-                  }}
-                  className="text-xs text-tower-gold hover:underline"
-                >
-                  Save
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="text-3xl font-bold">{teamName || 'untitled'}</div>
-                <button
-                  onClick={() => setRenaming(true)}
-                  className="text-xs px-2 py-1 rounded bg-night-deep/80 border border-white/10 text-tower-cream/60 hover:text-tower-cream"
-                >
-                  ✎ Rename
-                </button>
-                {/* Sign out — pushed to the end of the team-name row
-                    with ml-auto, red-tinted so it reads as a
-                    destructive action. Anonymous trial sessions
-                    don't pass onLogout, so this link only renders
-                    for signed-in users. */}
-                {onLogout && (
-                  <button
-                    type="button"
-                    // First click only opens the confirm modal — the
-                    // actual logout fires from the modal's Confirm
-                    // button below. This prevents accidental taps
-                    // (the link sits next to Rename on a busy row).
-                    onClick={() => setSignOutConfirmOpen(true)}
-                    className="ml-auto text-xs text-red-400 hover:text-red-300 underline-offset-2 hover:underline transition"
-                  >
-                    Sign out
-                  </button>
-                )}
-              </>
-            )}
-
-          </div>
-
-          
-
-          {/* The standalone invite-URL display + copy button used to
-              live here. It was redundant once Copy joined the share
-              row below (same Copy action, less duplicated chrome).
-              Anonymous users still need a sign-up CTA since they
-              don't have a referralCode to share. */}
-          {!referralCode && (
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={e => setRenameValue(e.target.value.slice(0, 40))}
+              className="flex-1 px-2 py-1 rounded bg-night-deep border border-white/10 focus:border-tower-gold focus:outline-none text-2xl font-bold"
+            />
             <button
-              onClick={onOpenSignup}
-              className="mt-3 w-full px-3 py-2 rounded-md bg-night-deep border border-tower-gold/30 text-sm text-tower-gold hover:bg-night-deep/80"
+              onClick={() => {
+                onTeamNameChange?.(renameValue.trim())
+                setRenaming(false)
+              }}
+              className="text-xs text-tower-gold hover:underline"
             >
-              Sign up to get your invite link →
+              Save
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="text-3xl font-bold">{teamName || 'untitled'}</div>
+            <button
+              onClick={() => setRenaming(true)}
+              className="text-xs px-2 py-1 rounded bg-night-deep/80 border border-white/10 text-tower-cream/60 hover:text-tower-cream"
+            >
+              ✎ Rename
+            </button>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={() => setSignOutConfirmOpen(true)}
+                className="ml-auto text-xs text-red-400 hover:text-red-300 underline-offset-2 hover:underline transition"
+              >
+                Sign out
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Invited-by card moved BELOW "How it works" per user
             feedback — was previously stacked at the top of the
             drawer where it crowded the floor card. See the matching
             placement marker further down. */}
 
-        {/* Current floor card */}
+        {/* "🔒 N teammates locked in" pill — shown for both pre- and
+            post-login (Section 2, screens 8 + 9). Pre-login the
+            trial user's `teammates` array is empty since they have no
+            DB rows, but the three default NPCs (Iris/Mia/Leo) are
+            still "locked in" conceptually — so we use
+            `computeTeammateCount`, which adds the defaults when the
+            array doesn't include them. */}
+        {(() => {
+          const lockedInCount = computeTeammateCount(teammates ?? [])
+          if (lockedInCount <= 0) return null
+          return (
+            <div className="flex justify-center">
+              <div className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2 text-[12px] font-semibold text-emerald-200 inline-flex items-center gap-2">
+                <span aria-hidden>🔒</span>
+                <span>
+                  <strong className="tabular-nums">{lockedInCount}</strong>{' '}
+                  {lockedInCount === 1 ? 'teammate' : 'teammates'} locked in
+                </span>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Pre-login SAVE GLOW CARD + tower/rewards link cards
+            (Section 2, screen 8). The save card is the focal CTA;
+            the two link cards beneath give a trial user secondary
+            paths to explore the tower or peek at the rewards while
+            they decide to convert. All hidden post-login. */}
+        {!referralCode && (
+          <>
+            <div className="rounded-xl border border-purple-500/40 bg-gradient-to-b from-purple-500/20 to-purple-500/[0.05] p-4 shadow-[0_0_24px_rgba(168,139,250,0.25)] text-center">
+              <div className="text-[10px] uppercase tracking-[0.08em] font-bold text-purple-300 mb-1.5">
+                ⚠ Not saved yet
+              </div>
+              <div className="text-[15px] font-bold leading-tight mb-1">
+                Save your team for launch.
+              </div>
+              <div className="text-[11.5px] text-tower-cream/65 leading-relaxed mb-3">
+                Free. Just an email. Office waits for you when AI Teammate ships.
+              </div>
+              <button
+                onClick={onOpenSignup}
+                className="w-full px-3 py-2.5 rounded-lg bg-purple-400 text-night-deep font-extrabold text-[13px] shadow-[0_4px_14px_rgba(168,139,250,0.45)] hover:bg-purple-300 transition"
+              >
+                Save my team →
+              </button>
+            </div>
+
+            <Link
+              href="/tower"
+              onClick={onClose}
+              className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
+            >
+              <span className="text-lg leading-none shrink-0" aria-hidden>
+                🏢
+              </span>
+              <div className="flex-1 min-w-0 text-left">
+                <div className="text-[12.5px] font-bold text-tower-cream leading-tight">
+                  Take the tower tour
+                </div>
+                <div className="text-[10.5px] text-tower-cream/55 mt-0.5">
+                  60 sec walkthrough
+                </div>
+              </div>
+              <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
+                ›
+              </span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setHowItWorksOpen(true)}
+              className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
+            >
+              <span className="text-lg leading-none shrink-0" aria-hidden>
+                🎁
+              </span>
+              <div className="flex-1 min-w-0 text-left">
+                <div className="text-[12.5px] font-bold text-tower-cream leading-tight">
+                  See all 20 floor rewards
+                </div>
+                <div className="text-[10.5px] text-tower-cream/55 mt-0.5">
+                  Free beta at Floor 3
+                </div>
+              </div>
+              <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
+                ›
+              </span>
+            </button>
+          </>
+        )}
+
+        {/* ── Post-login content: floor card + share + quick actions.
+            Hidden in trial mode (no referralCode) where the focal
+            CTA is the save-card group above. Each section is gated
+            individually rather than wrapped in a fragment to keep the
+            parse tree simple. ─────────────────────────────────── */}
+
+        {/* Current floor card — Section 2, screen 9. */}
+        {referralCode && (
         <div className="rounded-xl p-4 bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-500/30">
-          <div className="flex items-baseline justify-between">
-            <div className="text-[11px] uppercase tracking-widest text-tower-cream/50">Current floor</div>
-            {/* Right-aligned stack: total-invites count above, rank
-                below. Two lines so the user can see at a glance both
-                "how much have I done" (invites) and "where do I stand"
-                (rank) without leaving the drawer. The invite count
-                used to be implicit in the progress-bar caption only
-                ("N more invites → Floor X"), which hid the cumulative
-                number. */}
-            <div className="text-right space-y-0.5">
-              {/* Invite count + rank stack. The number is intentionally
-                  pumped up to text-base so the "how many invites have
-                  I racked up so far?" stat reads at a glance — the
-                  smaller text-sm version got lost next to the giant
-                  "Floor X" title and users were missing it. */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-widest text-tower-cream/50 mb-1">
+                Current floor
+              </div>
+              <div className="flex items-baseline gap-2">
+                <div className="text-5xl font-bold leading-none tabular-nums">
+                  {currentFloor}
+                </div>
+                <div className="text-base text-tower-cream/50">
+                  of {totalFloors}
+                </div>
+              </div>
+            </div>
+            {/* Invites + rank stack — right-aligned, rank in amber to
+                match the mockup (was purple-300 before). */}
+            <div className="text-right space-y-0.5 shrink-0">
               <div className="text-base font-semibold text-tower-cream">
                 <strong className="tabular-nums">{totalInvites}</strong>{' '}
                 <span className="text-tower-cream/70 font-normal text-sm">
                   {totalInvites === 1 ? 'invite' : 'invites'}
                 </span>
               </div>
-              <div className="text-sm font-semibold text-purple-300">
+              <div className="text-sm font-bold text-amber-300">
                 {rank == null ? (
-                  <span className="text-tower-cream/40">Rank —</span>
+                  <span className="text-tower-cream/40 font-semibold">Rank —</span>
                 ) : rank >= 51 ? (
                   <span title="Outside top 50 — keep inviting!">Rank 50+</span>
                 ) : (
@@ -404,42 +530,49 @@ export function MySquadDrawer({
               </div>
             </div>
           </div>
-          <div className="flex items-baseline gap-2 mt-1">
-            <div className="text-5xl font-bold">Floor {currentFloor}</div>
-            <div className="text-base text-tower-cream/50">of {totalFloors}</div>
-          </div>
+
           <div className="mt-3 h-1.5 rounded-full bg-night-deep/60 overflow-hidden">
             <div className="h-full bg-purple-400" style={{ width: `${progressPct}%` }} />
           </div>
-          <div className="mt-2 flex items-center justify-between text-xs">
-            <span className="text-tower-cream/80">
-              {nextFloor ? (
+
+          {/* "Next" line — centered under the progress bar so it
+              reads as a caption for the bar itself. */}
+          <div className="mt-2.5 text-center text-xs text-tower-cream/80">
+            {nextFloor ? (
               <>
-                <span className="font-bold">{invitesToNext} more {invitesToNext === 1 ? 'invite' : 'invites'}</span> → Floor {nextFloor.id}
+                <span className="text-tower-cream/55">Next:</span>{' '}
+                <span className="font-bold text-tower-cream">Floor {nextFloor.id}</span>{' '}
+                <span className="text-tower-cream/55">·</span>{' '}
+                <span className="font-semibold">
+                  {invitesToNext} {invitesToNext === 1 ? 'invite' : 'invites'} away
+                </span>
               </>
             ) : (
               'You reached the top'
             )}
-            </span>
           </div>
 
-          {/* Floor-activity row — viewers + total pokes for whichever
-              floor the user is currently looking at. Rendered for
-              BOTH owner-on-own-floor (office / tower) AND visitor-on-
-              someone-else (/floor/[code]) so the drawer layout is
-              consistent across contexts. When ownerName is set we
-              also surface a small "Visiting <owner>" caption to the
-              right so the visitor still sees whose floor the stats
-              belong to. */}
+          {/* Floor-activity row — viewers + total pokes. Rendered for
+              both owner-on-own-floor and visitor-on-other-floor so the
+              drawer layout stays consistent across contexts. Divider
+              + centered layout matches the mockup. */}
           {visiting && (
-            <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-5 text-xs">
-              <span className="flex items-center gap-1.5 text-tower-cream/85">
-                <DrawerEyeIcon />
-                <strong className="text-sm font-bold tabular-nums text-tower-cream">
-                  {visiting.viewerCount}
-                </strong>
-                <span className="text-tower-cream/55">viewing</span>
-              </span>
+            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-center gap-5 text-xs flex-wrap">
+              {/* Viewer count is meaningful when visiting someone
+                  else's floor (other people might be there too). On
+                  the owner's own /office it's mostly self-reference,
+                  so we hide it when ownerName is null to keep the
+                  row tight with just the pokes stat — mirrors the
+                  mockup where Floor 6 only shows the pokes line. */}
+              {visiting.ownerName && (
+                <span className="flex items-center gap-1.5 text-tower-cream/85">
+                  <DrawerEyeIcon />
+                  <strong className="text-sm font-bold tabular-nums text-tower-cream">
+                    {visiting.viewerCount}
+                  </strong>
+                  <span className="text-tower-cream/55">viewing</span>
+                </span>
+              )}
               <span className="flex items-center gap-1.5 text-tower-cream/85">
                 <span className="text-amber-300 text-sm leading-none" aria-hidden>★</span>
                 <strong className="text-sm font-bold tabular-nums text-tower-cream">
@@ -449,40 +582,38 @@ export function MySquadDrawer({
                   {visiting.totalPokes === 1 ? 'poke' : 'pokes'}
                 </span>
                 {!visiting.ownerName && (
-                  <span className="text-tower-cream/55 italic"> • just for fun</span>
+                  <span className="text-tower-cream/55 italic"> · just for fun</span>
                 )}
               </span>
-              {/* Visitor-only ownership caption — pushed to the row's
-                  right edge via ml-auto so the viewing/pokes pair
-                  stays grouped on the left. Truncated to keep the
-                  row single-line even with long team names. */}
               {visiting.ownerName && (
-                <span className="ml-auto text-amber-300/80 italic truncate max-w-[150px]">
+                <span className="text-amber-300/80 italic truncate max-w-[150px]">
                   on {visiting.ownerName}&apos;s floor
                 </span>
               )}
             </div>
           )}
         </div>
+        )}
 
-        {/* Share-floor section + per-teammate list were removed per
-            product call: the invite URL above already doubles as the
-            share-floor URL (one /floor/<code> route), and the scene
-            view already shows everyone — the redundant drawer list
-            was clutter. Edit modal is still reachable by clicking
-            teammates in the 3D scene (or via the bulk-add CTA). */}
-
-        {/* Share — three actions in one row: X, LinkedIn, Copy.
-            Copy folded in from the previous standalone URL pill above
-            so the drawer has a single share block instead of two
-            stacked panels. Threads was retired earlier (most users
-            cross-post X → Threads, copy reads better in tweet form).
-            Buttons stay rendered without a referralCode so the layout
-            doesn't shift; they're disabled with `cursor-not-allowed`
-            until the user has signed up. */}
+        {/* Share — three actions in one row: X, LinkedIn, Copy. Hidden
+            pre-login (the focal CTA is the save card above). */}
+        {referralCode && (
         <div>
-          <div className="text-sm font-semibold mb-2">
-            Share your office to move up the next floor
+          {/* Share-section header row — title on the left, "{N} invites
+              away" sub on the right (Section 2, screen 9). Mirrors the
+              MobileShareSheet header so trial vs post-login both read
+              the same way. */}
+          <div className="flex items-baseline justify-between gap-2 mb-2.5">
+            <h3 className="text-sm font-bold text-tower-cream">
+              {nextFloor
+                ? `Share to reach Floor ${nextFloor.id}`
+                : 'Share your penthouse'}
+            </h3>
+            <span className="text-[11px] font-semibold text-purple-300 whitespace-nowrap">
+              {nextFloor
+                ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} away`
+                : '👑 Top floor'}
+            </span>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <button
@@ -523,28 +654,49 @@ export function MySquadDrawer({
             </button>
           </div>
         </div>
+        )}
 
-        {/* Utility links row — "How it works" + (optional) "Arrange
-            your room". Both rendered as small text links so neither
-            dominates the drawer; Arrange sits in the corner per user
-            feedback ("chỉ cho hyperlink và cho nằm ở một góc nào đó")
-            rather than as a prominent button. */}
-        <div className="flex items-center justify-between gap-3 text-xs">
+        {/* Quick actions — 2-column card grid (Section 2, screen 9).
+            Hidden pre-login. */}
+        {referralCode && (
+        <div className={`grid gap-2 ${onArrangeRoom ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <button
+            type="button"
             onClick={() => setHowItWorksOpen(true)}
-            className="flex items-center gap-1 text-tower-cream/50 hover:text-tower-cream/80 transition"
+            className="flex flex-col items-center justify-center gap-1 px-3 py-3.5 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
           >
-            <span>ⓘ How it works</span>
+            <span className="text-base leading-none" aria-hidden>ⓘ</span>
+            <span className="text-[12px] font-semibold">How it works</span>
           </button>
           {onArrangeRoom && (
             <button
+              type="button"
               onClick={onArrangeRoom}
-              className="text-tower-cream/45 hover:text-tower-gold underline-offset-2 hover:underline transition whitespace-nowrap"
+              className="flex flex-col items-center justify-center gap-1 px-3 py-3.5 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
             >
-              🪄 Arrange your room
+              <span className="text-base leading-none" aria-hidden>🪄</span>
+              <span className="text-[12px] font-semibold">Arrange room</span>
             </button>
           )}
         </div>
+        )}
+
+        {/* Discord CTA — sits inline directly under the quick-actions
+            grid (Section 2, screen 9), not pinned to the drawer footer.
+            Shown for BOTH pre- and post-login, so the trial user has
+            a community fallback even when the floor/share/quick-action
+            block above is hidden. */}
+        <a
+          href={DISCORD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold transition"
+        >
+          <svg width="18" height="14" viewBox="0 0 71 55" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+            <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.44077 45.4204 0.52529C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.52529C25.5141 0.44336 25.4218 0.40110 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C7.41596 50.7066 14.2196 53.9330 20.8952 56.0834C20.9876 56.1127 21.0857 56.0806 21.1445 56.0074C22.7586 53.8321 24.2017 51.5327 25.4414 49.1156C25.5026 48.9988 25.4442 48.8594 25.3183 48.8143C23.0568 47.9498 20.9009 46.9023 18.8254 45.7017C18.6864 45.6195 18.6752 45.4225 18.8030 45.3260C19.2317 45.0054 19.6605 44.6733 20.0701 44.3383C20.1347 44.2844 20.2243 44.2731 20.2998 44.3073C32.3202 49.7978 45.4020 49.7978 57.2796 44.3073C57.3551 44.2703 57.4447 44.2816 57.5121 44.3355C57.9217 44.6705 58.3505 45.0054 58.7820 45.3260C58.9098 45.4225 58.9014 45.6195 58.7624 45.7017C56.6869 46.9247 54.5310 47.9498 52.2667 48.8115C52.1408 48.8566 52.0852 48.9988 52.1464 49.1156C53.4085 51.5299 54.8516 53.8265 56.4349 56.0046C56.4937 56.0806 56.5946 56.1127 56.6870 56.0834C63.3933 53.9330 70.1970 50.7066 77.2272 45.5576C77.2804 45.5182 77.3140 45.4590 77.3196 45.3942C78.8187 30.0731 74.8719 16.7700 67.0575 4.9823C67.0380 4.9429 67.0044 4.9147 66.9624 4.8978ZM25.7628 37.2926C22.2211 37.2926 19.3038 34.0454 19.3038 30.0645C19.3038 26.0836 22.1648 22.8364 25.7628 22.8364C29.3889 22.8364 32.2779 26.1120 32.2218 30.0645C32.2218 34.0454 29.3608 37.2926 25.7628 37.2926ZM45.3311 37.2926C41.7895 37.2926 38.8721 34.0454 38.8721 30.0645C38.8721 26.0836 41.7331 22.8364 45.3311 22.8364C48.9573 22.8364 51.8462 26.1120 51.7901 30.0645C51.7901 34.0454 48.9573 37.2926 45.3311 37.2926Z" />
+          </svg>
+          Join us on Discord
+        </a>
 
         {/* Invited-by card — moved down from the top per user
             feedback. Only renders when the server sealed an inviter
@@ -588,24 +740,15 @@ export function MySquadDrawer({
         inviteUrl={inviteUrl || null}
         currentFloor={currentFloor}
         totalInvites={totalInvites}
+        // Threading the same trial-mode signup opener the drawer
+        // itself uses → rewards modal footer swaps to the Save CTA
+        // when the user is pre-login.
+        onOpenSignup={onOpenSignup}
       />
 
-      <div className="border-t border-white/5 p-4 mt-auto space-y-2">
-        <a
-          href={DISCORD_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold transition"
-        >
-          <svg width="18" height="14" viewBox="0 0 71 55" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-            <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.44077 45.4204 0.52529C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.52529C25.5141 0.44336 25.4218 0.40110 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C7.41596 50.7066 14.2196 53.9330 20.8952 56.0834C20.9876 56.1127 21.0857 56.0806 21.1445 56.0074C22.7586 53.8321 24.2017 51.5327 25.4414 49.1156C25.5026 48.9988 25.4442 48.8594 25.3183 48.8143C23.0568 47.9498 20.9009 46.9023 18.8254 45.7017C18.6864 45.6195 18.6752 45.4225 18.8030 45.3260C19.2317 45.0054 19.6605 44.6733 20.0701 44.3383C20.1347 44.2844 20.2243 44.2731 20.2998 44.3073C32.3202 49.7978 45.4020 49.7978 57.2796 44.3073C57.3551 44.2703 57.4447 44.2816 57.5121 44.3355C57.9217 44.6705 58.3505 45.0054 58.7820 45.3260C58.9098 45.4225 58.9014 45.6195 58.7624 45.7017C56.6869 46.9247 54.5310 47.9498 52.2667 48.8115C52.1408 48.8566 52.0852 48.9988 52.1464 49.1156C53.4085 51.5299 54.8516 53.8265 56.4349 56.0046C56.4937 56.0806 56.5946 56.1127 56.6870 56.0834C63.3933 53.9330 70.1970 50.7066 77.2272 45.5576C77.2804 45.5182 77.3140 45.4590 77.3196 45.3942C78.8187 30.0731 74.8719 16.7700 67.0575 4.9823C67.0380 4.9429 67.0044 4.9147 66.9624 4.8978ZM25.7628 37.2926C22.2211 37.2926 19.3038 34.0454 19.3038 30.0645C19.3038 26.0836 22.1648 22.8364 25.7628 22.8364C29.3889 22.8364 32.2779 26.1120 32.2218 30.0645C32.2218 34.0454 29.3608 37.2926 25.7628 37.2926ZM45.3311 37.2926C41.7895 37.2926 38.8721 34.0454 38.8721 30.0645C38.8721 26.0836 41.7331 22.8364 45.3311 22.8364C48.9573 22.8364 51.8462 26.1120 51.7901 30.0645C51.7901 34.0454 48.9573 37.2926 45.3311 37.2926Z" />
-          </svg>
-          Join us on Discord
-        </a>
-        {/* Sign out moved out of this footer — it now sits at the
-            end of the team-name row at the top of the drawer (red
-            text, ml-auto-aligned). */}
-      </div>
+      {/* Discord CTA used to live in a fixed footer here; it's now
+          inline inside the scrolling content, right under the
+          quick-actions grid, per Section 2 / screen 9. */}
 
       {/* Sign-out confirmation modal — rendered as a portal-style
           overlay over the entire drawer so the dim backdrop reads as

@@ -174,18 +174,23 @@ export function TowerView({
           The anon/trial CTA card is kept since it's the only way for
           a non-signed-in visitor to get into the auth flow from here. */}
       {!signedIn && (
+        // Hidden on mobile — the header's "Claim your team" pill +
+        // MobileBottomNav's "Save my team" hero already give the trial
+        // user two paths into signup, and stacking a third floating
+        // card on top of the tower image was visual noise (the user
+        // explicitly asked for it gone on the small screen). Desktop
+        // keeps the card since it doesn't have the bottom-nav hero.
         <div
-          className="absolute z-20 rounded-xl md:rounded-2xl bg-black/70 backdrop-blur-md border border-white/15 max-w-[80vw] md:max-w-[280px]
-                     top-14 left-3 px-3 py-2
-                     md:top-16 md:left-4 md:px-4 md:py-3"
+          className="hidden md:block absolute z-20 rounded-2xl bg-black/70 backdrop-blur-md border border-white/15 max-w-[280px]
+                     top-16 left-4 px-4 py-3"
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
         >
-          <div className="text-[11px] md:text-sm text-white/85 mb-1.5 md:mb-2">
+          <div className="text-sm text-white/85 mb-2">
             🔒 Claim your team
           </div>
           <button
             onClick={onSignIn}
-            className="px-3 md:px-4 py-1 md:py-1.5 rounded-md bg-purple-300 text-[#1a1a2e] font-semibold text-[11px] md:text-xs tracking-wide hover:bg-purple-200 transition"
+            className="px-4 py-1.5 rounded-md bg-purple-300 text-[#1a1a2e] font-semibold text-xs tracking-wide hover:bg-purple-200 transition"
           >
             Go To Your Team
           </button>

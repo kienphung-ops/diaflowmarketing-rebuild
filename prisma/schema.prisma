@@ -20,6 +20,13 @@ model User {
   first_email      String?
   passwordHash     String?
   emailVerified    DateTime?
+  // Google OAuth2 — set on accounts that signed up via "Continue with
+  // Google". `googleId` is the immutable `sub` claim from Google's
+  // id_token; `googleEmail` mirrors the account's Google-side address
+  // for diagnostics (the canonical address lives in `email`). Both
+  // optional so password-only legacy accounts keep working unchanged.
+  googleId         String?              @unique
+  googleEmail      String?
   recommendedRole  String?
   reason           String?
   ipAddress        String?
