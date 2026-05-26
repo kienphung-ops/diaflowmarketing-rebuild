@@ -25,9 +25,6 @@ function resolveSiteUrl(): URL {
 
 const SITE_NAME = 'Diaflow Tower'
 const SITE_DESCRIPTION = 'Build your AI office. Invite friends to climb the tower.'
-// Standard OG / Twitter card image. Replace `/og.png` with a real
-// 1200×627 PNG dropped into `public/og.png`; until then the existing
-// tower marketing image is a safe placeholder.
 const OG_IMAGE = '/diaflow-logo.jpg'
 
 export const metadata: Metadata = {

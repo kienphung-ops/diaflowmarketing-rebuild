@@ -6,17 +6,6 @@ import { getUnlockedItemsForFloor } from '@/lib/floorsDb'
 import { maskEmail, type InviterInfo } from '@/lib/inviter'
 import FloorVisitorClient from './FloorVisitor.client'
 
-/**
- * Dynamic OG / Twitter card so a shared `/floor/<code>` URL renders
- * the room owner's team name as the social-preview title (instead of
- * the generic "Diaflow Tower" inherited from the root layout). Lets
- * link previews on Slack / iMessage / Discord / Twitter / LinkedIn
- * read "Join <TeamName> on Diaflow Tower" before the user even
- * opens the page.
- *
- * Image stays at the site default (`/og.png` resolved via
- * `metadataBase`) — per-team OG image generation is a future task.
- */
 export async function generateMetadata(
   { params }: { params: { code: string } },
 ): Promise<Metadata> {
@@ -49,13 +38,13 @@ export async function generateMetadata(
       title,
       description,
       url,
-      images: [{ url: '/og.png', width: 1200, height: 627, alt: title }],
+      images: [{ url: '/diaflow-logo.jpg', width: 1200, height: 627, alt: title }],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: ['/og.png'],
+      images: ['/diaflow-logo.jpg'],
     },
     alternates: { canonical: url },
   }
