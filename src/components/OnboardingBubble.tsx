@@ -28,43 +28,108 @@ import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
 function ModalShell({
   onClose,
   wide,
+  statusPill,
+  step,
+  totalSteps = 4,
   children,
 }: {
   onClose: () => void
   wide?: boolean
+  /** Optional small pill rendered top-left (replaces the original
+   *  unexplained green dot). Desktop-only — mobile mockup omits it
+   *  in favour of the step-dot indicator at the top of the sheet. */
+  statusPill?: string
+  /** 1-indexed step number. When set, mobile renders a grip + dot
+   *  progress strip at the top of the sheet (Section 1 mockup). */
+  step?: number
+  /** Total step count for the dot strip. Defaults to 4 (the current
+   *  iris → mia → mia-info → leo flow). */
+  totalSteps?: number
   children: React.ReactNode
 }) {
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/55 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/55 backdrop-blur-sm md:px-4"
       onClick={onClose}
     >
       <div
         onClick={e => e.stopPropagation()}
-        className={`relative ${wide ? 'max-w-2xl' : 'max-w-md'} w-full bg-night-mid border border-white/10 rounded-2xl text-tower-cream shadow-2xl animate-onboarding-pop`}
-        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+        className={
+          'relative w-full bg-night-mid border border-white/10 text-tower-cream shadow-2xl animate-onboarding-pop ' +
+          // Mobile: bottom sheet with grip — full width, rounded top
+          // only, anchored to bottom. Desktop: centered card with full
+          // rounded corners and a max width.
+          'rounded-t-3xl md:rounded-2xl ' +
+          (wide ? 'md:max-w-2xl ' : 'md:max-w-md ')
+        }
+        style={{
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
       >
-        {/* Green "live" indicator — pinned top-left, mirrors the
-            screenshots. Glow ring is purely cosmetic. */}
-        <span
-          aria-hidden
-          className="absolute top-4 left-4 inline-block w-3 h-3 rounded-full bg-emerald-400"
-          style={{ boxShadow: '0 0 12px rgba(52, 211, 153, 0.6)' }}
-        />
+        {/* Mobile grip + step dots — replaces the green dot for mobile
+            users (Section 1 mockup). Hidden on desktop where the
+            centered modal doesn't read as a draggable sheet. */}
+        {typeof step === 'number' && (
+          <div className="md:hidden flex flex-col items-center pt-2.5 pb-1" aria-hidden>
+            <div className="w-9 h-1 rounded-full bg-white/20" />
+            <div className="flex items-center gap-1.5 mt-2">
+              {Array.from({ length: totalSteps }).map((_, i) => (
+                <span
+                  key={i}
+                  className={
+                    'rounded-full transition-colors ' +
+                    (i + 1 === step
+                      ? 'w-4 h-1.5 bg-purple-400'
+                      : 'w-1.5 h-1.5 bg-white/20')
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Desktop-only status pill — top-left of the centered card. */}
+        {statusPill && (
+          <span
+            className="hidden md:inline-flex absolute top-3 left-3 items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/25 text-emerald-300 text-[10px] font-bold uppercase tracking-[0.08em]"
+          >
+            <span
+              aria-hidden
+              className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+              style={{ boxShadow: '0 0 6px rgba(52, 211, 153, 0.7)' }}
+            />
+            {statusPill}
+          </span>
+        )}
+
+        {/* × close — hidden on mobile (the mockup relies on grip-drag
+            / backdrop tap), shown on desktop where there's no grip. */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 p-1.5 rounded-md text-tower-cream/60 hover:text-tower-cream hover:bg-white/5 transition"
+          className="hidden md:flex absolute top-3 right-3 p-1.5 rounded-md text-tower-cream/60 hover:text-tower-cream hover:bg-white/5 transition"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
-        <div className="px-6 pt-12 pb-6">{children}</div>
+
+        <div
+          className={
+            // Mobile: tighter top padding since the grip+dots already
+            // occupy that space. Desktop: room for the pill / close.
+            (typeof step === 'number' ? 'pt-3 ' : 'pt-12 ') +
+            (statusPill ? 'md:pt-14 ' : 'md:pt-12 ') +
+            'px-6 pb-6'
+          }
+        >
+          {children}
+        </div>
       </div>
     </div>
   )
@@ -81,42 +146,58 @@ interface IrisProps {
 export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
   const [value, setValue] = useState('')
   return (
-    <ModalShell onClose={onSkip}>
+    <ModalShell onClose={onSkip} statusPill="Pre-launch · Free" step={1}>
+      {/* Centered layout per the mobile mockup. Headline, body, label
+          and input are all centered; the input itself still left-aligns
+          its typed value so users can read what they typed. */}
       <div className="text-center">
-        <div className="text-4xl mb-3" aria-hidden>🤝</div>
-        <h2 className="text-xl font-bold mb-1">Hi, I&apos;m Iris</h2>
-        <p className="text-sm text-tower-cream/70 mb-5 leading-relaxed">
-          Welcome to Diaflow Tower. Our AI teammates launch soon — meanwhile,
-          build your team, climb the tower, and the top floors win free usage
-          at launch. Every great team needs a name. What&apos;s yours called?
+        <div className="text-3xl mb-2.5" aria-hidden>🤝</div>
+        <h2 className="text-[24px] md:text-[26px] font-extrabold leading-tight tracking-tight mb-3">
+          Hire your AI team — for free.
+        </h2>
+        {/* Tightened body — two short stress-beat lines instead of two
+            full paragraphs. The keep-it promise lands on a bold close. */}
+        <p className="text-[14px] text-tower-cream/70 leading-relaxed mb-2.5">
+          Diaflow is launching{' '}
+          <strong className="text-tower-cream font-semibold">AI Teammate</strong>{' '}
+          this summer — real AI workers, not just chat.
+        </p>
+        <p className="text-[14px] text-tower-cream/85 font-semibold leading-relaxed mb-4">
+          Every teammate you earn is yours at launch.
         </p>
         <form
           onSubmit={e => {
             e.preventDefault()
             if (value.trim()) onSubmit(value.trim())
           }}
-          className="space-y-3"
         >
+          <label
+            htmlFor="iris-company-name"
+            className="block text-[11px] font-bold uppercase tracking-[0.06em] text-purple-300 mb-1.5"
+          >
+            Name your office
+          </label>
           <input
+            id="iris-company-name"
             type="text"
             autoFocus
             value={value}
             onChange={e => setValue(e.target.value.slice(0, 40))}
-            placeholder="e.g. Midnight Dev, Caffeine HR…"
-            className="w-full px-4 py-2.5 rounded-lg bg-night-deep/80 border border-white/10 focus:border-tower-gold focus:outline-none text-sm text-center"
+            placeholder="e.g. Acme Co, Midnight Dev"
+            className="w-full px-4 py-3 mb-3 rounded-xl bg-night-deep/80 border border-white/10 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/25 text-[15px] text-center"
           />
           <button
             type="submit"
             disabled={!value.trim()}
-            className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
-            Let&apos;s go →
+            Build my team →
           </button>
         </form>
-        <p className="mt-4 text-xs text-tower-cream/50">
-          Already have an office?{' '}
-          <Link href="/login" className="text-tower-gold hover:underline">
-            Log in →
+        <p className="mt-4 text-[13px] text-tower-cream/55">
+          Already saved?{' '}
+          <Link href="/login" className="text-purple-300 font-semibold hover:underline">
+            Log in
           </Link>
         </p>
       </div>
@@ -135,32 +216,38 @@ interface MiaProps {
 export function MiaBubble({ onSubmit, onSkip }: MiaProps) {
   const [value, setValue] = useState('')
   return (
-    <ModalShell onClose={onSkip}>
+    <ModalShell onClose={onSkip} step={2}>
       <div className="text-center">
-        <div className="text-4xl mb-3" aria-hidden>💁</div>
-        <h2 className="text-xl font-bold mb-1">Hi, I&apos;m Mia</h2>
-        <p className="text-sm text-tower-cream/70 mb-5">What do you do for work?</p>
+        <div className="text-3xl mb-2" aria-hidden>💁</div>
+        <h2 className="text-[22px] md:text-[24px] font-extrabold leading-tight tracking-tight mb-2">
+          Hi, I&apos;m Mia —{' '}
+          <span className="bg-gradient-to-r from-purple-300 to-purple-400 bg-clip-text text-transparent">
+            your AI teammate.
+          </span>
+        </h2>
+        <p className="text-[14px] text-tower-cream/70 leading-relaxed mb-4">
+          Tell me what you do and I&apos;ll specialize for your role.
+        </p>
         <form
           onSubmit={e => {
             e.preventDefault()
             if (value.trim()) onSubmit(value.trim())
           }}
-          className="space-y-3"
         >
           <input
             type="text"
             autoFocus
             value={value}
             onChange={e => setValue(e.target.value.slice(0, 80))}
-            placeholder="e.g. CEO, Developer, Designer…"
-            className="w-full px-4 py-2.5 rounded-lg bg-night-deep/80 border border-white/10 focus:border-tower-gold focus:outline-none text-sm text-center"
+            placeholder="Your role"
+            className="w-full px-4 py-3 mb-3 rounded-xl bg-night-deep/80 border border-white/10 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/25 text-[15px] text-center"
           />
           <button
             type="submit"
             disabled={!value.trim()}
-            className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
-            Let&apos;s see →
+            Match me →
           </button>
         </form>
       </div>
@@ -183,11 +270,15 @@ interface MiaInfoProps {
    *  the user submitted their job — swaps in a "Hang on…" hint so the
    *  modal doesn't read like a frozen default. */
   loading?: boolean
+  /** Raw role string the user typed in the previous step. Used to
+   *  personalise the loading headline ("Building your {role}
+   *  teammate…") so the morph feels addressed to them, not generic. */
+  userRole?: string | null
   /** Advance to Leo step. */
   onNext: () => void
 }
 
-export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaInfoProps) {
+export function MiaInfoBubble({ recommendedRole, reason, loading, userRole, onNext }: MiaInfoProps) {
   // Render priority:
   //   1. loading  → spinner + "matching…" — Diaflow API in flight
   //   2. reason   → personalised heading + reason (whitespace-pre-line)
@@ -199,77 +290,95 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaI
   // "finding your match" experience.
   const hasReason = !!(reason && reason.trim())
   const showLoading = !!loading && !hasReason
+  // Trim + truncate the user's typed role so it fits inside the
+  // morph headline without breaking layout. Empty string falls back to
+  // the generic "your" copy so the headline still parses.
+  const headlineRole = (userRole ?? '').trim().slice(0, 40) || 'your'
   return (
-    <ModalShell onClose={onNext}>
+    <ModalShell onClose={onNext} step={showLoading ? 3 : 3}>
       <div>
-        <div className="text-4xl mb-3" aria-hidden>💁</div>
+        {/* Each branch owns its own avatar:
+              loading      → ringed MorphAvatar (sells the morph)
+              personalised → simple 💁 above the combined headline
+              default      → simple 💁 above the generic pitch
+            so there's no duplicate when branches stack. */}
 
         {showLoading ? (
-          // Loading state — Diaflow API hasn't returned yet. Replaces
-          // both the personalised + default content so there's only
-          // ever one "phase" visible at a time. The CTA below stays
-          // enabled so the user can skip ahead if they don't want to
-          // wait (clicking advances to Leo regardless).
-          <>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80 mb-1">
-              Matching your AI teammate
+          // ── Mia morph / specializing state ────────────────────────
+          // Replaces the previous spinner-card with the choreographed
+          // morph from Section 1 / step 2 mockup: ringed avatar, role
+          // label, "Building your {role} teammate…" headline,
+          // adapting sub-line, progress bar, and a 2-item check list.
+          // The CTA is suppressed (hidden below) so users can't skip
+          // out of the ~2s morph mid-animation.
+          <div className="text-center">
+            <MorphAvatar />
+            <div className="text-[10.5px] uppercase tracking-[0.1em] font-bold text-purple-300 mb-1.5">
+              Specializing Mia for your role
             </div>
-            <h2 className="text-xl font-bold mb-4">
-              Finding the right fit…
+            <h2 className="text-[22px] md:text-[24px] font-extrabold leading-tight tracking-tight mb-2">
+              Building your{' '}
+              <span className="bg-gradient-to-r from-purple-300 to-purple-400 bg-clip-text text-transparent">
+                {headlineRole}
+              </span>{' '}
+              teammate…
             </h2>
-            <div className="flex items-start gap-3 py-4 mb-5 rounded-lg border border-purple-500/25 bg-purple-500/5 px-4">
-              <MiaSpinner />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-purple-200">
-                  Analyzing your role…
-                </p>
-                <p className="text-xs text-tower-cream/60 mt-0.5 leading-relaxed">
-                  We&apos;re picking the perfect AI teammate for what you do.
-                  This usually takes a couple of seconds.
-                </p>
-              </div>
+            <p className="text-[13.5px] text-tower-cream/65 mb-5">
+              Mia is adapting to the way you work.
+            </p>
+            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mb-5">
+              <div className="h-full w-3/4 bg-gradient-to-r from-purple-400 to-purple-300 rounded-full animate-morph-progress" />
             </div>
-          </>
+            <ul className="text-left text-[13px] space-y-2">
+              <li className="flex items-center gap-2.5 text-tower-cream/80">
+                <span className="text-emerald-400 font-extrabold leading-none" aria-hidden>✓</span>
+                <span>Calibrating to your role</span>
+              </li>
+              <li className="flex items-center gap-2.5 text-tower-cream/55">
+                <MorphSpinnerDot />
+                <span>Matching to your role…</span>
+              </li>
+            </ul>
+          </div>
         ) : hasReason ? (
-          // Diaflow returned a real rationale — surface the role as
-          // the heading and the reason as a styled bullet list. The
-          // upstream returns bullet-style text separated by `\n`, so
-          // we split on newlines and render each non-empty line as a
-          // <li> inside the same purple-bordered card the MiaInfoCard
-          // uses. Leading bullet characters are stripped so we can
-          // supply our own glyph (visual consistency between the two
-          // Mia surfaces).
-          <>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80 mb-1">
-              Your AI assistant match
-            </div>
-            <h2 className="text-xl font-bold mb-3">
-              {recommendedRole ?? 'Hi, I’m Mia — your Assistant.'}
+          // Diaflow returned a real rationale. Single combined headline
+          // ("Hi, I'm Mia — your <role>. I'm on your team the day AI
+          // Teammate launches:") with the role in purple gradient,
+          // followed by a purple-bordered card containing the bullet
+          // list (mockup Section 1 / step 3). Leading bullet glyphs
+          // from the upstream are stripped so we can supply our own
+          // (visual consistency between Mia surfaces).
+          <div className="text-center">
+            <div className="text-3xl mb-2.5" aria-hidden>💁</div>
+            <h2 className="text-[19px] md:text-[20px] font-extrabold leading-snug tracking-tight mb-4">
+              Hi, I&apos;m Mia —{' '}
+              <span className="bg-gradient-to-r from-purple-300 to-purple-400 bg-clip-text text-transparent">
+                your {recommendedRole ?? 'AI teammate'}.
+              </span>{' '}
+              I&apos;m on your team the day AI Teammate launches:
             </h2>
-            <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-4 py-3 mb-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80 mb-2">
-                What Mia will do for you
-              </p>
+            <div className="text-left rounded-xl border border-purple-500/25 bg-purple-500/[0.04] px-4 py-3 mb-5">
               <ul className="space-y-2">
                 {reason!
                   .split('\n')
                   .map(line => line.replace(/^[-•·*]\s*/, '').trim())
                   .filter(line => line.length > 0)
                   .map((line, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <span className="text-purple-300 mt-0.5 leading-none" aria-hidden>•</span>
+                    <li key={i} className="flex items-start gap-2.5 text-[14px]">
+                      <span className="text-purple-300 mt-1 leading-none" aria-hidden>•</span>
                       <span className="text-tower-cream/85">{line}</span>
                     </li>
                   ))}
               </ul>
             </div>
-          </>
+          </div>
         ) : (
           // Default fallback — Diaflow not configured / upstream
           // failed / no loading flag. Shows the generic pitch so the
           // modal isn't blank for users without a personalised
           // recommendation.
           <>
+            <div className="text-3xl mb-2.5 text-center md:text-left" aria-hidden>💁</div>
             <h2 className="text-xl font-bold mb-3">
               Hi, I&apos;m Mia — your Assistant.
             </h2>
@@ -287,46 +396,70 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, onNext }: MiaI
           </>
         )}
 
-        <button
-          type="button"
-          onClick={onNext}
-          className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition"
-        >
-          {showLoading ? 'Skip & meet your next teammate →' : 'Meet your next teammate →'}
-        </button>
+        {!showLoading && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition"
+          >
+            Meet the rest →
+          </button>
+        )}
       </div>
     </ModalShell>
   )
 }
 
-/** Purple loading spinner used by MiaInfoBubble while the Diaflow
- *  job-summary API is in flight. Tailwind's `animate-spin` keeps the
- *  whole svg rotating; the masked arc gives it visible motion. */
-function MiaSpinner() {
+/** Circular "morph" avatar — 💁 emoji wrapped in a spinning purple
+ *  arc ring. Used by the Mia loading state to sell the ~2s
+ *  "specializing" transformation as something happening, not theater.
+ *  Two concentric arcs spin in opposite directions for visual depth. */
+function MorphAvatar() {
   return (
-    <svg
-      className="animate-spin text-purple-300 shrink-0"
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
+    <div className="relative w-[88px] h-[88px] mx-auto mb-4">
+      {/* Soft purple glow background */}
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(168,117,255,0.35) 0%, transparent 70%)',
+        }}
+      />
+      {/* Outer ring — slower, reverse direction */}
+      <div
+        className="absolute -inset-2 rounded-full border-2 border-purple-400/40 animate-spin"
+        style={{
+          borderTopColor: 'transparent',
+          animationDuration: '1.8s',
+          animationDirection: 'reverse',
+        }}
+      />
+      {/* Inner ring — faster, forward direction */}
+      <div
+        className="absolute inset-0 rounded-full border-2 border-purple-400 animate-spin"
+        style={{
+          borderTopColor: 'transparent',
+          animationDuration: '1.2s',
+        }}
+      />
+      {/* Emoji center — gently pulses */}
+      <div className="absolute inset-0 flex items-center justify-center text-[56px] leading-none animate-morph-pulse">
+        <span aria-hidden>💁</span>
+      </div>
+    </div>
+  )
+}
+
+/** Pending-step dot used inside the morph check list. A small ring
+ *  with an open top arc that spins — visually matches the "in progress"
+ *  state from the mockup without needing a separate svg. */
+function MorphSpinnerDot() {
+  return (
+    <span
       aria-hidden
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeOpacity="0.25"
-        strokeWidth="3"
-      />
-      <path
-        d="M22 12a10 10 0 0 1-10 10"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
+      className="inline-block w-3.5 h-3.5 rounded-full border-[1.5px] border-tower-cream/40 animate-spin shrink-0"
+      style={{ borderTopColor: 'transparent', animationDuration: '0.9s' }}
+    />
   )
 }
 
@@ -347,45 +480,62 @@ interface LeoProps {
 }
 
 export function LeoBubble({ onContinue }: LeoProps) {
-  // Resolve YouTube URL from env. Both embed + watch flavours of the
-  // same ID are returned so the iframe can play in-place AND the
-  // "Watch on YouTube" button can deep-link to youtube.com.
+  // Resolve YouTube URL from env. Embed URL is the only flavour needed
+  // now — the "Watch on YouTube" link was removed per the Section 1 /
+  // step 4 mockup (the inline play button covers the same path).
   const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL)
 
   return (
-    <ModalShell onClose={onContinue} wide>
+    <ModalShell onClose={onContinue} wide step={4}>
       <div>
-        {/* Video — embedded YouTube iframe driven by NEXT_PUBLIC_YOUTUBE_URL */}
-        <div className="rounded-lg overflow-hidden border border-white/10 aspect-video bg-black mb-4 relative">
-          <iframe
-            src={video.embed}
-            title="Diaflow intro"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            className="w-full h-full"
+        {/* Embedded YouTube iframe driven by NEXT_PUBLIC_YOUTUBE_URL.
+            16:9 aspect ratio + purple glow underneath so the video
+            doesn't look pasted onto the dark surface. */}
+        <div className="relative mb-4">
+          <div
+            aria-hidden
+            className="absolute -inset-2 rounded-2xl opacity-50 blur-2xl"
+            style={{
+              background:
+                'radial-gradient(circle at 50% 70%, rgba(168,117,255,0.35), transparent 65%)',
+            }}
           />
+          <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-video bg-black">
+            <iframe
+              src={video.embed}
+              title="Diaflow intro"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="w-full h-full"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center justify-between mb-4 gap-3">
-          <p className="text-sm font-semibold text-tower-cream">
-            🚀 Hi, I&apos;m Leo — here&apos;s a quick tour of what we&apos;re building.
-          </p>
-          <a
-            href={video.watch}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-deep/80 border border-white/10 text-xs text-tower-cream/80 hover:bg-night-deep hover:text-tower-cream transition whitespace-nowrap"
-          >
-            ▶ Watch on YouTube
-          </a>
+        {/* Leo's one-liner — purple gradient highlights his specialised
+            role (mirrors the "your AI Pair Programmer" treatment Mia
+            uses one step earlier). */}
+        <p className="text-center text-[14px] text-tower-cream leading-relaxed mb-4">
+          <span aria-hidden>🚀</span> Hi, I&apos;m Leo —{' '}
+          <span className="bg-gradient-to-r from-purple-300 to-purple-400 bg-clip-text text-transparent font-semibold">
+            your AI Demo Specialist.
+          </span>{' '}
+          60-sec tour of your office.
+        </p>
+
+        {/* Purple-tinted promise reminder — third and final beat of
+            the "keep it" promise from Iris → Mia → Leo. Matches the
+            purple accent used throughout the rest of the onboarding. */}
+        <div className="flex items-center justify-center gap-2 rounded-xl border-y border-purple-400/25 bg-purple-500/[0.05] px-3 py-2.5 mb-4 text-[12.5px] font-semibold text-purple-300">
+          <span aria-hidden>🔒</span>
+          <span>Every teammate is yours at launch.</span>
         </div>
 
         <button
           type="button"
           onClick={onContinue}
-          className="w-full px-4 py-3 rounded-lg bg-tower-gold text-night-deep font-bold text-sm hover:bg-tower-gold/90 transition"
+          className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition"
         >
-          Got it — let&apos;s climb →
+          Let&apos;s climb →
         </button>
       </div>
     </ModalShell>

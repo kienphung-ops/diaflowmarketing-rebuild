@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAnchorPosition } from '@/lib/anchorPositions'
+import { useIsDesktop } from '@/hooks/useIsDesktop'
 
 interface Teammate {
   id: string
@@ -26,8 +27,15 @@ interface Props {
 }
 
 export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, onResetPosition, anchorSlug }: Props) {
-  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
-  const anchored = !!anchorSlug
+  // Only bind the live-anchor ref on desktop — on mobile we render
+  // as a bottom sheet anchored to the viewport, not to the
+  // character, so the transform-per-frame loop would just fight the
+  // sheet's position.
+  const isDesktop = useIsDesktop()
+  const anchorRef = useAnchorPosition(
+    open && isDesktop ? anchorSlug ?? null : null,
+  )
+  const anchored = !!anchorSlug && isDesktop
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
 
@@ -59,29 +67,62 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
     <div
       role="dialog"
       aria-modal="true"
+      // Mobile: full-bleed flex container with a backdrop and the
+      // form pinned to the bottom edge (sheet). Desktop behaviour
+      // depends on whether we have a character anchor:
+      //   anchored=true  → the form is absolutely positioned via the
+      //                    anchor ref, so the flex centering is moot
+      //                    and the backdrop disappears (the popover
+      //                    floats next to the character).
+      //   anchored=false → the form is centered in the viewport with
+      //                    the same backdrop the original modal used.
+      // z-40 so the bottom-sheet form on mobile paints over the
+      // MobileBottomNav (z-30). `pb-[…]` on mobile lifts the form
+      // up off the bottom edge by the nav's height so both surfaces
+      // are visible + tappable; on desktop `md:pb-0` removes the
+      // lift since the form is centred there.
       className={
-        anchored
-          ? 'fixed inset-0 z-30'
-          : 'fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4'
+        'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
+        (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}
     >
       <div
         ref={anchored ? anchorRef : undefined}
         onClick={anchored ? e => e.stopPropagation() : undefined}
-        className={anchored ? 'absolute top-0 left-0 pointer-events-none' : 'contents'}
+        className={
+          // Wrapper takes its shape from the device:
+          //   mobile  → full-width, sits at the bottom of the flex.
+          //   desktop → absolute, lives at top:0/left:0 and gets a
+          //             per-frame transform from the anchor ref.
+          (anchored
+            ? 'md:absolute md:top-0 md:left-0 md:pointer-events-none w-full md:w-auto '
+            : 'w-full md:w-auto md:contents ')
+        }
         style={anchored ? { willChange: 'transform' } : undefined}
       >
       <form
         onClick={e => e.stopPropagation()}
         onSubmit={handleSubmit}
         className={
-          anchored
-            ? 'pointer-events-auto w-[min(360px,calc(100vw-32px))] max-w-sm bg-night-mid border border-tower-gold/40 rounded-2xl p-6 text-tower-cream shadow-2xl'
-            : 'w-full max-w-sm bg-night-mid border border-tower-gold/40 rounded-2xl p-6 text-tower-cream shadow-2xl'
+          // Form shell — bottom sheet on mobile, anchored / centered
+          // card on desktop. Mobile gets a sheet grip + safe-area
+          // bottom inset; desktop keeps the existing 2xl rounded
+          // card with 6-unit padding.
+          'w-full bg-night-mid border-t border-tower-gold/40 text-tower-cream shadow-2xl ' +
+          'rounded-t-3xl md:rounded-2xl md:border md:border-tower-gold/40 ' +
+          'pt-3 px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:p-6 ' +
+          (anchored
+            ? 'md:pointer-events-auto md:w-[min(360px,calc(100vw-32px))] md:max-w-sm'
+            : 'md:max-w-sm md:mx-auto')
         }
         style={anchored ? { transform: 'translate(28px, -50%)' } : undefined}
       >
+        {/* Mobile sheet grip */}
+        <div className="md:hidden flex justify-center -mt-1 mb-3" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-lg font-bold">Edit teammate</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="text-tower-cream/50 hover:text-tower-cream text-xl">

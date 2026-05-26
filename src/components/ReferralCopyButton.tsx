@@ -51,8 +51,13 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
         'Copied!'
       ) : (
         <>
-          {/* Compact label on mobile, full label on desktop. */}
-          <span className="md:hidden">⧉ Invite link</span>
+          {/* Per the mobile spec: signed-in users see a compact
+              "Invite" pill (the bottom nav's hero share button is
+              the primary share affordance now, so the header button
+              only needs to advertise the option). Desktop keeps the
+              long "Copy your invite link" label since the header is
+              the only share entry point there. */}
+          <span className="md:hidden">Invite</span>
           <span className="hidden md:inline">Copy your invite link</span>
         </>
       )}

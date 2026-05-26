@@ -37,6 +37,7 @@ import {
   DEFAULT_NPC_COUNT,
 } from '@/lib/floors'
 import { useMaxTeammates } from '@/lib/floorsConfigClient'
+import { Mobile2DScene } from '@/components/scene2d/Mobile2DScene'
 import type { InviterInfo } from '@/lib/inviter'
 
 const SceneCanvas = dynamicImport(
@@ -377,8 +378,12 @@ export default function FloorVisitorClient(props: Props) {
           floor. Viewer count + total pokes now live inside the
           MySquadDrawer "Visiting" pill (see the `visiting` prop below)
           to keep the on-scene chrome minimal. */}
+      {/* Desktop-only visiting card — wider layout with the
+          "Tap a teammate to poke them" hint. Hidden on mobile
+          (md:block) so the new MOBILE visiting pill below takes
+          over there with its chip-style stats. */}
       <div
-        className="absolute top-14 md:top-16 left-3 md:left-4 z-20 px-4 py-2.5 rounded-2xl bg-black/65 backdrop-blur-md border border-white/15 max-w-[80vw] md:max-w-[260px]"
+        className="hidden md:block absolute md:top-16 md:left-4 z-20 px-4 py-2.5 rounded-2xl bg-black/65 backdrop-blur-md border border-white/15 md:max-w-[260px]"
         style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
       >
         <div className="text-[10px] text-amber-300/80 uppercase tracking-[0.18em] mb-0.5">
@@ -399,25 +404,76 @@ export default function FloorVisitorClient(props: Props) {
           bumped so the standard Header clears it. */}
       <PokesPanel teammates={teammates} pokingId={pokingId} onPoke={poke} />
 
-      {/* Visitors CAN drag teammates — the drop triggers a poke API
-          call (see pokeBySlug). Position changes themselves stay
-          client-side; only the poke counter is persisted. */}
-      <SceneCanvas
-        onboardingStep="done"
+      {/* Desktop: 3D scene. Visitors CAN drag teammates — the drop
+          triggers a poke API call (see pokeBySlug). Position changes
+          themselves stay client-side; only the poke counter is
+          persisted. Hidden on mobile, where the 2D scene below
+          handles rendering. */}
+      <div className="hidden md:block">
+        <SceneCanvas
+          onboardingStep="done"
+          companyName={props.teamName ?? null}
+          recruitedCharacters={teammates
+            .filter(t => !t.isDefault)
+            .map(t => ({ name: t.name, role: t.role }))}
+          currentFloor={props.currentFloor}
+          unlockedItemKeys={props.unlockedItemKeys}
+          onFloorClick={() => {}}
+          onTeammatePoke={pokeBySlug}
+          // Show the OWNER's Mia role (server-stored Diaflow recommendation)
+          // above her head when visiting their floor. Falls back to the
+          // OfficeScene default when the row isn't present (legacy
+          // accounts that pre-date the Diaflow integration).
+          miaRole={teammates.find(t => t.slug === 'mia')?.role ?? null}
+        />
+      </div>
+
+      {/* Mobile: 2D front-elevation visitor preview. Tapping a
+          teammate fires the same poke handler the desktop drag-drop
+          uses, so visitors get poke parity across breakpoints
+          (without the desktop-only drag affordance). */}
+      <Mobile2DScene
         companyName={props.teamName ?? null}
         recruitedCharacters={teammates
           .filter(t => !t.isDefault)
           .map(t => ({ name: t.name, role: t.role }))}
         currentFloor={props.currentFloor}
-        unlockedItemKeys={props.unlockedItemKeys}
-        onFloorClick={() => {}}
-        onTeammatePoke={pokeBySlug}
-        // Show the OWNER's Mia role (server-stored Diaflow recommendation)
-        // above her head when visiting their floor. Falls back to the
-        // OfficeScene default when the row isn't present (legacy
-        // accounts that pre-date the Diaflow integration).
         miaRole={teammates.find(t => t.slug === 'mia')?.role ?? null}
+        // Drag-drop → poke, matching the desktop 3D drag-drop
+        // behaviour and the owner's office view. Tap (no movement)
+        // is intentionally a no-op for visitors — they shouldn't be
+        // opening edit modals on someone else's floor.
+        onTeammatePoke={pokeBySlug}
       />
+
+      {/* Mobile-only "Visiting <owner>" pill anchored under the
+          header chrome. Tells the visitor whose office they're
+          looking at + the owner's floor / total-pokes status at a
+          glance. Mirrors mockup screen 16. Hidden on desktop where
+          the standard Header already has a wider visiting label. */}
+      <div
+        className="md:hidden fixed left-3 z-[11] rounded-2xl border border-white/10 bg-night-deep/85 backdrop-blur-md px-3 py-2.5 max-w-[75%] pointer-events-none"
+        style={{
+          top: 'calc(env(safe-area-inset-top, 0px) + 56px)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+        }}
+      >
+        <div className="text-[9px] uppercase tracking-[0.1em] font-extrabold text-tower-gold mb-0.5">
+          ⭐ Visiting
+        </div>
+        <div className="text-[14px] font-extrabold text-tower-cream leading-tight mb-1 truncate">
+          {ownerName}
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          <span className="rounded-full px-2 py-0.5 text-[9.5px] font-bold bg-tower-gold/15 text-tower-gold border border-tower-gold/30">
+            {props.currentFloor >= 20 ? '👑' : '🏢'} Floor{' '}
+            {props.currentFloor}
+          </span>
+          <span className="rounded-full px-2 py-0.5 text-[9.5px] font-bold bg-purple-500/15 text-purple-200 border border-purple-400/30">
+            ⭐ {totalPokes} {totalPokes === 1 ? 'poke' : 'pokes'}
+          </span>
+        </div>
+      </div>
 
       {/* MySquad — visitor's OWN squad, not the owner's. Right-edge
           floating button + slide-in drawer, same component the office
@@ -478,19 +534,54 @@ export default function FloorVisitorClient(props: Props) {
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
-      {/* Unlogged-visitor CTA — bottom-center, redirects into the
-          referral signup flow with the owner's code so they show up
-          as a credited invite the moment they create an account. */}
+      {/* Unlogged-visitor CTA. Two flavours of the same call-to-
+          action, gated on viewport so each gets a layout that fits
+          its constraints:
+
+           Desktop (md+): single-line gold pill bottom-centre, same
+             as before. Plenty of horizontal space → no need for the
+             two-line eyebrow + headline stack.
+           Mobile  (< md): full-width gold→purple gradient card with
+             eyebrow ("Like what you see?") above the headline
+             ("Build your AI team in 30 sec"), per mockup screen 16.
+             Same `?ref=<code>` deep-link in both. */}
       {!props.visitorSignedIn && (
-        <a
-          href={`/?ref=${encodeURIComponent(props.code)}`}
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 max-w-[92vw] whitespace-nowrap px-5 md:px-7 py-3 md:py-3.5 rounded-xl bg-gradient-to-r from-tower-gold to-amber-300 text-night-deep text-sm md:text-base shadow-2xl flex items-center gap-2 hover:from-amber-200 hover:to-tower-gold transition group"
-          style={{ boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}
-        >
-          <span className="opacity-80">Like what you see?</span>
-          <span className="font-bold">Build your own office in 30 seconds</span>
-          <span className="text-lg font-bold group-hover:translate-x-0.5 transition-transform">→</span>
-        </a>
+        <>
+          {/* Desktop / wider viewports — keep the established pill. */}
+          <a
+            href={`/?ref=${encodeURIComponent(props.code)}`}
+            className="hidden md:inline-flex fixed bottom-5 left-1/2 -translate-x-1/2 z-30 max-w-[92vw] whitespace-nowrap px-7 py-3.5 rounded-xl bg-gradient-to-r from-tower-gold to-amber-300 text-night-deep text-base shadow-2xl items-center gap-2 hover:from-amber-200 hover:to-tower-gold transition group"
+            style={{ boxShadow: '0 18px 50px rgba(0,0,0,0.55)' }}
+          >
+            <span className="opacity-80">Like what you see?</span>
+            <span className="font-bold">Build your own office in 30 seconds</span>
+            <span className="text-lg font-bold group-hover:translate-x-0.5 transition-transform">→</span>
+          </a>
+
+          {/* Mobile — full-width gradient card anchored above the
+              safe-area inset. Two-line copy + chunky arrow on the
+              right. Lifts higher than the iOS home indicator so the
+              tap target stays reachable. */}
+          <a
+            href={`/?ref=${encodeURIComponent(props.code)}`}
+            className="md:hidden fixed inset-x-4 z-30 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-[0_18px_50px_rgba(168,117,255,0.4)]"
+            style={{
+              bottom: 'max(1rem, env(safe-area-inset-bottom))',
+              background: 'linear-gradient(135deg, #c4a3ff 0%, #fbbf24 100%)',
+              color: '#0a0b14',
+            }}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-[10.5px] font-bold leading-tight opacity-75">
+                Like what you see?
+              </div>
+              <div className="text-[14px] font-extrabold leading-tight mt-0.5">
+                Build your AI team in 30 sec
+              </div>
+            </div>
+            <div className="text-xl font-extrabold shrink-0">→</div>
+          </a>
+        </>
       )}
 
       {/* Tower navigation overlay — covers the visited floor while

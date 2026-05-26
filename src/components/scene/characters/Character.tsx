@@ -359,6 +359,14 @@ export const Character = memo(function Character({
           ? 'off-floor'
           : null
         if (!reason) {
+          // Per the Step-1 design: default room state keeps the scene
+          // clean by hiding labels until the user signals interest.
+          // We surface the badge only on hover OR when this character
+          // is the currently-selected one (which keeps the label
+          // visible while a follow-up modal is open). Beacon mode
+          // below is exempt — those are emergency labels for an
+          // off-screen teammate the user can't find otherwise.
+          if (!hovered && !isSelected) return null
           return <NameBadge name={config.name} role={config.role} />
         }
         // Target world position for the beacon — above wall (y=5.9),

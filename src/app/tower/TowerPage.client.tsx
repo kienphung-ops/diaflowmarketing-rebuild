@@ -21,7 +21,17 @@ import {
 import { useMaxTeammates } from '@/lib/floorsConfigClient'
 import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
 import { useFloorPresence } from '@/hooks/useFloorPresence'
+import { useOrigin } from '@/hooks/useOrigin'
+import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
+import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
+import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
+import { TowerTourModal } from '@/components/mobile/TowerTourModal'
 import type { InviterInfo } from '@/lib/inviter'
+
+/** Local-storage key used to track whether the user has already
+ *  completed the mobile tower tour once. Cleared by the "Replay tour"
+ *  button so the user can rewatch it on demand. */
+const TOWER_TOUR_SEEN_KEY = 'diaflow_tower_tour_seen_v1'
 
 interface ServerRecruit {
   id: string
@@ -30,6 +40,10 @@ interface ServerRecruit {
   slug?: string | null
   isDefault?: boolean
   pokes?: number
+  /** "Launch-day promise" — Diaflow-API-generated sentence shown in
+   *  the speech bubble. May be null while the bulk-add background
+   *  fetch is still resolving; UI falls back to a generic line. */
+  description?: string | null
 }
 
 interface Props {
@@ -51,6 +65,30 @@ export default function TowerPageClient(props: Props) {
   const [signupOpen, setSignupOpen] = useState(false)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
+  // Mobile-only 4-step tour overlay. Auto-opens once on first visit
+  // (gated by localStorage so it doesn't replay on every refresh) and
+  // can be re-triggered manually via the "Replay tour" link below.
+  const [tourOpen, setTourOpen] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const seen = window.localStorage.getItem(TOWER_TOUR_SEEN_KEY)
+      if (!seen) setTourOpen(true)
+    } catch {
+      /* ignore — storage disabled */
+    }
+  }, [])
+  // Persist "tour seen" the moment the tour closes so the next visit
+  // doesn't auto-open it. Replay still works because the button below
+  // calls setTourOpen(true) directly without clearing the flag.
+  const handleTourClose = useCallback(() => {
+    setTourOpen(false)
+    try {
+      window.localStorage.setItem(TOWER_TOUR_SEEN_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+  }, [])
   // Spinner overlay during the slow /tower → / RSC round-trip. See the
   // TowerLanding.client.tsx note for the full rationale.
   const [isNavigating, setIsNavigating] = useState(false)
@@ -95,6 +133,11 @@ export default function TowerPageClient(props: Props) {
   // upgrade — prevents the celebration modal firing when the user
   // navigates Office → Tower → Office.
   const baselineFloorRef = useRef(props.currentFloor)
+  // Mobile share bottom-sheet — opened from the hero "Invite to climb"
+  // tab. Same component as TowerLanding.
+  const [mobileShareOpen, setMobileShareOpen] = useState(false)
+  // Origin for composing the shareable invite URL (post-hydration only).
+  const origin = useOrigin()
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
@@ -269,6 +312,10 @@ export default function TowerPageClient(props: Props) {
           router.push('/')
         }}
         onOpenSignup={!props.signedIn ? () => setSignupOpen(true) : undefined}
+        // Header "Invite" pill on mobile opens the share sheet.
+        onMobileInvite={
+          props.signedIn ? () => setMobileShareOpen(true) : undefined
+        }
       />
 
       <TowerView
@@ -296,12 +343,70 @@ export default function TowerPageClient(props: Props) {
           back to / without consuming a full sticky bottom bar (which
           would cover the bottom rows of the tower image). */}
       <MySquadFloatingButton visible onClick={() => setSquadOpen(true)} />
-      <MobileTowerActions
-        onOpenSquad={() => setSquadOpen(true)}
+
+      {/* Replay-tour link — small text button surfaced once the user
+          has already seen the tour at least once. Lets signed-in
+          (and trial) users rewatch the 4-step explainer without having
+          to clear their localStorage. Hidden while the tour is open. */}
+      {!tourOpen && (
+        <button
+          type="button"
+          onClick={() => setTourOpen(true)}
+          className="md:hidden fixed left-3 z-20 px-3 py-1.5 rounded-full bg-night-mid/80 border border-purple-400/30 text-purple-300 text-[11px] font-semibold hover:bg-night-mid hover:text-purple-200 transition backdrop-blur-md"
+          style={{
+            bottom: 'calc(72px + env(safe-area-inset-bottom))',
+          }}
+        >
+          ▶ Replay tour
+        </button>
+      )}
+
+      {/* Mobile chrome — counter chips below the header, share sheet,
+          progress pill, and the three-slot bottom nav. The "Tower" tab
+          is the active one here; tapping "Office" navigates back to /,
+          and "Invite to climb" opens the share sheet. */}
+      <div className="md:hidden fixed top-[52px] inset-x-0 z-10">
+        <MobileCounterChips
+          currentFloor={effective.currentFloor}
+          totalInvites={effective.totalInvites}
+          teammateCount={teammateCount}
+          maxTeammates={maxTeammates}
+          rank={rank}
+        />
+      </div>
+      {/* MobileProgressPill used to live here ("🎁 Floor lamp · Floor 2
+          · 1 invite away") but was covering the tower art's bottom
+          floors and duplicating info already in the counter chips.
+          The progress pill remains on the Office view (TowerLanding)
+          where the floor canvas leaves more room for it. */}
+      <MobileBottomNav
+        active="tower"
         onGoOffice={() => {
           setIsNavigating(true)
           router.push('/')
         }}
+        onGoTower={() => {
+          /* already here */
+        }}
+        onOpenSquad={() => setSquadOpen(true)}
+        // Hero CTA in the middle slot — label swaps with login state.
+        heroMode={props.signedIn ? 'invite' : 'save'}
+        onHero={() => {
+          if (props.signedIn) setMobileShareOpen(true)
+          else setSignupOpen(true)
+        }}
+      />
+      <MobileShareSheet
+        open={mobileShareOpen}
+        onClose={() => setMobileShareOpen(false)}
+        inviteUrl={
+          props.signedIn && props.referralCode && origin
+            ? `${origin}/floor/${props.referralCode}`
+            : null
+        }
+        currentFloor={effective.currentFloor}
+        totalInvites={effective.totalInvites}
+        onSignupNudge={!props.signedIn ? () => setSignupOpen(true) : undefined}
       />
 
       <MySquadDrawer
@@ -343,6 +448,19 @@ export default function TowerPageClient(props: Props) {
       />
 
       {signupOpen && <SignupModal onClose={() => setSignupOpen(false)} />}
+
+      {/* Mobile-only 4-step Tower tour. Auto-opens on first /tower visit
+          per the mockup choreography (step 8–11). Step 4's CTA branches:
+            - trial    → opens SignupModal ("Save my team to start climbing")
+            - signed-in → opens MobileShareSheet ("Share to start climbing") */}
+      <TowerTourModal
+        open={tourOpen}
+        onClose={handleTourClose}
+        currentFloor={effective.currentFloor}
+        signedIn={props.signedIn}
+        onSave={() => setSignupOpen(true)}
+        onShare={() => setMobileShareOpen(true)}
+      />
 
       <EmailVerifyModal
         open={emailVerifyOpen}
@@ -419,45 +537,7 @@ function LeaderboardButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-/**
- * Two compact bottom-right pills for /tower mobile: Office (back to /)
- * + My Squad. Kept as floating pills rather than a full sticky bottom
- * bar so the tower image isn't covered. The Office pill sits to the
- * LEFT of My Squad on the same baseline so both are reachable with one
- * thumb. The TowerView info card was relocated from bottom-left to
- * top-left specifically so this row could anchor to bottom-5 without
- * overlapping anything.
- */
-function MobileTowerActions({
-  onOpenSquad,
-  onGoOffice,
-}: {
-  onOpenSquad: () => void
-  onGoOffice: () => void
-}) {
-  return (
-    <div
-      className="md:hidden fixed bottom-5 right-5 z-30 flex items-center gap-2"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      <button
-        onClick={onGoOffice}
-        aria-label="Back to office view"
-        className="px-3.5 py-2.5 rounded-full bg-night-mid/95 border border-tower-gold/40 text-tower-cream font-semibold text-xs shadow-lg flex items-center gap-1.5 backdrop-blur-sm"
-        style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-      >
-        <span aria-hidden>🏠</span>
-        Office
-      </button>
-      <button
-        onClick={onOpenSquad}
-        aria-label="Open My Squad"
-        className="px-3.5 py-2.5 rounded-full bg-tower-gold text-night-deep font-semibold text-xs shadow-lg flex items-center gap-1.5"
-        style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-      >
-        <span aria-hidden>📋</span>
-        My Squad
-      </button>
-    </div>
-  )
-}
+// MobileTowerActions was retired in favour of MobileBottomNav +
+// MobileShareSheet. The new three-slot nav carries Office / Invite /
+// Tower as a sticky bar at the bottom of every page, replacing the
+// floating "Office + My Squad" pill row that used to live here.

@@ -50,7 +50,7 @@ export default async function Home() {
         reason: true,
         referredAt: true,
         recruitedTeams: {
-          select: { id: true, name: true, role: true, slug: true, isDefault: true, pokes: true },
+          select: { id: true, name: true, role: true, slug: true, isDefault: true, pokes: true, description: true },
           orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
         },
         referredBy: {

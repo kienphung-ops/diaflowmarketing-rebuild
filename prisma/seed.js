@@ -51,7 +51,7 @@ const FLOORS = [
   { id: 2,  invitesRequired: 1,   label: 'Floor lamp + basic chair',       maxTeammates: 4,  unlock_items: ['💡 Floor lamp', 'Basic chair'] },
   // F3: 2nd "basic chair + desk" pair. These are 2 SEPARATE items
   // (office_desk + basic_chair) now, not the retired composite.
-  { id: 3,  invitesRequired: 2,   label: 'Basic chair + desk',             maxTeammates: 5,  unlock_items: ['🪑 Basic chair + desk'], product_reward: 'Free beta access' },
+  { id: 3,  invitesRequired: 2,   label: 'Basic chair + desk',             maxTeammates: 5,  unlock_items: ['🪑 Basic chair + desk'], product_reward: '🚀Free early beta' },
   { id: 4,  invitesRequired: 4,   label: 'Potted plant',                    maxTeammates: 5,  unlock_items: ['🌿 Potted plant'] },
   // F5: 3rd "basic chair + desk" pair (cap). From here on the user
   // has 3 office workstations.

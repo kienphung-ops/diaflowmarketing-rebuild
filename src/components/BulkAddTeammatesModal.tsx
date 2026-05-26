@@ -75,14 +75,29 @@ export function BulkAddTeammatesModal({ open, slotsAvailable, currentFloor, onCl
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 backdrop-blur-sm px-4"
+      // Bottom sheet on mobile, centered modal on desktop. Same
+      // pattern used by SignupModal + HowItWorksModal so all three
+      // present consistent geometry at every breakpoint.
+      className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/65 backdrop-blur-sm md:px-4"
       onClick={onClose}
     >
       <form
         onClick={e => e.stopPropagation()}
         onSubmit={handleSubmit}
-        className="w-full max-w-lg bg-night-mid border border-tower-gold/40 rounded-2xl p-6 text-tower-cream shadow-2xl"
+        className={
+          'w-full bg-night-mid text-tower-cream shadow-2xl ' +
+          // Card shape — flat top on mobile (sheet anchored to the
+          // bottom edge), rounded card on desktop.
+          'rounded-t-3xl md:rounded-2xl md:max-w-lg ' +
+          'border-t md:border md:border-tower-gold/40 border-tower-gold/40 ' +
+          // Padding — eat the iOS home-indicator inset on mobile.
+          'pt-5 px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:p-6'
+        }
       >
+        {/* Mobile sheet grip */}
+        <div className="md:hidden flex justify-center -mt-2.5 mb-3" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
         <div className="flex items-start justify-between mb-3">
           <div>
             <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">Floor {currentFloor}</div>

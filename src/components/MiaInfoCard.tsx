@@ -24,6 +24,7 @@
 
 import { useEffect } from 'react'
 import { useAnchorPosition } from '@/lib/anchorPositions'
+import { useIsDesktop } from '@/hooks/useIsDesktop'
 
 interface Props {
   open: boolean
@@ -62,8 +63,14 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
   // Subscribe to the character's screen position. When `anchorSlug`
   // is null we pass null to opt out, and the modal falls back to
   // the legacy centered layout. See lib/anchorPositions.ts.
-  const anchorRef = useAnchorPosition(open ? anchorSlug ?? null : null)
-  const anchored = !!anchorSlug
+  // Only follow the live character position on desktop. On mobile
+  // we render as a bottom sheet — the rAF transform loop would just
+  // fight the sheet anchor, so we skip it entirely there.
+  const isDesktop = useIsDesktop()
+  const anchorRef = useAnchorPosition(
+    open && isDesktop ? anchorSlug ?? null : null,
+  )
+  const anchored = !!anchorSlug && isDesktop
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -87,14 +94,21 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
     <div
       role="dialog"
       aria-modal="true"
+      // Mobile: bottom-sheet flex container with a dim backdrop.
+      // Desktop split:
+      //   anchored=true  → transparent overlay; the card is absolutely
+      //                    positioned via the anchor ref so the office
+      //                    scene behind stays interactive.
+      //   anchored=false → centered modal with a dim backdrop (legacy
+      //                    fallback when the character slug isn't set).
       className={
-        anchored
-          ? // Anchored mode: transparent backdrop captures outside-clicks
-            // for dismissal but lets the office scene below stay visible.
-            // The card itself is positioned by `anchorRef` (ref-translated
-            // by an rAF loop in lib/anchorPositions).
-            'fixed inset-0 z-30'
-          : 'fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4'
+        // z-40 + bottom-padding lift so the mobile bottom-sheet
+        // doesn't render directly underneath MobileBottomNav (z-30,
+        // ≈72px tall at the bottom edge). Desktop loses the lift
+        // since the card is centred there.
+        'fixed inset-0 z-40 flex items-end md:items-center justify-center backdrop-blur-sm bg-black/60 ' +
+        'pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0 ' +
+        (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
       }
       onClick={onClose}
     >
@@ -102,41 +116,47 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
         ref={anchored ? anchorRef : undefined}
         onClick={e => e.stopPropagation()}
         className={
-          anchored
-            ? // Card root pinned to (0,0); transform from useAnchorPosition
-              // places it at the character's head. We then nudge it via a
-              // child wrapper (see below) so the card sits to the upper-
-              // right of the character rather than directly over them.
-              'absolute top-0 left-0 pointer-events-none'
-            : 'w-full max-w-md bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
+          // Wrapper: bottom-sheet on mobile, anchored-or-centered on
+          // desktop. When `anchored=true` on desktop we leave the flex
+          // and become absolutely positioned at (0,0) so the rAF
+          // transform from the anchor ref takes effect.
+          'w-full md:w-auto ' +
+          (anchored ? 'md:absolute md:top-0 md:left-0 md:pointer-events-none' : '')
         }
         style={anchored ? { willChange: 'transform' } : undefined}
       >
         <div
           className={
-            anchored
-              ? 'pointer-events-auto w-[min(420px,calc(100vw-32px))] max-w-md bg-night-mid border border-tower-gold/30 rounded-2xl p-6 text-tower-cream shadow-2xl'
-              : ''
+            // Card shell — bottom sheet on mobile, normal card on
+            // desktop. Mobile flat-tops + sheet grip + safe-area
+            // bottom; desktop keeps the existing 2xl rounded card.
+            'bg-night-mid border-t border-tower-gold/30 text-tower-cream shadow-2xl ' +
+            'rounded-t-3xl md:rounded-2xl md:border md:border-tower-gold/30 ' +
+            'pt-3 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-6 ' +
+            (anchored
+              ? 'md:pointer-events-auto md:w-[min(420px,calc(100vw-32px))] md:max-w-md'
+              : 'md:max-w-md md:mx-auto')
           }
           style={
             anchored
-              ? // Offset from anchor (character head): bumped up-right so
-                // the card doesn't cover the figure. translateY(-50%) +
-                // small +x pushes the card's left edge to just right of
-                // the character; -y lifts it above the head plane.
-                {
-                  transform: 'translate(28px, -50%)',
-                }
+              ? // Same offset trick used by the other anchored pop-ups:
+                // shift the card's left edge to sit beside the
+                // character + lift the vertical centre to head height.
+                { transform: 'translate(28px, -50%)' }
               : undefined
           }
         >
+        {/* Mobile sheet grip — hidden on desktop. */}
+        <div className="md:hidden flex justify-center -mt-1 mb-3" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
+        </div>
         <div className="flex items-start justify-between mb-4">
           <div>
             {/* <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
               {recommendedRole ? 'Your AI assistant match' : 'Operations Assistant'}
             </div> */}
-            <h2 className="text-xl font-bold mt-1">
-              {recommendedRole ? `Hi, I'm Mia — your AI ${recommendedRole}` : 'Hi, I’m Mia 👋'}
+            <h2 className="text-xl mt-1">
+              {recommendedRole ? `Hi, I'm Mia — your ${recommendedRole}. When AI Teammate launches, I will:` : `Hi, I'm Mia 👋. When AI Teammate launches, I will:`}
             </h2>
           </div>
           <button
@@ -175,9 +195,6 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
           // characters (`-`, `•`, `·`, `*`) are stripped because we
           // supply our own purple bullet glyph for visual consistency.
           <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-4 py-3 mb-5">
-            <p className="text-[14px] tracking-widest text-purple-300/80 mb-2">
-              when ai teammate launches, mia will
-            </p>
             <ul className="space-y-2">
               {reason!
                 .split('\n')

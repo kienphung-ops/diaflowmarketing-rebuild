@@ -10,38 +10,58 @@ interface Props {
   onClose: () => void
   inviteUrl: string | null
   /** Current floor — used to compute next-floor delta for the Copy
-   *  button's enriched payload. Optional so legacy callers that just
-   *  want the table still work; falls back to floor 1 (the worst case
-   *  is the copy says "N invites from the next floor" with the user's
-   *  view of N being whatever the floor-1 → floor-2 threshold is). */
+   *  button's enriched payload + the YOU marker in the table. */
   currentFloor?: number
-  /** User's cumulative invites — see currentFloor above. */
+  /** User's cumulative invites. */
   totalInvites?: number
+  /** Trial → Save CTA in the footer. When undefined the footer
+   *  falls back to the share row (signed-in case). */
+  onOpenSignup?: () => void
 }
 
-// (removed) FLOOR_REWARDS hardcoded fallback table — superseded by
-// the per-floor `productReward` column populated from the seed. The
-// fallback's values had drifted out of sync with the live DB (e.g.
-// it claimed F6 had "1 mo free" when the canonical reward sits at
-// F7 now), so the modal silently lied for those rows. Reward lookup
-// is now strictly `cfg.productReward`.
-
-const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-
+/**
+ * "Every floor, every unlock" rewards modal.
+ *
+ * Rewritten to match the mobile mockup (Section 4, screens 12/13):
+ *
+ *   ┌─────────────────────────────────────────┐
+ *   │ Every floor, every unlock           ×   │
+ *   │ 20 floors. Climb by inviting friends.   │
+ *   ├──────────────────────────────────────── │
+ *   │ FLOOR · INVITES · REWARDS               │
+ *   ├──────────────────────────────────────── │
+ *   │ 1 [YOU] · — · Hire 3 · 🖼 Frame + desk │ ← current row (accent)
+ *   │ 2      · 1 · Hire 4 · 💡 Lamp + chair  │
+ *   │ 3      · 2 · Hire 5 · 🪑 …  🚀 Free beta│ ← milestone (gold)
+ *   │ …                                       │
+ *   │ 20     · 108 · 👑 Penthouse · 3-mo Pro… │ ← penthouse (purple)
+ *   ├──────────────────────────────────────── │
+ *   │ FOOTER (swaps by login state):          │
+ *   │   pre-login  → ⚠ glow card + Save CTA   │
+ *   │   logged-in  → Share to reach Floor N   │
+ *   └─────────────────────────────────────────┘
+ *
+ * Rows color-code by tier so the user can scan to "what matters":
+ *   current floor       → accent (purple) + YOU badge
+ *   milestone (real)    → gold left-border + gold floor/invites
+ *   penthouse (final)   → purple-tinted gradient
+ *   regular             → muted opacity
+ *
+ * A floor is treated as a "milestone" when `productReward` is set
+ * (non-empty string) — those are the floors where Diaflow promises
+ * something real (free beta, free Pro months, featured-at-launch).
+ * Decor-only floors stay muted.
+ */
 export function HowItWorksModal({
   open,
   onClose,
   inviteUrl,
   currentFloor = 1,
   totalInvites = 0,
+  onOpenSignup,
 }: Props) {
   const [copied, setCopied] = useState(false)
-  // Live floor catalogue from /api/floors. Falls back to the static
-  // FLOOR_CONFIG snapshot until the first response lands.
   const floors = useFloorsConfig()
-  // Next-floor + invites-to-next mirror the math in MySquadDrawer +
-  // IrisHireModal so the Copy-button payload reads the same string in
-  // every place: "built my AI office, N invites from the next floor — <url>".
   const nextFloor = useFloor(currentFloor + 1)
   const invitesToNext = nextFloor
     ? Math.max(0, nextFloor.invitesRequired - totalInvites)
@@ -58,10 +78,7 @@ export function HowItWorksModal({
   if (!open) return null
   if (typeof document === 'undefined') return null
 
-  // X share text + URL go in separate params per the spec
-  // (requirements/share-btn.md): X auto-appends + auto-shortens the
-  // URL when passed via `&url=`, and `&hashtags=` appends a
-  // hashtag chip below the tweet text.
+  // ── Share payload (post-login footer) ──────────────────────────
   const xText = encodeURIComponent(
     'just built my AI office at diaflow 🚀 climb the floors with me'
   )
@@ -75,8 +92,6 @@ export function HowItWorksModal({
 
   async function handleCopy() {
     if (!inviteUrl) return
-    // Enriched payload — matches MySquadDrawer + IrisHireModal so
-    // every Copy button across the app pastes the same string.
     const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
     try {
       await navigator.clipboard.writeText(payload)
@@ -87,330 +102,250 @@ export function HowItWorksModal({
     }
   }
 
+  // Footer mode — pre-login if we don't have an invite URL AND the
+  // caller wired onOpenSignup. Otherwise share row.
+  const isPreLogin = !inviteUrl && !!onOpenSignup
+
   return createPortal(
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 80,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        fontFamily: FONT,
-      }}
+      className="fixed inset-0 z-[80] flex items-end md:items-center justify-center md:p-5"
       role="dialog"
       aria-modal="true"
+      aria-label="Every floor, every unlock"
     >
-      {/* Backdrop — strong blur so the drawer + office scene behind both go soft */}
+      {/* Backdrop */}
       <div
         onClick={onClose}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
-        }}
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm"
       />
 
-      {/* Card */}
+      {/* Sheet — bottom on mobile, centered card on desktop */}
       <div
         onClick={e => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          background: '#13112a',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '20px',
-          width: '100%',
-          maxWidth: '520px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          color: 'white',
-          overflow: 'hidden',
-        }}
+        className={
+          'relative z-[1] flex flex-col text-tower-cream overflow-hidden w-full ' +
+          'bg-[#181a2e] ' +
+          'rounded-t-3xl md:rounded-2xl ' +
+          'max-h-[88dvh] md:max-h-[90vh] md:max-w-[520px] ' +
+          'border-t md:border border-white/10'
+        }
       >
-        {/* Header */}
-        <div style={{ padding: '24px 24px 16px', flexShrink: 0 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: '12px',
-            }}
-          >
-            <div>
-              <p style={{ fontWeight: 800, fontSize: '22px', margin: '0 0 6px', lineHeight: 1.2 }}>
-                Every floor, every unlock
-              </p>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: 0, lineHeight: 1.5 }}>
-                20 floors. New decor, more teammates, and real rewards at every level.
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'rgba(255,255,255,0.6)',
-                fontSize: '15px',
-                cursor: 'pointer',
-              }}
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Column headers. The TEAMMATES + DECOR + REWARD columns
-              were folded into a single wider REWARD column — each row
-              now reads as one stitched sentence ("max 5 + Basic chair
-              + first desk + Free beta access") so the unlock at each
-              floor is grokable in one glance instead of three eye
-              hops across the row. */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '56px 80px 1fr',
-              gap: 0,
-              marginTop: '20px',
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-              paddingBottom: '8px',
-            }}
-          >
-            {['FLOOR', 'INVITES', 'REWARD'].map(h => (
-              <p
-                key={h}
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  letterSpacing: '0.07em',
-                  color: 'rgba(255,255,255,0.35)',
-                  margin: 0,
-                }}
-              >
-                {h}
-              </p>
-            ))}
-          </div>
+        {/* Mobile grip */}
+        <div className="md:hidden flex justify-center pt-2.5" aria-hidden>
+          <div className="w-9 h-1 rounded-full bg-white/20" />
         </div>
 
-        {/* Scrollable table rows */}
-        <div style={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
-          {floors.map((cfg, i) => {
-            const reward = cfg.productReward
-            const isLast = i === floors.length - 1
+        {/* Header — title + subtitle + close × */}
+        <header className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
+          <div>
+            <h2 className="text-[17px] md:text-lg font-extrabold leading-tight">
+              Every floor, every unlock
+            </h2>
+            <p className="text-[11.5px] md:text-xs text-tower-cream/55 mt-0.5 leading-relaxed">
+              {inviteUrl
+                ? 'Climb by inviting friends.'
+                : '20 floors. Climb by inviting friends.'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="shrink-0 w-6 h-6 rounded-full bg-white/5 text-tower-cream/60 hover:text-tower-cream text-sm leading-none flex items-center justify-center"
+          >
+            ×
+          </button>
+        </header>
+
+        {/* Column headers — sticky-feel band above the scroll list */}
+        <div
+          className="grid items-center gap-2.5 px-5 py-2 bg-white/[0.02] border-b border-white/5 text-[9.5px] font-bold uppercase tracking-[0.06em] text-tower-cream/45 shrink-0"
+          style={{ gridTemplateColumns: '36px 50px 1fr' }}
+        >
+          <div className="text-center">Floor</div>
+          <div className="text-center">Invites</div>
+          <div>Rewards</div>
+        </div>
+
+        {/* Scrollable reward list */}
+        <div className="flex-1 overflow-y-auto bg-[#181a2e]">
+          {floors.map(cfg => {
+            const isCurrent = cfg.id === currentFloor
             const isPenthouse = cfg.id === floors.length
+            const hasReward = !!cfg.productReward?.trim()
+            const isMilestone = hasReward && !isPenthouse
+            const isFaded = !isCurrent && !isMilestone && !isPenthouse
+
+            // Row tint + left-border per tier. Milestone floors use
+            // amber tokens directly — the project's `tower-gold` alias
+            // was retired into a purple in tailwind.config (kept for
+            // markup back-compat), so we'd render purple-on-purple
+            // here instead of the intended gold accent.
+            const rowClass = isCurrent
+              ? 'bg-purple-500/[0.06] border-l-2 border-l-purple-400'
+              : isPenthouse
+              ? 'bg-gradient-to-r from-purple-500/15 via-purple-500/[0.04] to-transparent border-l-2 border-l-purple-300'
+              : isMilestone
+              ? 'bg-gradient-to-r from-amber-400/10 via-amber-400/[0.03] to-transparent border-l-2 border-l-amber-400'
+              : ''
+
+            // Number / invite-count text colour
+            const accentText = isCurrent
+              ? 'text-purple-200'
+              : isPenthouse
+              ? 'text-purple-300'
+              : isMilestone
+              ? 'text-amber-300'
+              : 'text-tower-cream/70'
+
             return (
               <div
                 key={cfg.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '56px 80px 1fr',
-                  gap: 0,
-                  padding: '13px 0',
-                  borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                  background: cfg.id === 1 ? 'rgba(129,140,248,0.07)' : 'transparent',
-                }}
+                className={
+                  'grid items-start gap-2.5 px-5 py-2.5 border-b border-white/5 text-[12px] ' +
+                  rowClass +
+                  (isFaded ? ' opacity-65' : '')
+                }
+                style={{ gridTemplateColumns: '36px 50px 1fr' }}
               >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: '14px',
-                    fontWeight: cfg.id === 1 ? 700 : 400,
-                    color: isPenthouse ? '#fbbf24' : 'white',
-                  }}
-                >
-                  {cfg.id}
-                </p>
-                <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
-                  {cfg.invitesRequired}
-                </p>
-                {/* Stitched reward line in three "•"-separated chunks:
-                    1. "<max> teammate slots" (white, bold)
-                    2. unlock_items joined by " + " (now reads the
-                       Postgres text[] field — each item appears as
-                       its own badge instead of a single concatenated
-                       string)
-                    3. product reward (green) when present.
-                    Falls back to `cfg.label` if unlockItems is empty
-                    (defensive — every seeded floor should have at
-                    least one item, but legacy / partially-edited
-                    rows shouldn't show a blank middle column). */}
-                <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>
-                    <b>• {cfg.maxTeammates} teammate slots</b>
+                {/* Floor number */}
+                <div className="text-center">
+                  <div className={`text-[15px] font-extrabold leading-none ${accentText}`}>
+                    {cfg.id}
+                  </div>
+                  {isCurrent && (
+                    <div className="mt-1 inline-block px-1 py-0.5 rounded text-[8px] font-extrabold tracking-[0.04em] bg-purple-500 text-night-deep">
+                      YOU
+                    </div>
+                  )}
+                </div>
+
+                {/* Invites required — em-dash on floor 1 */}
+                <div className={`text-center text-[14px] font-extrabold leading-tight ${accentText}`}>
+                  {cfg.id === 1 ? '—' : cfg.invitesRequired}
+                </div>
+
+                {/* Reward description — hire-cap (bold), decor list
+                    (muted), real-reward pill (gold or purple). */}
+                <div className="leading-snug">
+                  <span className="font-bold text-tower-cream">
+                    Hire up to {cfg.maxTeammates}
                   </span>
-                  <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>•</span>
-                  <span>
-                    {isPenthouse ? '🏆 ' : ''}
-                    {cfg.unlockItems.length > 0
-                      ? cfg.unlockItems.map((item, idx) => (
-                          <span key={idx}>
-                            {idx > 0 && (
-                              <span style={{ color: 'rgba(255,255,255,0.35)', margin: '0 4px' }}>
-                                +
-                              </span>
-                            )}
-                            <span>{item}</span>
-                          </span>
-                        ))
-                      : cfg.label}
-                  </span>
-                  {reward && (
+                  {cfg.unlockItems.length > 0 && (
                     <>
-                      <span style={{ color: 'rgba(255,255,255,0.4)', margin: '0 6px' }}>•</span>
-                      <span style={{ color: '#34d399', fontWeight: 600 }}>{reward}</span>
+                      <span className="text-tower-cream/30 mx-1.5">·</span>
+                      <span className="text-tower-cream/65">
+                        {cfg.unlockItems.join(' + ')}
+                      </span>
                     </>
                   )}
-                </p>
+                  {hasReward && (
+                    <div className="mt-1.5">
+                      <span
+                        className={
+                          'inline-block px-1.5 py-0.5 rounded text-[10.5px] font-extrabold border ' +
+                          (isPenthouse
+                            ? 'bg-purple-500/20 border-purple-400/40 text-purple-200'
+                            : 'bg-amber-400/15 border-amber-400/40 text-amber-300')
+                        }
+                      >
+                      {cfg.productReward}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })}
         </div>
 
-        {/* Footer — share section */}
-        <div
-          style={{
-            padding: '16px 24px 24px',
-            flexShrink: 0,
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-          }}
-        >
-          <p style={{ fontSize: '14px', color: 'white', fontWeight: 600, margin: '0 0 12px', lineHeight: 1.4 }}>
-            Share your office to move up the next floor
-          </p>
-
-          {/* Share row — X / LinkedIn / Copy. Mirrors MySquadDrawer so
-              the affordance is consistent everywhere the invite URL
-              is offered. Threads + the standalone URL pill were
-              removed (Threads consolidated into X cross-posting, the
-              URL pill duplicated the Copy action). */}
-          {!inviteUrl && (
-            <div
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '10px',
-                padding: '10px 14px',
-                marginBottom: '10px',
-                fontSize: '13px',
-                color: 'rgba(255,255,255,0.5)',
-              }}
-            >
-              Sign up to get your personal invite link.
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-            <a
-              href={xShareHref}
-              aria-disabled={!inviteUrl}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '7px',
-                background: '#000',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '10px',
-                padding: '11px',
-                color: 'white',
-                fontWeight: 700,
-                fontSize: '13px',
-                textDecoration: 'none',
-                opacity: inviteUrl ? 1 : 0.4,
-                pointerEvents: inviteUrl ? 'auto' : 'none',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="white" aria-hidden>
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-              X
-            </a>
-            <a
-              href={linkedinShareHref}
-              aria-disabled={!inviteUrl}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '7px',
-                background: '#0a66c2',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '11px',
-                color: 'white',
-                fontWeight: 700,
-                fontSize: '13px',
-                textDecoration: 'none',
-                opacity: inviteUrl ? 1 : 0.4,
-                pointerEvents: inviteUrl ? 'auto' : 'none',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="white" aria-hidden>
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-              </svg>
-              LinkedIn
-            </a>
-            <button
-              onClick={handleCopy}
-              disabled={!inviteUrl}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '7px',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '10px',
-                padding: '11px',
-                color: 'white',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: inviteUrl ? 'pointer' : 'not-allowed',
-                opacity: inviteUrl ? 1 : 0.4,
-              }}
-            >
-              {copied ? (
-                <>
-                  <span aria-hidden>✓</span>
-                  Copied
-                </>
-              ) : (
-                <>
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
-                    <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
-                  </svg>
-                  Copy
-                </>
+        {/* Footer — pre-login Save CTA vs post-login share row */}
+        <div className="shrink-0 border-t border-white/10 bg-[#181a2e] px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {isPreLogin ? (
+            <>
+              <div className="rounded-xl  flex-col items-center justify-center  border border-tower-gold/40 bg-gradient-to-b from-tower-gold/15 to-tower-gold/[0.03] p-3 mb-3">
+                <div className="text-[10px] uppercase tracking-[0.06em] font-extrabold text-tower-gold mb-1">
+                  ⚠ Not saved yet
+                </div>
+                <div className="text-[13px] font-bold leading-tight">
+                  Save your team to start climbing.
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  onClose()
+                  onOpenSignup?.()
+                }}
+                className="w-full px-3 py-3 rounded-xl bg-tower-gold text-night-deep font-extrabold text-[14px] shadow-[0_6px_18px_rgba(251,191,36,0.4)] hover:bg-tower-gold/95 transition"
+              >
+                Save my team →
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between mb-2">
+                <div className="text-[13px] font-bold">
+                  {nextFloor
+                    ? `Share to reach Floor ${nextFloor.id}`
+                    : 'Share your office'}
+                </div>
+                <div className="text-[11px] text-purple-300 font-semibold">
+                  {nextFloor
+                    ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} away`
+                    : 'penthouse'}
+                </div>
+              </div>
+              {!inviteUrl && (
+                <div className="text-[12px] text-tower-cream/55 mb-2 px-3 py-2 rounded-md bg-white/[0.03] border border-white/5">
+                  Sign up to get your personal invite link.
+                </div>
               )}
-            </button>
-          </div>
+              <div className="grid grid-cols-3 gap-2">
+                <a
+                  href={xShareHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-disabled={!inviteUrl}
+                  className={
+                    'flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-tower-cream bg-night-deep/80 border border-white/10 ' +
+                    (inviteUrl ? '' : 'opacity-40 pointer-events-none')
+                  }
+                >
+                  <span className="w-5 h-5 rounded-md bg-black inline-flex items-center justify-center text-[11px] font-bold">
+                    𝕏
+                  </span>
+                  X
+                </a>
+                <a
+                  href={linkedinShareHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-disabled={!inviteUrl}
+                  className={
+                    'flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-tower-cream bg-night-deep/80 border border-white/10 ' +
+                    (inviteUrl ? '' : 'opacity-40 pointer-events-none')
+                  }
+                >
+                  <span className="w-5 h-5 rounded-md bg-[#0a66c2] inline-flex items-center justify-center text-[11px] font-extrabold italic text-white">
+                    in
+                  </span>
+                  LinkedIn
+                </a>
+                <button
+                  onClick={handleCopy}
+                  disabled={!inviteUrl}
+                  className={
+                    'flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-tower-cream bg-night-deep/80 border border-white/10 ' +
+                    (inviteUrl ? '' : 'opacity-40 cursor-not-allowed')
+                  }
+                >
+                  <span className="w-5 h-5 rounded-md bg-purple-500/20 inline-flex items-center justify-center text-[12px] text-purple-200">
+                    🔗
+                  </span>
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>,
