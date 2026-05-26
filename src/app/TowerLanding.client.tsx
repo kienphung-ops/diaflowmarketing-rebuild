@@ -26,6 +26,11 @@ import { BulkAddTeammatesModal } from '@/components/BulkAddTeammatesModal'
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
 import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
 import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
+import {
+  RECRUIT_BODY_COLORS,
+  RECRUIT_HAIR_COLORS,
+  RECRUIT_SKIN_COLORS,
+} from '@/components/scene2d/Mobile2DScene'
 import { MiaWelcomeBubble } from '@/components/mobile/MiaWelcomeBubble'
 import { Mobile2DScene } from '@/components/scene2d/Mobile2DScene'
 import { EmailVerifyModal } from '@/components/EmailVerifyModal'
@@ -990,6 +995,7 @@ export default function TowerLanding(props: Props) {
         recruitedCharacters={customRecruits.map(r => ({ name: r.name, role: r.role }))}
         currentFloor={effective.currentFloor}
         miaRole={miaRole}
+        slotsAvailable={slotsAvailable}
         onNpcClick={slug => {
           if (slug === 'iris') setIrisModalOpen(true)
           else setActiveNpcModal(slug)
@@ -1170,6 +1176,19 @@ export default function TowerLanding(props: Props) {
           if (!bubbleTeammate) return null
           const idx = customRecruits.findIndex(r => r.id === bubbleTeammate.id)
           return idx >= 0 ? `recruited-${idx}` : null
+        })()}
+        // Same palette the 2D minifigure on the floor uses — index by
+        // recruit position so the portrait at the top of the bubble
+        // matches the character the user just tapped.
+        {...(() => {
+          if (!bubbleTeammate) return {}
+          const idx = customRecruits.findIndex(r => r.id === bubbleTeammate.id)
+          if (idx < 0) return {}
+          return {
+            bodyColor: RECRUIT_BODY_COLORS[idx % RECRUIT_BODY_COLORS.length],
+            hairColor: RECRUIT_HAIR_COLORS[idx % RECRUIT_HAIR_COLORS.length],
+            skinColor: RECRUIT_SKIN_COLORS[idx % RECRUIT_SKIN_COLORS.length],
+          }
         })()}
         onClose={() => setBubbleTeammate(null)}
         onEdit={() => {

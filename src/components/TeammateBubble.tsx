@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
+import { TeammatePortrait } from './TeammatePortrait'
 
 interface Teammate {
   id: string
@@ -23,6 +24,13 @@ interface Props {
   /** Scene slug for live anchoring next to the character. Typically
    *  `recruited-{index}`. When null the bubble renders centered. */
   anchorSlug?: string | null
+  /** Custom recruit palette — same colours used by the 2D minifigure
+   *  on the office floor so the portrait at the top of the modal
+   *  reads as the same identity. Resolved by the parent from the
+   *  recruit's index. */
+  bodyColor?: string
+  hairColor?: string
+  skinColor?: string
   onClose: () => void
   /** Opens the edit modal (Step 3 in the design — Name + Role +
    *  Save / Remove / Cancel). The bubble closes itself first so the
@@ -49,7 +57,7 @@ interface Props {
  * built before this design. This bubble is strictly for the user-
  * recruited teammates.
  */
-export function TeammateBubble({ open, teammate, anchorSlug, onClose, onEdit }: Props) {
+export function TeammateBubble({ open, teammate, anchorSlug, bodyColor, hairColor, skinColor, onClose, onEdit }: Props) {
   // Anchor to the live character position ONLY on desktop. On
   // mobile we render as a bottom sheet, where a per-frame transform
   // would just fight the sheet's bottom-anchored position.
@@ -91,7 +99,20 @@ export function TeammateBubble({ open, teammate, anchorSlug, onClose, onEdit }: 
   // launch-day promise.
   const cardBody = (
     <>
-      <div className="flex items-start gap-2 px-4 pt-3.5 pb-1.5">
+      {/* Recruit pixel portrait — same shared component as the
+          default-NPC modals. Colours come from the parent (cycled
+          RECRUIT_BODY/HAIR/SKIN palettes) so the portrait matches the
+          on-floor 2D minifigure exactly. */}
+      <div className="flex justify-center pt-3 pb-1">
+        <TeammatePortrait
+          bodyColor={bodyColor}
+          hairColor={hairColor}
+          skinColor={skinColor}
+          width={48}
+          height={62}
+        />
+      </div>
+      <div className="flex items-start gap-2 px-4 pt-1 pb-1.5">
         <div className="flex-1 min-w-0">
           <span className="text-sm font-bold truncate">{teammate.name}</span>
           <span className="mx-1.5 text-tower-cream/40">·</span>

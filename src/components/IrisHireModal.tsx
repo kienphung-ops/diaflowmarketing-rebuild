@@ -7,6 +7,7 @@ import { buildShareCopyText } from '@/lib/shareCopy'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
+import { TeammatePortrait } from './TeammatePortrait'
 
 interface Props {
   open: boolean
@@ -207,12 +208,12 @@ export function IrisHireModal({
         </div>
 
         <div className="px-7 pb-7 pt-2 text-center">
-          {/* Iris pixel portrait — same identity across all three
-              states. Brown skin, black hair, dark navy suit, red tie.
-              Matches the 2D minifigure on the office floor so the
-              modal reads as "Iris speaking". */}
+          {/* Iris pixel portrait — shared TeammatePortrait keeps the
+              identity consistent with the 2D minifigure on the office
+              floor. `slug="iris"` selects the dark navy suit + red
+              tie + lapel overlay automatically. */}
           <div className="flex justify-center mb-3">
-            <IrisPortrait />
+            <TeammatePortrait slug="iris" />
           </div>
 
           {/* Headline is identical across the three states — only the
@@ -379,58 +380,7 @@ function LinkIcon() {
   )
 }
 
-/**
- * Iris pixel portrait — chest-up sprite of the AI Recruiter, used as
- * the identity element at the top of the modal. Reproduces the look
- * of the office-floor 2D minifigure (black hair, brown skin, dark
- * navy suit with red tie + lapel) per the mockup at
- * `diaflow-iris-modal-three-states.html`.
- *
- * Standalone SVG (no external asset), viewBox 56×72 → render size
- * fixed via inline width/height so a font-size change on the modal
- * shell can't accidentally scale the portrait.
- */
-function IrisPortrait() {
-  return (
-    <svg
-      width="56"
-      height="72"
-      viewBox="0 0 56 72"
-      aria-hidden
-      style={{ imageRendering: 'pixelated' }}
-    >
-      {/* Hair — top cap + two side tufts. Dark almost-black so the
-          shape reads against the navy suit. */}
-      <rect x="10" y="0" width="36" height="14" fill="#1a1a1a" rx="2" />
-      <rect x="8" y="12" width="5" height="10" fill="#1a1a1a" />
-      <rect x="43" y="12" width="5" height="10" fill="#1a1a1a" />
-
-      {/* Face — brown skin, slightly rounded so it doesn't read as
-          a sticker. */}
-      <rect x="14" y="11" width="28" height="22" fill="#5d4030" rx="2" />
-
-      {/* Eyes — white per the desktop voxel sprites. */}
-      <rect x="19" y="20" width="3" height="4" fill="#ffffff" />
-      <rect x="34" y="20" width="3" height="4" fill="#ffffff" />
-
-      {/* Suit body — dark navy, slightly wider than the face. */}
-      <rect x="6" y="34" width="44" height="38" fill="#1c2440" rx="3" />
-
-      {/* Lapel triangle just below the collar — same colour as the
-          suit shadow tone for depth. */}
-      <path
-        d="M 20 34 L 28 38 L 28 44 Z"
-        fill="#141a30"
-      />
-      <path
-        d="M 36 34 L 28 38 L 28 44 Z"
-        fill="#141a30"
-      />
-
-      {/* Red tie running down the centre — main band + slightly
-          darker centre stripe so it doesn't read as a flat block. */}
-      <rect x="25.5" y="36" width="5" height="24" fill="#c53030" rx="1" />
-      <rect x="27" y="36" width="2" height="24" fill="#a02020" />
-    </svg>
-  )
-}
+/* Local IrisPortrait moved to components/TeammatePortrait so the
+   same chest-up SVG can render in every character-tap modal
+   (Mia / Leo / custom recruits). Iris's red-tie + lapel overlay is
+   gated by `slug === 'iris'` inside that component. */

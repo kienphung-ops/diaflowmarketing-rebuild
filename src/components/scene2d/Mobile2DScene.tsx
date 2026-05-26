@@ -57,6 +57,10 @@ interface Props {
   currentFloor: number
   /** Optional override for Mia's role label — mirrors the 3D scene. */
   miaRole?: string | null
+  /** Open teammate seats on the user's current floor. Drives the
+   *  "👋 ready to hire…" speech bubble that floats above Iris when
+   *  there's headcount waiting to be filled. */
+  slotsAvailable?: number
   /** Fires on a TAP (small movement, short press) of a default NPC. */
   onNpcClick?: (slug: 'iris' | 'mia' | 'leo') => void
   /** Fires on a TAP of a recruited teammate. `index` matches the
@@ -86,6 +90,7 @@ export function Mobile2DScene({
   recruitedCharacters,
   currentFloor,
   miaRole,
+  slotsAvailable,
   onNpcClick,
   onTeammateClick,
   onTeammatePoke,
@@ -350,6 +355,15 @@ export function Mobile2DScene({
             onTap={() => onNpcClick?.(slug)}
             onPoke={() => onTeammatePoke?.(slug)}
             onMove={pos => handleCharMove(slug, pos)}
+            // Iris-only "ready to hire" hint — shows whenever there's
+            // open headcount on the user's floor, so the recruiter
+            // NPC visually signals that tapping her does something
+            // useful right now.
+            hint={
+              slug === 'iris' && (slotsAvailable ?? 0) > 0
+                ? '👋 ready to hire…'
+                : undefined
+            }
           />
         )
       })}
@@ -422,7 +436,7 @@ const NPC_CONFIG: Record<
 /** Body colours for recruited teammates — mirrors RECRUIT_APPEARANCES
  *  in OfficeScene.tsx so the user's roster looks consistent across
  *  desktop ↔ mobile. We use the `clothesColor` from each entry. */
-const RECRUIT_BODY_COLORS = [
+export const RECRUIT_BODY_COLORS = [
   '#22c55e',
   '#f59e0b',
   '#6366f1',
@@ -436,7 +450,7 @@ const RECRUIT_BODY_COLORS = [
 /** Hair palette for recruited teammates — cycled with body colour so
  *  no two adjacent recruits look identical. Chosen to span warm /
  *  cool / neutral tones for visual variety. */
-const RECRUIT_HAIR_COLORS = [
+export const RECRUIT_HAIR_COLORS = [
   '#3b2410', // dark brown
   '#1c1c1c', // black
   '#6b3410', // chestnut
@@ -449,7 +463,7 @@ const RECRUIT_HAIR_COLORS = [
 
 /** Skin palette for recruited teammates — cycled independently so the
  *  combinations vary. */
-const RECRUIT_SKIN_COLORS = [
+export const RECRUIT_SKIN_COLORS = [
   '#fcd2b3',
   '#c98a5b',
   '#f1c27d',
@@ -618,6 +632,7 @@ function CharacterSprite({
   onTap,
   onPoke,
   onMove,
+  hint,
 }: {
   slug: string
   name: string
@@ -635,6 +650,10 @@ function CharacterSprite({
   onTap: () => void
   onPoke: () => void
   onMove: (pos: [number, number, number]) => void
+  /** Optional floating hint rendered ABOVE the name tag (e.g.
+   *  "👋 ready to hire…" for Iris when slots are open). Hidden when
+   *  unset so most sprites stay silent. */
+  hint?: string
 }) {
   const { xPct, yPct } = projectToScreen(worldPos)
   // Gesture state — captured at pointerdown, mutated on pointermove,
@@ -859,6 +878,19 @@ function CharacterSprite({
         touchAction: 'none',
       }}
     >
+      {/* Status hint — only rendered when the parent passes a non-
+          empty `hint` (currently Iris-only, when she has open slots).
+          Sits above the name tag with a subtle bob so the bubble
+          reads as "active speech" rather than another static label. */}
+      {hint && (
+        <div
+          className="mb-1 px-1.5 py-0.5 rounded-md bg-purple-500/95 text-white text-[8.5px] font-bold leading-tight text-center whitespace-nowrap mx-auto shadow-[0_4px_10px_rgba(168,117,255,0.45)] animate-nav-arrow-bounce"
+          aria-hidden
+        >
+          {hint}
+        </div>
+      )}
+
       {/* Name + role tag floating above the head. Always visible on
           mobile (no hover) so the user can tell minifigures apart at
           a glance — matches the mockup's "Mia / Iris / Leo" labels. */}

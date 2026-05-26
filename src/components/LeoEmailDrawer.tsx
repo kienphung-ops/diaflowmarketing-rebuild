@@ -17,6 +17,7 @@ import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
+import { TeammatePortrait } from './TeammatePortrait'
 
 interface Props {
   open: boolean
@@ -101,20 +102,28 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
         <div className="md:hidden flex justify-center -mt-1 mb-3" aria-hidden>
           <div className="w-9 h-1 rounded-full bg-white/20" />
         </div>
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
-              Demo Specialist
-            </div>
-            <h2 className="text-2xl font-bold mt-1">Hi, I&apos;m Leo 👋</h2>
+
+        {/* Close × — absolute top-right so the portrait below can sit
+            centered in the full width. */}
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 text-tower-cream/50 hover:text-tower-cream text-xl leading-none px-2 py-1"
+        >
+          ×
+        </button>
+
+        {/* Leo pixel portrait — matches the 2D minifigure on the floor
+            so the modal reads as "Leo speaking". */}
+        <div className="flex justify-center mb-3">
+          <TeammatePortrait slug="leo" />
+        </div>
+
+        <div className="mb-4 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-tower-gold/80">
+            Demo Specialist
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="text-tower-cream/50 hover:text-tower-cream text-xl"
-          >
-            ×
-          </button>
+          <h2 className="text-2xl font-bold mt-1">Hi, I&apos;m Leo 👋</h2>
         </div>
 
         <div className="mb-4 rounded-md overflow-hidden border border-white/10 aspect-video bg-black">
