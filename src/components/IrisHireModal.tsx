@@ -16,36 +16,50 @@ interface Props {
    *  card falls back to its legacy centered layout. */
   anchorSlug?: string | null
   /** Current floor the user is on. Used to compute the "next" floor
-   *  shown in the packed-state copy ("Unlock a new slot at Floor X"). */
+   *  shown in the packed-state copy ("Open up a new seat at Floor N"). */
   currentFloor: number
   /** User's cumulative invites — combined with next-floor threshold
    *  to compute the "N invites from the next floor" wording inside
    *  the Copy-button payload (see buildShareCopyText). */
   totalInvites: number
-  /** Slots still available on the current floor. Drives the two-state
-   *  copy: 0 → "Need to hire another teammate?" + share; >0 → "You
-   *  have an open slot." + Add-teammate button. */
+  /** Slots still available on the current floor. Drives the two
+   *  signed-in stages: 0 → share grid (Stage B); >0 → Add-teammate
+   *  button (Stage A). Ignored when `signedIn` is false. */
   slotsAvailable: number
   /** Personal invite link — required for the share buttons to be
-   *  enabled. `null` for unlogged trial users; the buttons grey out. */
+   *  enabled. `null` for unlogged trial users; signals pre-login
+   *  mode (Stage C). */
   inviteUrl: string | null
-  /** Fires when the user hits "+ Add teammate" in the open-slot state.
-   *  Parent typically opens BulkAddTeammatesModal. */
+  /** True when the user has a real account. False for trial mode →
+   *  the pre-login Stage C copy + "Save my team" CTA renders. */
+  signedIn?: boolean
+  /** Fires when the user hits "+ Add teammate" in the open-slot
+   *  state (Stage A). Parent typically opens BulkAddTeammatesModal. */
   onAddTeammate?: () => void
+  /** Fires when a trial user hits "Save my team" in Stage C. Parent
+   *  opens SignupModal. */
+  onOpenSignup?: () => void
 }
 
 /**
- * Iris pop-up — replaces the MySquadDrawer that used to open when the
- * user clicks Iris in the office scene. Iris is the "HR / hiring"
- * NPC; this modal is her recruiting prompt and has two clear modes
- * based on whether there's open headcount on the user's current floor.
+ * Iris pop-up — opens when the user clicks Iris in the office scene.
+ * Three states share the same shell (Iris pixel portrait, "Hi, I'm
+ * Iris — your AI Recruiter." headline, dark bottom-sheet chrome) and
+ * differ only in the body + CTA per the mobile mockup at
+ * `requirements/.../diaflow-iris-modal-three-states.html`:
  *
- *  - Packed (slotsAvailable === 0): nudges the user to climb a floor
- *    via sharing. Three share affordances stacked horizontally —
- *    X / LinkedIn / Copy — same as MySquadDrawer's share row.
+ *   Stage A · Open slot (signedIn, slotsAvailable > 0)
+ *     "You've got an open seat, and I've got teammates ready to meet
+ *      you." → [ + Add teammate ]
  *
- *  - Open slot (slotsAvailable > 0): single "+ Add teammate" CTA that
- *    routes into the BulkAddTeammatesModal upstream.
+ *   Stage B · Out of slot (signedIn, slotsAvailable === 0)
+ *     "I've got teammates ready to bring on, but your office is full.
+ *      Open up a new seat at Floor N — share your link to climb."
+ *     → [ X ] [ LinkedIn ] [ Copy ]
+ *
+ *   Stage C · Pre-login (!signedIn)
+ *     "I've got teammates lined up for you. Save your team first —
+ *      then I'll start bringing them in." → [ Save my team ]
  */
 export function IrisHireModal({
   open,
@@ -54,7 +68,9 @@ export function IrisHireModal({
   totalInvites,
   slotsAvailable,
   inviteUrl,
+  signedIn,
   onAddTeammate,
+  onOpenSignup,
   anchorSlug,
 }: Props) {
   const [copied, setCopied] = useState(false)
@@ -176,10 +192,10 @@ export function IrisHireModal({
         </div>
         {/* Top status row — green dot on the left mirrors the Iris
             online-indicator from the scene, X close on the right. */}
-        <div className="flex items-center justify-between px-5 pt-4">
+        <div className="flex items-center justify-between px-5">
           <span
             aria-hidden
-            className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]"
+            className="w-2.5 h-2.5"
           />
           <button
             onClick={onClose}
@@ -191,41 +207,72 @@ export function IrisHireModal({
         </div>
 
         <div className="px-7 pb-7 pt-2 text-center">
-          <div className="text-4xl mb-3" aria-hidden>
-            🏢
+          {/* Iris pixel portrait — same identity across all three
+              states. Brown skin, black hair, dark navy suit, red tie.
+              Matches the 2D minifigure on the office floor so the
+              modal reads as "Iris speaking". */}
+          <div className="flex justify-center mb-3">
+            <IrisPortrait />
           </div>
 
-          {hasSlot ? (
+          {/* Headline is identical across the three states — only the
+              body + CTA change. */}
+          <h2 className="text-[19px] font-bold leading-snug tracking-tight mb-3">
+            Hi, I&apos;m Iris — your AI Recruiter.
+          </h2>
+
+          {!signedIn ? (
+            // ── Stage C · Pre-login ────────────────────────────────
             <>
-              <h2 className="text-xl font-bold mb-2">You have an open slot.</h2>
-              <p className="text-sm text-tower-cream/70 mb-5 leading-relaxed">
-                {slotsAvailable === 1
-                  ? '1 teammate slot is waiting to be filled on this floor.'
-                  : `${slotsAvailable} teammate slots are waiting to be filled on this floor.`}
+              <p className="text-[14px] text-tower-cream/70 leading-relaxed mb-5">
+                I&apos;ve got teammates lined up for you. Save your team
+                first — then I&apos;ll start bringing them in.
+              </p>
+              <button
+                onClick={() => {
+                  onClose()
+                  onOpenSignup?.()
+                }}
+                className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition"
+              >
+                Save my team
+              </button>
+            </>
+          ) : hasSlot ? (
+            // ── Stage A · Open slot ────────────────────────────────
+            <>
+              <p className="text-[14px] text-tower-cream/70 leading-relaxed mb-5">
+                You&apos;ve got an open seat, and I&apos;ve got teammates
+                ready to meet you.
               </p>
               <button
                 onClick={() => {
                   onClose()
                   onAddTeammate?.()
                 }}
-                className="w-full px-4 py-3 rounded-md bg-tower-gold text-night-deep font-semibold text-sm hover:bg-tower-gold/90 transition"
+                className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition"
               >
                 + Add teammate
               </button>
             </>
           ) : (
+            // ── Stage B · Out of slot ──────────────────────────────
             <>
-              <h2 className="text-xl font-bold mb-2">Need to hire another teammate?</h2>
-              <p className="text-sm text-tower-cream/70 mb-5 leading-relaxed">
+              <p className="text-[14px] text-tower-cream/70 leading-relaxed mb-5">
+                I&apos;ve got teammates ready to bring on, but your
+                office is full.{' '}
                 {nextFloor ? (
                   <>
-                    Unlock a new teammate slot at <strong className="text-tower-cream">Floor {nextFloor.id}</strong>.
-                    {' '}Share your link to get there.
+                    Open up a new seat at{' '}
+                    <strong className="text-tower-cream">
+                      Floor {nextFloor.id}
+                    </strong>{' '}
+                    — share your link to climb.
                   </>
                 ) : (
                   <>
-                    You&apos;ve reached the penthouse — keep sharing to grow
-                    your office further.
+                    You&apos;ve reached the penthouse — keep sharing to
+                    grow your team.
                   </>
                 )}
               </p>
@@ -236,7 +283,7 @@ export function IrisHireModal({
                   aria-disabled={!inviteUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
                   }`}
                   aria-label="Share on X"
@@ -249,7 +296,7 @@ export function IrisHireModal({
                   aria-disabled={!inviteUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
                   }`}
                   aria-label="Share on LinkedIn"
@@ -260,7 +307,7 @@ export function IrisHireModal({
                 <button
                   onClick={handleCopy}
                   disabled={!inviteUrl}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Copy invite link"
                 >
                   {copied ? (
@@ -276,12 +323,6 @@ export function IrisHireModal({
                   )}
                 </button>
               </div>
-
-              {!inviteUrl && (
-                <p className="mt-3 text-[11px] text-tower-cream/40">
-                  Sign up to get your personal invite link.
-                </p>
-              )}
             </>
           )}
         </div>
@@ -334,6 +375,62 @@ function LinkIcon() {
     >
       <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
       <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
+    </svg>
+  )
+}
+
+/**
+ * Iris pixel portrait — chest-up sprite of the AI Recruiter, used as
+ * the identity element at the top of the modal. Reproduces the look
+ * of the office-floor 2D minifigure (black hair, brown skin, dark
+ * navy suit with red tie + lapel) per the mockup at
+ * `diaflow-iris-modal-three-states.html`.
+ *
+ * Standalone SVG (no external asset), viewBox 56×72 → render size
+ * fixed via inline width/height so a font-size change on the modal
+ * shell can't accidentally scale the portrait.
+ */
+function IrisPortrait() {
+  return (
+    <svg
+      width="56"
+      height="72"
+      viewBox="0 0 56 72"
+      aria-hidden
+      style={{ imageRendering: 'pixelated' }}
+    >
+      {/* Hair — top cap + two side tufts. Dark almost-black so the
+          shape reads against the navy suit. */}
+      <rect x="10" y="0" width="36" height="14" fill="#1a1a1a" rx="2" />
+      <rect x="8" y="12" width="5" height="10" fill="#1a1a1a" />
+      <rect x="43" y="12" width="5" height="10" fill="#1a1a1a" />
+
+      {/* Face — brown skin, slightly rounded so it doesn't read as
+          a sticker. */}
+      <rect x="14" y="11" width="28" height="22" fill="#5d4030" rx="2" />
+
+      {/* Eyes — white per the desktop voxel sprites. */}
+      <rect x="19" y="20" width="3" height="4" fill="#ffffff" />
+      <rect x="34" y="20" width="3" height="4" fill="#ffffff" />
+
+      {/* Suit body — dark navy, slightly wider than the face. */}
+      <rect x="6" y="34" width="44" height="38" fill="#1c2440" rx="3" />
+
+      {/* Lapel triangle just below the collar — same colour as the
+          suit shadow tone for depth. */}
+      <path
+        d="M 20 34 L 28 38 L 28 44 Z"
+        fill="#141a30"
+      />
+      <path
+        d="M 36 34 L 28 38 L 28 44 Z"
+        fill="#141a30"
+      />
+
+      {/* Red tie running down the centre — main band + slightly
+          darker centre stripe so it doesn't read as a flat block. */}
+      <rect x="25.5" y="36" width="5" height="24" fill="#c53030" rx="1" />
+      <rect x="27" y="36" width="2" height="24" fill="#a02020" />
     </svg>
   )
 }

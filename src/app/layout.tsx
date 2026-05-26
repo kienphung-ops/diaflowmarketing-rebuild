@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import './globals.css'
 import { GoogleAnalytics } from '@/components/GoogleAnalytics'
 import { GoogleTagManager, GoogleTagManagerNoScript } from '@/components/GoogleTagManager'
@@ -15,11 +16,24 @@ import { GoogleTagManager, GoogleTagManagerNoScript } from '@/components/GoogleT
  *      shared links.
  *   2. VERCEL_URL — auto-populated on every Vercel deploy (preview +
  *      production). Falls back here when NEXT_PUBLIC_SITE_URL is unset.
- *   3. localhost — dev fallback.
+ *   3. Request host — read live from the incoming request's headers
+ *      via Next's `headers()` helper. This handles local dev + any
+ *      non-Vercel deployment (custom domain behind a reverse proxy,
+ *      tunnels like ngrok, etc.) without requiring an env var.
+ *   4. localhost — only reached if the request had no `host` header,
+ *      which shouldn't happen in practice.
  */
-function resolveSiteUrl(): URL {
+async function resolveSiteUrl(): Promise<URL> {
   if (process.env.NEXT_PUBLIC_SITE_URL) return new URL(process.env.NEXT_PUBLIC_SITE_URL)
   if (process.env.VERCEL_URL) return new URL(`https://${process.env.VERCEL_URL}`)
+  const h = await headers()
+  const host = h.get('x-forwarded-host') ?? h.get('host')
+  if (host) {
+    const forwardedProto = h.get('x-forwarded-proto')?.split(',')[0]?.trim()
+    const isLocal = /^(localhost|127\.0\.0\.1|\[::1\]|\d+\.\d+\.\d+\.\d+)(:\d+)?$/i.test(host)
+    const proto = forwardedProto || (isLocal ? 'http' : 'https')
+    return new URL(`${proto}://${host}`)
+  }
   return new URL('http://localhost:3000')
 }
 
@@ -27,37 +41,42 @@ const SITE_NAME = 'Diaflow Tower'
 const SITE_DESCRIPTION = 'Build your AI office. Invite friends to climb the tower.'
 const OG_IMAGE = '/diaflow-logo.jpg'
 
-export const metadata: Metadata = {
-  metadataBase: resolveSiteUrl(),
-  title: SITE_NAME,
-  description: SITE_DESCRIPTION,
-  icons: {
-    icon: [
-      { url: '/diaflow-logo.jpg', type: 'image/jpeg' },
-    ],
-    shortcut: '/diaflow-logo.jpg',
-    apple: '/diaflow-logo.jpg',
-  },
-  // Open Graph — Facebook / LinkedIn / Discord / iMessage etc. all
-  // read these. Per-route pages can override individual fields via
-  // their own `metadata` / `generateMetadata` exports without having
-  // to re-state the unchanged ones.
-  openGraph: {
-    type: 'website',
-    siteName: SITE_NAME,
+// `generateMetadata` (instead of a static `metadata` export) so we
+// can `await resolveSiteUrl()` — reading the incoming request's host
+// header requires the async helper. Per-route pages can still override
+// individual fields via their own `metadata` / `generateMetadata`
+// exports without having to re-state the unchanged ones.
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    metadataBase: await resolveSiteUrl(),
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
-    url: '/',
-    images: [{ url: OG_IMAGE, width: 1200, height: 627, alt: SITE_NAME }],
-  },
-  // Twitter / X — `summary_large_image` is the right card type for a
-  // 1200×627 hero, matching the OG image dimensions.
-  twitter: {
-    card: 'summary_large_image',
-    title: SITE_NAME,
-    description: SITE_DESCRIPTION,
-    images: [OG_IMAGE],
-  },
+    icons: {
+      icon: [
+        { url: '/diaflow-logo.jpg', type: 'image/jpeg' },
+      ],
+      shortcut: '/diaflow-logo.jpg',
+      apple: '/diaflow-logo.jpg',
+    },
+    // Open Graph — Facebook / LinkedIn / Discord / iMessage etc. all
+    // read these.
+    openGraph: {
+      type: 'website',
+      siteName: SITE_NAME,
+      title: SITE_NAME,
+      description: SITE_DESCRIPTION,
+      url: '/',
+      images: [{ url: OG_IMAGE, width: 1200, height: 627, alt: SITE_NAME }],
+    },
+    // Twitter / X — `summary_large_image` is the right card type for
+    // a 1200×627 hero, matching the OG image dimensions.
+    twitter: {
+      card: 'summary_large_image',
+      title: SITE_NAME,
+      description: SITE_DESCRIPTION,
+      images: [OG_IMAGE],
+    },
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

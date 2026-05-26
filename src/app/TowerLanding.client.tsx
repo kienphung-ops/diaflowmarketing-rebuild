@@ -1276,7 +1276,9 @@ export default function TowerLanding(props: Props) {
             ? `${origin}/floor/${props.referralCode}`
             : null
         }
+        signedIn={props.signedIn}
         onAddTeammate={() => setBulkAddOpen(true)}
+        onOpenSignup={() => setShowSignupModal(true)}
       />
 
       {showSignupModal && <SignupModal onClose={() => setShowSignupModal(false)} />}

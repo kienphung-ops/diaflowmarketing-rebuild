@@ -378,9 +378,12 @@ export function Mobile2DScene({
   )
 }
 
-/** Default NPC palette + names. Hair + skin tones mirror the 3D
- *  scene's CharacterConfig (see scene/characters/characters.config.ts)
- *  so the same teammate reads as the same identity across views. */
+/** Default NPC palette + names. Colours match the SVG voxel mockup
+ *  in `requirements/flow/mobile/diaflow-mobile-minifigures.html` —
+ *  three named characters with per-character hair, skin, and shirt
+ *  base colours. Shadow variants are derived per-render via the
+ *  `darken()` helper so we don't have to hand-pick a darker hex per
+ *  field. */
 const NPC_CONFIG: Record<
   'iris' | 'mia' | 'leo',
   {
@@ -394,23 +397,25 @@ const NPC_CONFIG: Record<
   iris: {
     name: 'Iris',
     role: 'AI Recruiter',
-    bodyColor: '#f9a8d4',
-    hairColor: '#1C1C1C',
-    skinColor: '#c98a5b',
+    // Dark navy suit per the mockup — Iris also paints a red tie +
+    // lapel overlay on top in the sprite renderer (see CharacterSprite).
+    bodyColor: '#1c2440',
+    hairColor: '#1a1a1a',
+    skinColor: '#6b4a35',
   },
   mia: {
     name: 'Mia',
     role: 'Assistant',
-    bodyColor: '#a875ff',
-    hairColor: '#8B4513',
-    skinColor: '#fcd2b3',
+    bodyColor: '#5a8ed8',
+    hairColor: '#8b5a3c',
+    skinColor: '#f5d4b0',
   },
   leo: {
     name: 'Leo',
     role: 'Demo Specialist',
-    bodyColor: '#60a5fa',
-    hairColor: '#2C2C54',
-    skinColor: '#f1c27d',
+    bodyColor: '#6d3fc8',
+    hairColor: '#1a1a30',
+    skinColor: '#f5d4b0',
   },
 }
 
@@ -602,6 +607,7 @@ const TAP_MAX_MS = 350
  * drag persists across re-renders until the user navigates away.
  */
 function CharacterSprite({
+  slug,
   name,
   role,
   worldPos,
@@ -928,108 +934,129 @@ function CharacterSprite({
         </div>
       )}
 
-      {/* Stacked body — hair + head + torso + arms + hands + legs.
-          Soft box-shadow matches the 3D scene's emissive glow.
-          The bounce animation wraps the whole stack via a keyed inner
-          div so re-firing restarts the keyframes from t=0. */}
+      {/* Lego-voxel minifigure — single SVG per the mockup at
+          requirements/flow/mobile/diaflow-mobile-minifigures.html.
+          Every solid surface (head, body, arms, hair) has a darker
+          right-side copy so the figure reads as a 3D block lit from
+          the upper-left. Iris additionally paints a red tie + lapel
+          overlay onto the suit-coloured body. The bounce animation
+          wraps the whole SVG via a keyed inner div so re-firing
+          restarts the keyframes from t=0. */}
       <div
         key={`bounce-${bounceId}`}
-        className="mx-auto w-7 h-9 rounded-sm relative"
+        className="mx-auto relative"
         style={{
-          background: bodyColor,
-          boxShadow: `0 0 14px ${bodyColor}55`,
+          width: 44,
+          height: 62,
+          filter: `drop-shadow(0 0 12px ${bodyColor}55)`,
           animation: bounceId > 0 ? 'mobile2dBounce 0.45s ease-out' : undefined,
         }}
       >
-        {/* Head — skin-toned square with subtle darker outline */}
-        <div
-          className="absolute left-1/2 -translate-x-1/2 -top-3.5 w-5 h-5 rounded-sm"
-          style={{
-            background: skinColor,
-            border: `1px solid ${darken(skinColor, 0.35)}`,
-          }}
-        >
-          {/* Hair — cap that sits on the top of the head, sticks out
-              a hair (no pun) on both sides so the character reads as
-              having a hairline instead of a bald skin block. Renders
-              behind the eyes because eyes are positioned absolutely
-              from the head. */}
-          <div
-            className="absolute -top-[3px] -left-[1.5px] -right-[1.5px] h-2 rounded-t-md"
-            style={{
-              background: hairColor,
-              boxShadow: `inset 0 -1px 0 ${darken(hairColor, 0.25)}`,
-            }}
-            aria-hidden
-          />
-          {/* Side hair tufts — frame the face on both sides so the
-              top-down hair cap doesn't read as a floating beanie. */}
-          <span
-            className="absolute -left-[1.5px] top-[2px] w-[2px] h-[6px]"
-            style={{ background: hairColor }}
-            aria-hidden
-          />
-          <span
-            className="absolute -right-[1.5px] top-[2px] w-[2px] h-[6px]"
-            style={{ background: hairColor }}
-            aria-hidden
-          />
-
-          {/* Eyes — bumped to 1×1 px so they're visible at this scale
-              (the previous 0.5×0.5 effectively rendered as half pixels
-              and disappeared on most displays). */}
-          <span className="absolute left-[5px] top-[8px] w-[2px] h-[2px] rounded-[1px] bg-[#1a1a2e]" />
-          <span className="absolute right-[5px] top-[8px] w-[2px] h-[2px] rounded-[1px] bg-[#1a1a2e]" />
-          {/* Smile — slightly thicker arc so it reads across the small face */}
-          <span className="absolute left-1/2 -translate-x-1/2 bottom-[3px] w-2 h-[1.5px] rounded-full bg-[#a8362c]" />
-        </div>
-
-        {/* Left + right arms — same colour as the torso so the arm
-            silhouette extends the clothes block, with a skin-toned
-            hand at the bottom. Slightly inset from the body's outer
-            edge so they read as separate limbs, not a wider torso. */}
-        <span
-          className="absolute -left-[3px] top-[3px] w-[3px] h-[15px] rounded-sm"
-          style={{
-            background: bodyColor,
-            boxShadow: `inset 1px 0 0 ${darken(bodyColor, 0.2)}`,
-          }}
-          aria-hidden
+        <MinifigureSvg
+          slug={slug}
+          bodyColor={bodyColor}
+          hairColor={hairColor}
+          skinColor={skinColor}
         />
-        <span
-          className="absolute -right-[3px] top-[3px] w-[3px] h-[15px] rounded-sm"
-          style={{
-            background: bodyColor,
-            boxShadow: `inset -1px 0 0 ${darken(bodyColor, 0.2)}`,
-          }}
-          aria-hidden
-        />
-        {/* Hands — small skin-toned blocks anchored to the bottom of
-            each arm. Just-visible at this scale but enough to break
-            the silhouette so the character reads as "arms hanging at
-            its sides" not "rectangular costume". */}
-        <span
-          className="absolute -left-[3px] top-[18px] w-[3px] h-[3px] rounded-sm"
-          style={{
-            background: skinColor,
-            border: `1px solid ${darken(skinColor, 0.35)}`,
-          }}
-          aria-hidden
-        />
-        <span
-          className="absolute -right-[3px] top-[18px] w-[3px] h-[3px] rounded-sm"
-          style={{
-            background: skinColor,
-            border: `1px solid ${darken(skinColor, 0.35)}`,
-          }}
-          aria-hidden
-        />
-
-        {/* Legs — dark trousers, slightly more spread so the gait
-            reads at the small scale. */}
-        <div className="absolute left-1 -bottom-2 w-2 h-2.5 bg-[#2d2d2d] rounded-sm" />
-        <div className="absolute right-1 -bottom-2 w-2 h-2.5 bg-[#2d2d2d] rounded-sm" />
       </div>
     </button>
+  )
+}
+
+/**
+ * Lego-voxel minifigure — one SVG per character. Layered top to
+ * bottom: ground shadow → legs → feet → trapezoid body → arms →
+ * hands → head → hair → eyes. Every solid surface has a darker
+ * "shadow" copy on its right edge (implied light source: upper-left)
+ * so the figure reads as a 3D block. Shadow tones are derived from
+ * the base colour via `darken()` so we don't have to hand-pick a
+ * separate field per teammate.
+ *
+ * Iris (`slug === 'iris'`) gets a red tie + dark lapel overlay on
+ * top of the dark navy suit body, matching the SVG mockup at
+ * requirements/flow/mobile/diaflow-mobile-minifigures.html.
+ *
+ * ViewBox is 100×140; the rendered size is set by the parent's
+ * width/height (typically 44×62px for the office canvas).
+ */
+function MinifigureSvg({
+  slug,
+  bodyColor,
+  hairColor,
+  skinColor,
+}: {
+  slug: string
+  bodyColor: string
+  hairColor: string
+  skinColor: string
+}) {
+  // Per-surface shadow colours — ~25-30% darker than the base, picked
+  // to mirror the hex values in the mockup template.
+  const bodyShadow = darken(bodyColor, 0.28)
+  const hairShadow = darken(hairColor, 0.3)
+  const skinShadow = darken(skinColor, 0.18)
+
+  const isIris = slug === 'iris'
+
+  return (
+    <svg
+      viewBox="0 0 100 140"
+      className="block w-full h-full"
+      aria-hidden
+    >
+      {/* Ground shadow — soft ellipse under the feet, grounds the
+          figure on the wood floor. */}
+      <ellipse cx="50" cy="135" rx="28" ry="4" fill="rgba(0,0,0,0.3)" />
+
+      {/* Legs (dark trousers with right-side shadow) */}
+      <rect x="33" y="95" width="14" height="34" fill="#1a1a1a" />
+      <rect x="53" y="95" width="14" height="34" fill="#0e0e0e" />
+
+      {/* Feet — slightly wider than the legs so they read as shoes. */}
+      <rect x="31" y="123" width="18" height="8" rx="1" fill="#0a0a0a" />
+      <rect x="51" y="123" width="18" height="8" rx="1" fill="#000" />
+
+      {/* Body — tapered trapezoid for the Lego silhouette. */}
+      <path d="M 25 55 L 75 55 L 78 100 L 22 100 Z" fill={bodyColor} />
+      <path d="M 60 55 L 75 55 L 78 100 L 62 100 Z" fill={bodyShadow} />
+
+      {/* Iris-only overlay — red tie + dark lapel sitting on top of
+          the suit. The lapel triangles tuck under the collar so the
+          tie reads as the focal point of the chest. */}
+      {isIris && (
+        <>
+          {/* Lapel */}
+          <path d="M 36 55 L 50 58 L 50 70 Z" fill={bodyShadow} />
+          <path d="M 64 55 L 50 58 L 50 70 Z" fill={darken(bodyShadow, 0.25)} />
+          {/* Tie */}
+          <rect x="47" y="55" width="6" height="32" fill="#c53030" />
+          <rect x="50" y="55" width="3" height="32" fill="#a02020" />
+        </>
+      )}
+
+      {/* Arms — separate rectangles flanking the body, each with a
+          darker shadow copy on the right side. */}
+      <rect x="14" y="58" width="14" height="30" fill={bodyColor} />
+      <rect x="72" y="58" width="14" height="30" fill={bodyShadow} />
+
+      {/* Hands — small skin-toned blocks at the bottom of each arm. */}
+      <rect x="12" y="84" width="16" height="10" rx="2" fill={skinColor} />
+      <rect x="72" y="84" width="16" height="10" rx="2" fill={skinShadow} />
+
+      {/* Head — large skin-toned square with rounded corners, plus
+          the standard right-side shadow band. */}
+      <rect x="28" y="22" width="44" height="36" rx="3" fill={skinColor} />
+      <rect x="58" y="22" width="14" height="36" fill={skinShadow} />
+
+      {/* Hair — overhanging cap that sits on top of the head.
+          Slightly wider than the head so it reads as hair, not a
+          flat strip stuck to the face. */}
+      <rect x="25" y="10" width="50" height="16" rx="2" fill={hairColor} />
+      <rect x="60" y="10" width="15" height="16" fill={hairShadow} />
+
+      {/* Eyes — white per the desktop voxel sprites, not black. */}
+      <rect x="36" y="36" width="5" height="6" fill="white" />
+      <rect x="59" y="36" width="5" height="6" fill="white" />
+    </svg>
   )
 }
