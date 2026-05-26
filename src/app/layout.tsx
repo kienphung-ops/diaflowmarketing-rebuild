@@ -66,7 +66,14 @@ export async function generateMetadata(): Promise<Metadata> {
       title: SITE_NAME,
       description: SITE_DESCRIPTION,
       url: '/',
-      images: [{ url: OG_IMAGE, width: 1200, height: 627, alt: SITE_NAME }],
+      // Declared dimensions MUST match the actual file or LinkedIn /
+      // Facebook reject the image silently (and then cache the "no
+      // image" verdict for ~7 days). `/diaflow-logo.jpg` is a square
+      // 2048×2048 bitmap. LinkedIn accepts square OG images — they
+      // just render letterboxed in the landscape preview slot, which
+      // is still better than no preview at all. If a proper 1200×627
+      // landscape asset gets added later, swap OG_IMAGE + dimensions.
+      images: [{ url: OG_IMAGE, width: 2048, height: 2048, alt: SITE_NAME }],
     },
     // Twitter / X — `summary_large_image` is the right card type for
     // a 1200×627 hero, matching the OG image dimensions.

@@ -38,7 +38,12 @@ export async function generateMetadata(
       title,
       description,
       url,
-      images: [{ url: '/diaflow-logo.jpg', width: 1200, height: 627, alt: title }],
+      // Declared dimensions MUST match the actual file or LinkedIn /
+      // Facebook reject the image silently (and then cache the "no
+      // image" verdict for ~7 days). `/diaflow-logo.jpg` is square
+      // 2048×2048 — declaring it 1200×627 (landscape) was the bug
+      // that prevented the preview from rendering.
+      images: [{ url: '/diaflow-logo.jpg', width: 2048, height: 2048, alt: title }],
     },
     twitter: {
       card: 'summary_large_image',
