@@ -11,6 +11,12 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 25
 
 const POLL_MS = 2_000
+// Close the stream OURSELVES a beat before Vercel's hard `maxDuration`
+// kill. If we let the function run to the 25s limit, Vercel terminates it
+// and logs "Task timed out after 25 seconds". Ending the stream cleanly
+// at ~23s lets the function return normally — the browser's EventSource
+// then auto-reconnects (picking up where we left off via the snapshot).
+const SELF_CLOSE_MS = 23_000
 
 /**
  * Server-Sent Events stream that pushes floor / invite changes to a
@@ -99,8 +105,20 @@ export async function GET(req: NextRequest) {
         }
       }, POLL_MS)
 
+      // Graceful self-close before Vercel's hard timeout (see comment on
+      // SELF_CLOSE_MS). The client reconnects automatically.
+      const selfClose = setTimeout(() => {
+        clearInterval(interval)
+        try {
+          controller.close()
+        } catch {
+          /* already closed */
+        }
+      }, SELF_CLOSE_MS)
+
       const onAbort = () => {
         clearInterval(interval)
+        clearTimeout(selfClose)
         try {
           controller.close()
         } catch {

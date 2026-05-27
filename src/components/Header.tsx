@@ -34,6 +34,12 @@ interface Props {
    *  "go see the tower you're climbing." Cleared when the button is
    *  clicked (parent flips it back to false in onToggleTower). */
   attentionTower?: boolean
+  /** Desktop-only — fires when the signed-in user clicks the header's
+   *  "Share to climb" button. Wired by the parent to open the centered
+   *  ShareModal (same surface the floor-preview "Share to climb" CTA
+   *  opens). When omitted, the button falls back to copy-to-clipboard
+   *  via ReferralCopyButton. */
+  onShareClimb?: () => void
 }
 
 export function Header({
@@ -43,14 +49,13 @@ export function Header({
   referralCode,
   teammateCount,
   maxTeammates,
-  slotsAvailable,
   showTower,
   onOpenSignup,
   onToggleTower,
-  onAddTeammates,
   onMobileInvite,
   hideAuthCta,
   attentionTower,
+  onShareClimb,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -99,16 +104,6 @@ export function Header({
           teammates
           {!signedIn && <span className="ml-2 opacity-60 hidden md:inline">(trial)</span>}
         </div>
-
-        {/* Add-teammate pulse — only on desktop in header; mobile uses bottom bar */}
-        {onAddTeammates && (
-          <button
-            onClick={onAddTeammates}
-            className="hidden md:inline-flex px-3 py-1.5 rounded-md bg-tower-gold text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold/90 transition animate-pulse"
-          >
-            + Add {slotsAvailable} {slotsAvailable === 1 ? 'teammate' : 'teammates'}
-          </button>
-        )}
 
         {/* Tower toggle — desktop only. The header right slot on mobile
             is too narrow to fit Tower view alongside the stats pill +
@@ -221,11 +216,23 @@ export function Header({
               </button>
             )}
             <span className="hidden md:inline-flex">
-              <ReferralCopyButton
-                code={referralCode}
-                currentFloor={currentFloor}
-                totalInvites={totalInvites}
-              />
+              {onShareClimb ? (
+                // Opens the centered ShareModal ("Share to reach Floor N")
+                // — same surface the floor-preview "Share to climb" CTA
+                // uses. Falls back to copy-in-place when no handler.
+                <button
+                  onClick={onShareClimb}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
+                >
+                  <span aria-hidden>📣</span> Share to climb
+                </button>
+              ) : (
+                <ReferralCopyButton
+                  code={referralCode}
+                  currentFloor={currentFloor}
+                  totalInvites={totalInvites}
+                />
+              )}
             </span>
           </>
         ) : hideAuthCta ? null : onOpenSignup ? (

@@ -352,6 +352,9 @@ export default function TowerPageClient(props: Props) {
         onMobileInvite={
           props.signedIn ? () => setMobileShareOpen(true) : undefined
         }
+        // Desktop "Share to climb" → centered ShareModal (already wired
+        // for the tour CTA). Signed-in only.
+        onShareClimb={props.signedIn ? () => setShareModalOpen(true) : undefined}
       />
 
       <TowerView

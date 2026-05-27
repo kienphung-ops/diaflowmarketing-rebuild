@@ -28,9 +28,12 @@ import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { SignupModal } from '@/components/SignupModal'
 import { EmailVerifyModal } from '@/components/EmailVerifyModal'
 import { CelebrationModal } from '@/components/CelebrationModal'
+import { HowItWorksModal } from '@/components/HowItWorksModal'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
 import { useFloorPresence } from '@/hooks/useFloorPresence'
+import { useOrigin } from '@/hooks/useOrigin'
 import { useRealtimeFloor } from '@/hooks/useRealtimeFloor'
+import { useIsDesktop } from '@/hooks/useIsDesktop'
 import {
   computeTeammateCount,
   filterCustomTeammates,
@@ -133,6 +136,9 @@ export default function FloorVisitorClient(props: Props) {
   const [squadOpen, setSquadOpen] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
+  // "What is Diaflow Tower?" → opens the rewards/how-it-works modal.
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false)
+  const origin = useOrigin()
   // Covers the visited floor with a spinner while /tower loads. See the
   // TowerLanding.client.tsx note for the full rationale.
   const [isNavigating, setIsNavigating] = useState(false)
@@ -362,6 +368,10 @@ export default function FloorVisitorClient(props: Props) {
 
   const totalPokes = teammates.reduce((sum, t) => sum + t.pokes, 0)
   const ownerName = props.teamName || 'this team'
+  // On desktop we want a clean "just visiting" view — hide the visitor's
+  // own My Squad sidebar + the header Tower-view button so the focus is
+  // the owner's floor. Mobile keeps the My Squad pill.
+  const isDesktop = useIsDesktop()
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-[#04040d]">
@@ -377,7 +387,10 @@ export default function FloorVisitorClient(props: Props) {
         maxTeammates={visitorMaxTeammates}
         slotsAvailable={visitorSlotsAvailable}
         showTower={false}
-        onToggleTower={() => {
+        // Tower-view button hidden while visiting another user's floor
+        // on desktop (cleaner "just visiting" chrome). The button is
+        // desktop-only anyway, so omitting onToggleTower removes it.
+        onToggleTower={isDesktop ? undefined : () => {
           setIsNavigating(true)
           router.push('/tower')
         }}
@@ -398,26 +411,33 @@ export default function FloorVisitorClient(props: Props) {
           (md:block) so the new MOBILE visiting pill below takes
           over there with its chip-style stats. */}
       <div
-        className="hidden md:block absolute md:top-16 md:left-4 z-20 px-4 py-2.5 rounded-2xl bg-black/65 backdrop-blur-md border border-white/15 md:max-w-[260px]"
+        className="hidden md:block absolute top-16 left-4 z-20 px-4 py-3 rounded-2xl bg-night-deep/85 backdrop-blur-md border border-white/10 max-w-[280px]"
         style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
       >
-        <div className="text-[10px] text-amber-300/80 uppercase tracking-[0.18em] mb-0.5">
-          Visiting
+        <div className="text-[10px] uppercase tracking-[0.1em] font-extrabold text-tower-gold mb-0.5">
+          ⭐ Visiting
         </div>
-        <div className="text-lg md:text-xl font-bold text-amber-300 leading-tight truncate">
+        <div className="text-xl font-extrabold text-tower-cream leading-tight mb-1.5 truncate">
           {ownerName}
         </div>
-        <div className="text-[11px] text-white/70 mt-0.5">
-          Floor <span className="text-amber-200 font-semibold">{props.currentFloor}</span>
-          <span className="opacity-40 mx-1.5">·</span>
-          Tap a teammate to poke them
+        {/* Floor + total-pokes chips — mirrors the mobile visiting pill. */}
+        <div className="flex gap-1.5 flex-wrap">
+          <span className="rounded-full px-2.5 py-1 text-[11px] font-bold bg-tower-gold/15 text-tower-gold border border-tower-gold/30">
+            {props.currentFloor >= 20 ? '👑' : '🏢'} Floor {props.currentFloor}
+          </span>
+          <span className="rounded-full px-2.5 py-1 text-[11px] font-bold bg-purple-500/15 text-purple-200 border border-purple-400/30">
+            ⭐ {totalPokes} {totalPokes === 1 ? 'poke' : 'pokes'}
+          </span>
+        </div>
+        <div className="text-[11px] text-tower-cream/55 mt-2">
+          Drag a teammate to poke them
         </div>
       </div>
 
-      {/* Pokes leaderboard panel — right side on desktop, hidden on
-          mobile (visitor can still poke via the scene). Top offset
-          bumped so the standard Header clears it. */}
-      <PokesPanel teammates={teammates} pokingId={pokingId} onPoke={poke} />
+      {/* The right-side "Squad / Poke a teammate" panel was removed on
+          desktop — visitors now poke the same way as on mobile: by
+          dragging a teammate in the scene (onTeammatePoke). The left
+          "Visiting" card carries the "tap a teammate to poke" hint. */}
 
       {/* Desktop: 3D scene. Visitors CAN drag teammates — the drop
           triggers a poke API call (see pokeBySlug). Position changes
@@ -491,10 +511,10 @@ export default function FloorVisitorClient(props: Props) {
       </div>
 
       {/* MySquad — visitor's OWN squad, not the owner's. Right-edge
-          floating button + slide-in drawer, same component the office
-          + tower views use so the user has a consistent way to
-          inspect / share their own progress from anywhere. */}
-      <MySquadFloatingButton visible onClick={() => setSquadOpen(true)} />
+          floating button + slide-in drawer. Hidden on DESKTOP while
+          visiting another user's floor (cleaner view); kept on mobile
+          so the visitor can still reach their own squad/share. */}
+      <MySquadFloatingButton visible={!isDesktop} onClick={() => setSquadOpen(true)} />
 
       <MySquadDrawer
         open={squadOpen}
@@ -523,6 +543,42 @@ export default function FloorVisitorClient(props: Props) {
           viewerCount: visitorCount,
           totalPokes,
         }}
+      />
+
+      {/* "What is Diaflow Tower?" helper — bottom-left. Collapsed to a
+          "?" circle; expands to the full label on hover (desktop). Tap
+          opens the How-it-works / rewards modal. Lifted above the
+          anonymous "Build your own office" bottom card on mobile so they
+          don't overlap. */}
+      <button
+        type="button"
+        onClick={() => setHowItWorksOpen(true)}
+        aria-label="What is Diaflow Tower?"
+        className={
+          'group fixed left-4 z-30 flex items-center rounded-full bg-night-mid/90 border border-white/15 backdrop-blur-md text-tower-cream/80 hover:text-tower-cream shadow-lg transition-all ' +
+          (props.visitorSignedIn ? 'bottom-4' : 'bottom-[6.5rem] md:bottom-4')
+        }
+        style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}
+      >
+        <span className="w-10 h-10 flex items-center justify-center rounded-full text-lg font-bold shrink-0">
+          ?
+        </span>
+        <span className="max-w-0 group-hover:max-w-[220px] overflow-hidden whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 text-[13px] font-semibold">
+          <span className="pr-4">What is Diaflow Tower?</span>
+        </span>
+      </button>
+
+      <HowItWorksModal
+        open={howItWorksOpen}
+        onClose={() => setHowItWorksOpen(false)}
+        inviteUrl={
+          props.visitorSignedIn && props.visitorReferralCode && origin
+            ? `${origin}/floor/${props.visitorReferralCode}`
+            : null
+        }
+        currentFloor={liveVisitorFloor}
+        totalInvites={liveVisitorInvites}
+        onOpenSignup={!props.visitorSignedIn ? () => setSignupOpen(true) : undefined}
       />
 
       {signupOpen && <SignupModal onClose={() => setSignupOpen(false)} />}
@@ -606,60 +662,3 @@ export default function FloorVisitorClient(props: Props) {
   )
 }
 
-/** Right-side pokes leaderboard with a per-teammate poke button. */
-function PokesPanel({
-  teammates,
-  pokingId,
-  onPoke,
-}: {
-  teammates: Teammate[]
-  pokingId: string | null
-  onPoke: (id: string) => void
-}) {
-  return (
-    <aside className="hidden md:flex absolute top-32 right-12 z-20 w-[240px] max-h-[70vh] flex-col rounded-2xl bg-black/65 backdrop-blur-md border border-white/15 overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/10">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-tower-gold/80">
-          Squad
-        </div>
-        <div className="text-sm font-semibold text-tower-cream mt-0.5">
-          Poke a teammate
-        </div>
-      </div>
-      <ul className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-        {teammates.map(t => (
-          <li
-            key={t.id}
-            className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-white/5 transition"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold truncate text-tower-cream">
-                  {t.name}
-                </span>
-                {t.isDefault && (
-                  <span className="shrink-0 text-[8px] uppercase tracking-wider px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">
-                    NPC
-                  </span>
-                )}
-              </div>
-              <div className="text-[10px] text-tower-cream/50 truncate">
-                {t.role}
-              </div>
-            </div>
-            <div className="shrink-0 text-[11px] text-amber-300 font-bold tabular-nums w-8 text-right">
-              ★ {t.pokes}
-            </div>
-            <button
-              onClick={() => onPoke(t.id)}
-              disabled={pokingId === t.id}
-              className="shrink-0 px-2.5 py-1 rounded-md bg-tower-gold text-night-deep text-xs font-bold hover:bg-amber-200 disabled:opacity-60 transition"
-            >
-              Poke
-            </button>
-          </li>
-        ))}
-      </ul>
-    </aside>
-  )
-}

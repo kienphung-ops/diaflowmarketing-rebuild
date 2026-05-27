@@ -61,19 +61,19 @@ const FLOORS = [
   // seating. See ExecutiveChair mesh + the basic_chair → 0 /
   // executive_chair → 3 swap in ITEMS below.
   { id: 6,  invitesRequired: 9,   label: 'Bookshelf + upgraded chairs',     maxTeammates: 6,  unlock_items: ['📚 Bookshelf', 'Upgraded extra chair'] },
-  { id: 7,  invitesRequired: 12,  label: 'Printer',             maxTeammates: 7,  unlock_items: ['🖨 Printer'],product_reward: '🎁 1 mo free' },
+  { id: 7,  invitesRequired: 12,  label: 'Printer',             maxTeammates: 7,  unlock_items: ['🖨 Printer'],product_reward: '🎁 1 month Pro free' },
   { id: 8,  invitesRequired: 16,  label: 'Whiteboard with diagrams',        maxTeammates: 7,  unlock_items: ['📋 Whiteboard with diagrams'] },
   { id: 9,  invitesRequired: 21,  label: 'Mini fridge',                     maxTeammates: 8,  unlock_items: ['🧃 Mini fridge'] },
   // F10 + F11 swapped vs the old seed — spec puts the couch first
   // (lounge area at slot-tier 8) and the trophy at the next tier (9).
   { id: 10, invitesRequired: 27,  label: 'Couch / lounge area',             maxTeammates: 8,  unlock_items: ['🛋 Couch / lounge area'] },
-  { id: 11, invitesRequired: 34,  label: 'Trophy on shelf',                 maxTeammates: 9,  unlock_items: ['🏆 Trophy on shelf'] },
+  { id: 11, invitesRequired: 34,  label: 'Trophy on shelf',                 maxTeammates: 9,  unlock_items: ['🏆 Trophy on shelf'], product_reward:'🎁 2 months Pro free' },
   { id: 12, invitesRequired: 42,  label: 'Upgraded dark wood desk',         maxTeammates: 9,  unlock_items: ['🪵 Upgraded dark wood desk'] },
   { id: 13, invitesRequired: 51,  label: 'Neon sign on wall',               maxTeammates: 10, unlock_items: ['🌟 Neon sign on wall'] },
   // 2-mo reward moved from F15 → F14 per spec; F15 no longer carries
   // a product reward.
-  { id: 14, invitesRequired: 61,  label: 'Arcade machine',                  maxTeammates: 10, unlock_items: ['🕹 Arcade machine'], product_reward: '🎁 2 mo free' },
-  { id: 15, invitesRequired: 72,  label: 'Floor-to-ceiling windows',        maxTeammates: 11, unlock_items: ['🪟 Floor-to-ceiling windows'] },
+  { id: 14, invitesRequired: 61,  label: 'Arcade machine',                  maxTeammates: 10, unlock_items: ['🕹 Arcade machine'] },
+  { id: 15, invitesRequired: 72,  label: 'Floor-to-ceiling windows',        maxTeammates: 11, unlock_items: ['🪟 Floor-to-ceiling windows'], product_reward: '🎁 3 months Pro free'},
   // F16 is now a tea-table beat (the simple round table). Living wall
   // moved one floor up to share F17 with the ping-pong table.
   { id: 16, invitesRequired: 84,  label: 'Tea table',                       maxTeammates: 11, unlock_items: ['🍵 Tea table'] },
@@ -82,7 +82,7 @@ const FLOORS = [
   // Rooftop terrace was replaced by the DJ stand — same z=19 slot,
   // different vibe.
   { id: 19, invitesRequired: 102, label: 'DJ stand',                        maxTeammates: 13, unlock_items: ['🎵 DJ stand'] },
-  { id: 20, invitesRequired: 108, label: 'Full penthouse',                  maxTeammates: 14, unlock_items: ['👑 Full penthouse'], product_reward: '🏆 3-mo free + featured + team featured at launch' },
+  { id: 20, invitesRequired: 108, label: 'Full penthouse',                  maxTeammates: 14, unlock_items: ['👑 Full penthouse'], product_reward: '🎁 4 months Pro free · ⭐ Featured' },
 ]
 
 const MAX_FLOOR = 20

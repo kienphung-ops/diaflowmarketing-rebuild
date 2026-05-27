@@ -26,6 +26,7 @@ import { BulkAddTeammatesModal } from '@/components/BulkAddTeammatesModal'
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
 import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
 import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
+import { ShareModal } from '@/components/ShareModal'
 import {
   RECRUIT_BODY_COLORS,
   RECRUIT_HAIR_COLORS,
@@ -142,6 +143,9 @@ export default function TowerLanding(props: Props) {
   // whether the user taps it from Office or from anywhere else that
   // mounts the nav.
   const [mobileShareOpen, setMobileShareOpen] = useState(false)
+  // Desktop centered share modal — opened by the header "Share to climb"
+  // button (same surface as the floor-preview CTA).
+  const [shareModalOpen, setShareModalOpen] = useState(false)
   const [bulkAddOpen, setBulkAddOpen] = useState(false)
   // Per-recruit "greeting" nonce. Keyed by the recruit's index in
   // customRecruits; bumping an index makes that minifigure pop a
@@ -1026,6 +1030,8 @@ export default function TowerLanding(props: Props) {
         onMobileInvite={
           props.signedIn ? () => setMobileShareOpen(true) : undefined
         }
+        // Desktop "Share to climb" → centered ShareModal. Signed-in only.
+        onShareClimb={props.signedIn ? () => setShareModalOpen(true) : undefined}
       />
 
       {/* Mobile-only counter chip strip. Slides in directly below the
@@ -1207,6 +1213,21 @@ export default function TowerLanding(props: Props) {
 
       {/* Tower navigation overlay — see useState comment above. */}
       {isNavigating && <ViewTransitionOverlay label="Loading tower view…" />}
+
+      {/* Desktop "Share to climb" modal — centered "Share to reach Floor
+          N" surface opened from the header button. (Renders via portal,
+          so placement here is fine.) */}
+      <ShareModal
+        open={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        inviteUrl={
+          props.signedIn && props.referralCode && origin
+            ? `${origin}/floor/${props.referralCode}`
+            : null
+        }
+        currentFloor={effective.currentFloor}
+        totalInvites={effective.totalInvites}
+      />
 
       {/* Arrange-your-room — DESKTOP uses the fullscreen 3D RoomArranger
           overlay. MOBILE arranges the 2D scene in place (items draggable

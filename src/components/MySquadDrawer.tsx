@@ -10,6 +10,18 @@ import { useOrigin } from '@/hooks/useOrigin'
 import { buildShareCopyText } from '@/lib/shareCopy'
 import type { InviterInfo } from '@/lib/inviter'
 
+/** Ordinal suffix for the "Nth teammate" label (1st, 2nd, 3rd, 4th…). */
+function ordinal(n: number): string {
+  const mod100 = n % 100
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`
+  switch (n % 10) {
+    case 1: return `${n}st`
+    case 2: return `${n}nd`
+    case 3: return `${n}rd`
+    default: return `${n}th`
+  }
+}
+
 interface ServerRecruit {
   id: string
   name: string
@@ -168,6 +180,19 @@ export function MySquadDrawer({
         )
       )
     : 100
+
+  // What the NEXT floor unlocks — a reward (product perk or decor) plus
+  // the new teammate slot it opens. Shown as a small gold pill under the
+  // progress bar (e.g. "🎁 1 month of Pro free · 7th teammate").
+  const nextRewardLabel = nextFloor
+    ? (() => {
+        const reward =
+          nextFloor.productReward?.trim() ||
+          nextFloor.unlockItems?.find(s => s && s.trim())?.trim() ||
+          nextFloor.label
+        return `${reward} · ${ordinal(nextFloor.maxTeammates)} teammate`
+      })()
+    : ''
 
   async function handleCopy() {
     if (!inviteUrl) return
@@ -371,10 +396,15 @@ export function MySquadDrawer({
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="text-3xl font-bold">{teamName || 'untitled'}</div>
+            {/* Name takes the row; Rename + Sign out sit together on the
+                right (Sign out is a subtle gray link, not a red far-right
+                button) — matches the mockup. */}
+            <div className="flex-1 min-w-0 text-3xl font-bold truncate text-center md:text-left">
+              {teamName || 'untitled'}
+            </div>
             <button
               onClick={() => setRenaming(true)}
-              className="text-xs px-2 py-1 rounded bg-night-deep/80 border border-white/10 text-tower-cream/60 hover:text-tower-cream"
+              className="shrink-0 text-xs px-2 py-1 rounded bg-night-deep/80 border border-white/10 text-tower-cream/70 hover:text-tower-cream inline-flex items-center gap-1"
             >
               ✎ Rename
             </button>
@@ -382,7 +412,7 @@ export function MySquadDrawer({
               <button
                 type="button"
                 onClick={() => setSignOutConfirmOpen(true)}
-                className="ml-auto text-xs text-red-400 hover:text-red-300 underline-offset-2 hover:underline transition"
+                className="shrink-0 text-xs text-tower-cream/50 hover:text-tower-cream/80 underline-offset-2 hover:underline transition"
               >
                 Sign out
               </button>
@@ -406,7 +436,7 @@ export function MySquadDrawer({
           const lockedInCount = computeTeammateCount(teammates ?? [])
           if (lockedInCount <= 0) return null
           return (
-            <div className="flex justify-center">
+            <div className="flex justify-center md:justify-start">
               <div className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2 text-[12px] font-semibold text-emerald-200 inline-flex items-center gap-2">
                 <span aria-hidden>🔒</span>
                 <span>
@@ -539,9 +569,9 @@ export function MySquadDrawer({
             <div className="h-full bg-purple-400" style={{ width: `${progressPct}%` }} />
           </div>
 
-          {/* "Next" line — centered under the progress bar so it
-              reads as a caption for the bar itself. */}
-          <div className="mt-2.5 text-center text-xs text-tower-cream/80">
+          {/* "Next" line — caption under the progress bar. Centered on
+              mobile, left-aligned on desktop. */}
+          <div className="mt-2.5 text-center md:text-left text-xs text-tower-cream/80">
             {nextFloor ? (
               <>
                 <span className="text-tower-cream/55">Next:</span>{' '}
@@ -556,27 +586,26 @@ export function MySquadDrawer({
             )}
           </div>
 
+          {/* Next-floor reward pill — what unlocks at the next floor. */}
+          {nextFloor && (
+            <div className="mt-2 flex justify-center md:justify-start">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-400/10 border border-amber-400/30 px-2.5 py-1 text-[11.5px] font-semibold text-amber-300">
+                <span aria-hidden>🎁</span>
+                <span>{nextRewardLabel}</span>
+              </span>
+            </div>
+          )}
+
           {/* Floor-activity row — viewers + total pokes. Rendered for
               both owner-on-own-floor and visitor-on-other-floor so the
               drawer layout stays consistent across contexts. Divider
               + centered layout matches the mockup. */}
           {visiting && (
-            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-center gap-5 text-xs flex-wrap">
-              {/* Viewer count is meaningful when visiting someone
-                  else's floor (other people might be there too). On
-                  the owner's own /office it's mostly self-reference,
-                  so we hide it when ownerName is null to keep the
-                  row tight with just the pokes stat — mirrors the
-                  mockup where Floor 6 only shows the pokes line. */}
-              {visiting.ownerName && (
-                <span className="flex items-center gap-1.5 text-tower-cream/85">
-                  <DrawerEyeIcon />
-                  <strong className="text-sm font-bold tabular-nums text-tower-cream">
-                    {visiting.viewerCount}
-                  </strong>
-                  <span className="text-tower-cream/55">viewing</span>
-                </span>
-              )}
+            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-center md:justify-start gap-5 text-xs flex-wrap">
+              {/* Live "N viewing" count is hidden for now — the floor
+                  presence API isn't wired into the product yet, so we
+                  only surface the total-pokes stat. (Re-add the viewer
+                  count here once presence is in use.) */}
               <span className="flex items-center gap-1.5 text-tower-cream/85">
                 <span className="text-amber-300 text-sm leading-none" aria-hidden>★</span>
                 <strong className="text-sm font-bold tabular-nums text-tower-cream">
@@ -928,24 +957,3 @@ function LinkedInLogo() {
   )
 }
 
-/** Minimal eye SVG — used for the "Visiting" pill so visitors can see
- *  how many other people are also looking at the floor right now. */
-function DrawerEyeIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="text-tower-cream/70 shrink-0"
-      aria-hidden
-    >
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  )
-}
