@@ -26,6 +26,8 @@ import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
 import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
 import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
 import { TowerTourModal } from '@/components/mobile/TowerTourModal'
+import { TowerTourDesktop } from '@/components/TowerTourDesktop'
+import { ShareModal } from '@/components/ShareModal'
 import type { InviterInfo } from '@/lib/inviter'
 
 /** Local-storage key used to track whether the user has already
@@ -136,6 +138,9 @@ export default function TowerPageClient(props: Props) {
   // Mobile share bottom-sheet — opened from the hero "Invite to climb"
   // tab. Same component as TowerLanding.
   const [mobileShareOpen, setMobileShareOpen] = useState(false)
+  // Desktop centered share modal — opened from the desktop tower tour's
+  // step-4 "Share to start climbing" CTA (the mobile sheet is md:hidden).
+  const [shareModalOpen, setShareModalOpen] = useState(false)
   // Origin for composing the shareable invite URL (post-hydration only).
   const origin = useOrigin()
 
@@ -361,6 +366,18 @@ export default function TowerPageClient(props: Props) {
         </button>
       )}
 
+      {/* Desktop replay-tour button — bottom-left, mirrors the mobile
+          one. Lets users rewatch the 4-step explainer on demand. */}
+      {!tourOpen && (
+        <button
+          type="button"
+          onClick={() => setTourOpen(true)}
+          className="hidden md:inline-flex fixed left-4 bottom-4 z-20 items-center gap-1.5 px-3.5 py-2 rounded-full bg-night-mid/80 border border-purple-400/30 text-purple-300 text-xs font-semibold hover:bg-night-mid hover:text-purple-200 transition backdrop-blur-md"
+        >
+          ▶ Replay tour
+        </button>
+      )}
+
       {/* Mobile chrome — counter chips below the header, share sheet,
           progress pill, and the three-slot bottom nav. The "Tower" tab
           is the active one here; tapping "Office" navigates back to /,
@@ -460,6 +477,33 @@ export default function TowerPageClient(props: Props) {
         signedIn={props.signedIn}
         onSave={() => setSignupOpen(true)}
         onShare={() => setMobileShareOpen(true)}
+      />
+
+      {/* Desktop 4-step tower tour — shares `tourOpen` with the mobile
+          modal, so it auto-opens on first /tower visit (after the
+          post-Leo "Tower view" nudge) and the replay button below
+          re-triggers it. `hidden md:flex` internally so only one
+          breakpoint renders. Step-4 CTA: trial → signup modal,
+          signed-in → desktop ShareModal. */}
+      <TowerTourDesktop
+        open={tourOpen}
+        onClose={handleTourClose}
+        currentFloor={effective.currentFloor}
+        signedIn={props.signedIn}
+        onSave={() => setSignupOpen(true)}
+        onShare={() => setShareModalOpen(true)}
+      />
+
+      <ShareModal
+        open={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        inviteUrl={
+          props.signedIn && props.referralCode && origin
+            ? `${origin}/floor/${props.referralCode}`
+            : null
+        }
+        currentFloor={effective.currentFloor}
+        totalInvites={effective.totalInvites}
       />
 
       <EmailVerifyModal

@@ -268,7 +268,7 @@ export function TowerTourModal({
  * TowerView uses, so the markers land on the exact same bitmap rows
  * as the YOU pin on /tower.
  */
-function TowerIllustration({ step, currentFloor }: { step: 1 | 2 | 3 | 4; currentFloor: number }) {
+export function TowerIllustration({ step, currentFloor }: { step: 1 | 2 | 3 | 4; currentFloor: number }) {
   // Same calibration constants as components/TowerView.tsx — the
   // /tower.png bitmap has Floor 1's label at ~90% from the top and
   // Floor 20's at ~12%. The tower also tilts very slightly to the

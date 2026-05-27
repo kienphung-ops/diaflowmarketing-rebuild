@@ -31,6 +31,10 @@ if (typeof window !== 'undefined' && !document.getElementById('poke-animations')
       35%  { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
     }
+    @keyframes hireHintBob {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-4px); }
+    }
   `
   document.head.appendChild(style)
 }
@@ -53,11 +57,15 @@ interface CharacterProps {
   greetingText?: string
   spawnSignal?: number
   spawnGreeting?: string
+  /** Persistent nudge pill floated above the head (e.g. Iris's
+   *  "👋 ready to hire…" when a teammate slot is open). Desktop mirror
+   *  of the mobile CharacterSprite `hint`. Null/undefined = no pill. */
+  hint?: string | null
 }
 
 export const Character = memo(function Character({
   config, model, onSelect, isSelected, positionOverride,
-  onDragStart, draggingSlugRef, onPoke, pokeSignal, greetingSignal, greetingText, spawnSignal, spawnGreeting,
+  onDragStart, draggingSlugRef, onPoke, pokeSignal, greetingSignal, greetingText, spawnSignal, spawnGreeting, hint,
 }: CharacterProps) {
   const pos = positionOverride ?? config.position
 
@@ -359,14 +367,12 @@ export const Character = memo(function Character({
           ? 'off-floor'
           : null
         if (!reason) {
-          // Per the Step-1 design: default room state keeps the scene
-          // clean by hiding labels until the user signals interest.
-          // We surface the badge only on hover OR when this character
-          // is the currently-selected one (which keeps the label
-          // visible while a follow-up modal is open). Beacon mode
-          // below is exempt — those are emergency labels for an
-          // off-screen teammate the user can't find otherwise.
-          if (!hovered && !isSelected) return null
+          // Name + role are always visible (parity with the mobile 2D
+          // scene, which paints a persistent name tag over every
+          // figure). The previous hover/selected gate forced desktop
+          // users to hover each minifigure to learn who it was. Beacon
+          // mode below is still exempt — those are emergency labels for
+          // an off-screen teammate the user can't find otherwise.
           return <NameBadge name={config.name} role={config.role} />
         }
         // Target world position for the beacon — above wall (y=5.9),
@@ -431,6 +437,33 @@ export const Character = memo(function Character({
             }}
           >
             {speech.text}
+          </div>
+        </Html>
+      )}
+
+      {/* Persistent "ready to hire" nudge — floats above the name
+          badge. Gently bobs to draw the eye. Pointer-events none so it
+          never eats clicks meant for the figure below. */}
+      {hint && (
+        <Html position={[0, 2.55, 0]} center>
+          <div
+            style={{
+              animation: 'hireHintBob 1.6s ease-in-out infinite',
+              background: 'rgba(168,85,247,0.95)',
+              color: '#fff',
+              borderRadius: '999px',
+              padding: '3px 10px',
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '0.01em',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              boxShadow: '0 4px 14px rgba(168,85,247,0.55)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            }}
+          >
+            {hint}
           </div>
         </Html>
       )}

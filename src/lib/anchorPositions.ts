@@ -77,12 +77,35 @@ function subscribe(slug: string, cb: Listener): () => void {
  * Pass `slug = null` to opt out (e.g. modal not anchored — useful
  * for the same component to support both centered and anchored
  * modes via a single prop).
+ *
+ * Edge-aware mode (`opts.flipEdge`): when set, the hook owns the
+ * FULL position of the card — measure its rendered box and place it
+ * beside the character, flipping to the other side and clamping to
+ * the viewport when there isn't room. Callers that use this must NOT
+ * apply their own static offset transform (the hook overwrites it).
+ * When `flipEdge` is off (default) behavior is unchanged: the element
+ * is parked at the character pixel and the caller adds its own offset.
  */
-export function useAnchorPosition(slug: string | null) {
+interface AnchorOpts {
+  /** Horizontal gap (px) between the character pixel and the card edge. */
+  gap?: number
+  /** When true, flip the card to the character's left if it would
+   *  overflow the right viewport edge, and clamp Y to stay on-screen. */
+  flipEdge?: boolean
+  /** When true, vertically centre the card on the character pixel
+   *  (translate up by half its height). */
+  vCenter?: boolean
+}
+
+export function useAnchorPosition(slug: string | null, opts?: AnchorOpts) {
   const elRef = useRef<HTMLDivElement | null>(null)
   // Keep the latest target position in a ref so the rAF loop doesn't
   // depend on React state. The loop reads this ref and writes DOM.
   const latestRef = useRef<AnchorPos | null>(slug ? getAnchorPosition(slug) : null)
+
+  const gap = opts?.gap ?? 28
+  const flipEdge = !!opts?.flipEdge
+  const vCenter = !!opts?.vCenter
 
   useEffect(() => {
     if (!slug) return
@@ -91,14 +114,40 @@ export function useAnchorPosition(slug: string | null) {
       latestRef.current = pos
     })
 
+    const MARGIN = 8 // min px gap from any viewport edge
+
     let rafId = 0
     function tick() {
       const el = elRef.current
       const pos = latestRef.current
       if (el && pos) {
-        // translate3d gets a compositor-only path on most browsers,
-        // avoiding layout thrash even at 60fps.
-        el.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`
+        if (flipEdge) {
+          // Hook owns the full placement. Measure the rendered card so
+          // we know whether it fits to the right of the character.
+          const w = el.offsetWidth
+          const h = el.offsetHeight
+          const vw = window.innerWidth
+          const vh = window.innerHeight
+
+          // Prefer the right side; flip left when it would clip.
+          let x = pos.x + gap
+          if (x + w > vw - MARGIN) {
+            const leftX = pos.x - gap - w
+            // Only flip if the left side actually has more room;
+            // otherwise clamp on the right so we never push off-screen.
+            x = leftX >= MARGIN ? leftX : Math.max(MARGIN, vw - MARGIN - w)
+          }
+
+          let y = vCenter ? pos.y - h / 2 : pos.y
+          // Clamp vertically so the card never runs off top/bottom.
+          y = Math.min(Math.max(y, MARGIN), vh - MARGIN - h)
+
+          el.style.transform = `translate3d(${x}px, ${y}px, 0)`
+        } else {
+          // translate3d gets a compositor-only path on most browsers,
+          // avoiding layout thrash even at 60fps.
+          el.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`
+        }
       }
       rafId = requestAnimationFrame(tick)
     }
@@ -108,7 +157,7 @@ export function useAnchorPosition(slug: string | null) {
       cancelAnimationFrame(rafId)
       unsubscribe()
     }
-  }, [slug])
+  }, [slug, gap, flipEdge, vCenter])
 
   return elRef
 }

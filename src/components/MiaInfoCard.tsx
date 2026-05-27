@@ -136,9 +136,11 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
         <div
           className={
             // Card shell — bottom sheet on mobile, normal card on
-            // desktop. Mobile flat-tops + sheet grip + safe-area
-            // bottom; desktop keeps the existing 2xl rounded card.
-            'bg-night-mid border-t border-tower-gold/30 text-tower-cream shadow-2xl ' +
+            // desktop. `relative` so the absolute-positioned × close
+            // button anchors to the card's top-right instead of
+            // escaping to the fixed backdrop (which put the × up in
+            // the office area at the top of the screen).
+            'relative bg-night-mid border-t border-tower-gold/30 text-tower-cream shadow-2xl ' +
             'rounded-t-3xl md:rounded-2xl md:border md:border-tower-gold/30 ' +
             'pt-3 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-6 ' +
             (anchored

@@ -52,6 +52,10 @@ interface Props {
   /** Per-user item position overrides (Arrange-your-room feature).
    *  Pass-through to OfficeScene → FloorItems. */
   itemPositionOverrides?: Record<string, [number, number, number]>
+  /** Open teammate slots on the current floor. When > 0 (and onboarding
+   *  is done) Iris floats a "👋 ready to hire…" nudge — desktop mirror
+   *  of the mobile Iris hint. */
+  slotsAvailable?: number
 }
 
 export function SceneCanvas(props: Props) {

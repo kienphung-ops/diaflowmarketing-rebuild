@@ -72,6 +72,10 @@ interface Props {
    *  (stored in `User.recommendedRole` / `RecruitedTeammate(slug='mia').role`)
    *  shows up above her head. Iris + Leo keep their static defaults. */
   miaRole?: string | null
+  /** Open teammate slots on the current floor. When > 0 and onboarding
+   *  is done, Iris floats a persistent "👋 ready to hire…" nudge above
+   *  her head — desktop mirror of the mobile Iris hint. */
+  slotsAvailable?: number
 }
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -181,6 +185,7 @@ export function OfficeScene({
   readonly = false,
   onTeammatePoke,
   miaRole,
+  slotsAvailable,
 }: Props) {
   // `unlockedItemKeys` is no longer consumed here — FloorItems reads
   // its config straight from /api/floors via useFloorItems. Kept on
@@ -363,6 +368,13 @@ export function OfficeScene({
 
   const isOnboarding = onboardingStep !== 'done'
 
+  // Iris "👋 ready to hire…" nudge — shown only once onboarding is done
+  // and there's an open teammate slot on the floor (matches the mobile
+  // Iris hint). During onboarding Iris is busy with the team-name step,
+  // so the hire prompt would be premature.
+  const irisHint =
+    !isOnboarding && (slotsAvailable ?? 0) > 0 ? '👋 ready to hire…' : undefined
+
   // Auto-wander: every WANDER_INTERVAL_MS, pick one visible character at
   // random and walk them to a random in-bounds position. Skipped in
   // readonly mode (tower-view previews are static snapshots) and during
@@ -455,6 +467,7 @@ export function OfficeScene({
               draggingSlugRef={dragSlugRef}
               onPoke={handlePokeChar}
               pokeSignal={pokeSignals['iris'] ?? 0}
+              hint={irisHint}
             />
 
             {showLeo && (

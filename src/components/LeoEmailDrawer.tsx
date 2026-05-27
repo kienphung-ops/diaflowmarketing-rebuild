@@ -89,7 +89,10 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
       >
         <div
           className={
-            'bg-night-mid border-t border-tower-gold/30 text-tower-cream shadow-2xl ' +
+            // `relative` so the absolute × close button anchors to the
+            // card's top-right rather than escaping to the fixed
+            // backdrop (which put it up in the office area).
+            'relative bg-night-mid border-t border-tower-gold/30 text-tower-cream shadow-2xl ' +
             'rounded-t-3xl md:rounded-2xl md:border md:border-tower-gold/30 ' +
             'pt-3 px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:p-6 ' +
             (anchored

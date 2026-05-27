@@ -19,6 +19,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
+import { useAnchorPosition } from '@/lib/anchorPositions'
+import { useIsDesktop } from '@/hooks/useIsDesktop'
 
 /**
  * Shared card chrome. Renders the green "online" dot + X close + a
@@ -31,6 +33,7 @@ function ModalShell({
   statusPill,
   step,
   totalSteps = 4,
+  anchorSlug,
   children,
 }: {
   onClose: () => void
@@ -45,24 +48,68 @@ function ModalShell({
   /** Total step count for the dot strip. Defaults to 4 (the current
    *  iris → mia → mia-info → leo flow). */
   totalSteps?: number
+  /** Character slug to anchor beside on DESKTOP (iris / mia / leo).
+   *  When set, the desktop card floats next to the live 3D character
+   *  position (following it every frame) instead of sitting centered.
+   *  Mobile always keeps the bottom-sheet layout — a per-frame
+   *  transform would fight the sheet's bottom-edge position. */
+  anchorSlug?: string | null
   children: React.ReactNode
 }) {
+  // Live character-anchor only on desktop. `useAnchorPosition` returns
+  // a ref the rAF loop writes `translate3d(...)` onto every frame.
+  // Edge-aware mode: the hook owns the full placement — it parks the
+  // card to the RIGHT of the character, but flips to the LEFT (and
+  // clamps vertically) when the right side would clip off-screen. This
+  // is what keeps a right-edge character like Leo from overflowing.
+  const isDesktop = useIsDesktop()
+  const anchorRef = useAnchorPosition(
+    anchorSlug && isDesktop ? anchorSlug : null,
+    { flipEdge: true, vCenter: true, gap: 28 },
+  )
+  const anchored = !!anchorSlug && isDesktop
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/55 backdrop-blur-sm md:px-4"
+      className={
+        'fixed inset-0 z-30 flex items-end md:items-center justify-center bg-black/55 backdrop-blur-sm md:px-4 ' +
+        // When anchored on desktop, drop the dim backdrop so the office
+        // scene + the character the bubble points at stay visible.
+        (anchored ? 'md:bg-transparent md:backdrop-blur-0' : '')
+      }
       onClick={onClose}
     >
+      {/* Anchor wrapper — absolutely positioned at the viewport origin
+          on desktop when anchored; the rAF loop transforms it to the
+          character's screen pixel. On mobile (or unanchored desktop)
+          it's an inert pass-through. */}
       <div
+        ref={anchored ? anchorRef : undefined}
         onClick={e => e.stopPropagation()}
+        className={
+          'w-full md:w-auto ' +
+          (anchored ? 'md:absolute md:top-0 md:left-0 md:pointer-events-none' : '')
+        }
+        style={anchored ? { willChange: 'transform' } : undefined}
+      >
+      <div
         className={
           'relative w-full bg-night-mid border border-white/10 text-tower-cream shadow-2xl animate-onboarding-pop ' +
           // Mobile: bottom sheet with grip — full width, rounded top
-          // only, anchored to bottom. Desktop: centered card with full
-          // rounded corners and a max width.
+          // only, anchored to bottom. Desktop: rounded card.
           'rounded-t-3xl md:rounded-2xl ' +
-          (wide ? 'md:max-w-2xl ' : 'md:max-w-md ')
+          (anchored
+            ? // Anchored desktop card — fixed comfortable width beside
+              // the character. Re-enable pointer events the wrapper
+              // dropped so the card stays interactive.
+              'md:pointer-events-auto ' +
+              (wide
+                ? 'md:w-[min(520px,calc(100vw-32px))] '
+                : 'md:w-[min(420px,calc(100vw-32px))] ')
+            : // Centered fallback.
+              (wide ? 'md:max-w-2xl md:mx-auto ' : 'md:max-w-md md:mx-auto '))
         }
         style={{
           boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
@@ -91,7 +138,7 @@ function ModalShell({
           </div>
         )}
 
-        {/* Desktop-only status pill — top-left of the centered card. */}
+        {/* Desktop-only status pill — top-left of the card. */}
         {statusPill && (
           <span
             className="hidden md:inline-flex absolute top-3 left-3 items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/25 text-emerald-300 text-[10px] font-bold uppercase tracking-[0.08em]"
@@ -131,6 +178,7 @@ function ModalShell({
           {children}
         </div>
       </div>
+      </div>
     </div>
   )
 }
@@ -146,17 +194,20 @@ interface IrisProps {
 export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
   const [value, setValue] = useState('')
   return (
-    <ModalShell onClose={onSkip} statusPill="Pre-launch · Free" step={1}>
-      {/* Centered layout per the mobile mockup. Headline, body, label
-          and input are all centered; the input itself still left-aligns
-          its typed value so users can read what they typed. */}
-      <div className="text-center">
-        <div className="text-3xl mb-2.5" aria-hidden>🤝</div>
+    <ModalShell onClose={onSkip} step={1} anchorSlug="iris">
+      {/* Alignment splits by breakpoint:
+            mobile  → centered (matches the bottom-sheet onboarding)
+            desktop → left-aligned bubble (matches the Option-B mockup),
+                      with the 🤝 inline before the headline. */}
+      <div className="text-center md:text-left">
+        {/* Emoji — own line + centered on mobile; inline before the
+            headline on desktop (the md:inline copy lives inside the
+            <h2> below). */}
+        <div className="text-3xl mb-2.5 md:hidden" aria-hidden>🤝</div>
         <h2 className="text-[24px] md:text-[26px] font-extrabold leading-tight tracking-tight mb-3">
+          <span className="hidden md:inline mr-2.5" aria-hidden>🤝</span>
           Hire your AI team — for free.
         </h2>
-        {/* Tightened body — two short stress-beat lines instead of two
-            full paragraphs. The keep-it promise lands on a bold close. */}
         <p className="text-[14px] text-tower-cream/70 leading-relaxed mb-2.5">
           Diaflow is launching{' '}
           <strong className="text-tower-cream font-semibold">AI Teammate</strong>{' '}
@@ -184,7 +235,9 @@ export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
             value={value}
             onChange={e => setValue(e.target.value.slice(0, 40))}
             placeholder="e.g. Acme Co, Midnight Dev"
-            className="w-full px-4 py-3 mb-3 rounded-xl bg-night-deep/80 border border-white/10 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/25 text-[15px] text-center"
+            // Placeholder + typed value centre on mobile, left-align on
+            // desktop to match the surrounding left-aligned layout.
+            className="w-full px-4 py-3 mb-3 rounded-xl bg-night-deep/80 border border-white/10 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500/25 text-[15px] text-center md:text-left"
           />
           <button
             type="submit"
@@ -194,7 +247,9 @@ export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
             Build my team →
           </button>
         </form>
-        <p className="mt-4 text-[13px] text-tower-cream/55">
+        {/* Footer stays centered on both breakpoints — matches the
+            mockup where the "Log in" line sits centred under the CTA. */}
+        <p className="mt-4 text-center text-[13px] text-tower-cream/55">
           Already saved?{' '}
           <Link href="/login" className="text-purple-300 font-semibold hover:underline">
             Log in
@@ -216,7 +271,7 @@ interface MiaProps {
 export function MiaBubble({ onSubmit, onSkip }: MiaProps) {
   const [value, setValue] = useState('')
   return (
-    <ModalShell onClose={onSkip} step={2}>
+    <ModalShell onClose={onSkip} step={2} anchorSlug="mia">
       <div className="text-center">
         <div className="text-3xl mb-2" aria-hidden>💁</div>
         <h2 className="text-[22px] md:text-[24px] font-extrabold leading-tight tracking-tight mb-2">
@@ -295,7 +350,7 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, userRole, onNe
   // the generic "your" copy so the headline still parses.
   const headlineRole = (userRole ?? '').trim().slice(0, 40) || 'your'
   return (
-    <ModalShell onClose={onNext} step={showLoading ? 3 : 3}>
+    <ModalShell onClose={onNext} step={showLoading ? 3 : 3} anchorSlug="mia">
       <div>
         {/* Each branch owns its own avatar:
               loading      → ringed MorphAvatar (sells the morph)
@@ -486,7 +541,7 @@ export function LeoBubble({ onContinue }: LeoProps) {
   const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL)
 
   return (
-    <ModalShell onClose={onContinue} wide step={4}>
+    <ModalShell onClose={onContinue} wide step={4} anchorSlug="leo">
       <div>
         {/* Embedded YouTube iframe driven by NEXT_PUBLIC_YOUTUBE_URL.
             16:9 aspect ratio + purple glow underneath so the video

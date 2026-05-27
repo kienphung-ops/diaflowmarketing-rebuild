@@ -907,9 +907,14 @@ export default function TowerLanding(props: Props) {
         // Tower view is now a dedicated route — see /tower. Button navigates
         // there instead of toggling an overlay.
         showTower={false}
+        // Post-onboarding pulse — desktop mirror of the mobile bottom
+        // nav. Drops on mobile (Header's Tower button is md+ only) so
+        // there's no double-pulse with MobileBottomNav.
+        attentionTower={attentionTower}
         onToggleTower={
           onboardingComplete
             ? () => {
+                setAttentionTower(false)
                 setIsNavigating(true)
                 router.push('/tower')
               }
@@ -981,6 +986,9 @@ export default function TowerLanding(props: Props) {
           // Override Mia's hard-coded "Assistant" label with whatever
           // role is stored for her (Diaflow recommendation when set).
           miaRole={miaRole}
+          // Open-slot count drives Iris's "👋 ready to hire…" head nudge
+          // (desktop parity with the mobile 2D scene).
+          slotsAvailable={slotsAvailable}
           resetSignal={resetSignal}
         />
       </div>

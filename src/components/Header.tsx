@@ -27,6 +27,13 @@ interface Props {
    *  center "Build your own office" button already covers the
    *  signup path and a duplicate header button reads as clutter. */
   hideAuthCta?: boolean
+  /** When true, paints a pulsing ring + glow around the desktop
+   *  "Tower view" button and floats a bouncing "Click here" arrow
+   *  beneath it. Desktop mirror of MobileBottomNav's `attentionTower`
+   *  pulse — fires right after onboarding so the user's next move is
+   *  "go see the tower you're climbing." Cleared when the button is
+   *  clicked (parent flips it back to false in onToggleTower). */
+  attentionTower?: boolean
 }
 
 export function Header({
@@ -43,6 +50,7 @@ export function Header({
   onAddTeammates,
   onMobileInvite,
   hideAuthCta,
+  attentionTower,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -63,7 +71,7 @@ export function Header({
         <span className="text-tower-cream font-bold tracking-wide sm:hidden">
           Diaflow
         </span>
-        <span className="hidden sm:block text-tower-cream font-semibold tracking-wide">
+        <span className="hidden sm:block text-tower-cream font-bold tracking-wide">
           Diaflow Tower
         </span>
       </Link>
@@ -108,12 +116,54 @@ export function Header({
             10px. Mobile users reach the tower view via the bottom bar
             (and on /tower itself there's a back-arrow). */}
         {onToggleTower && (
-          <button
-            onClick={onToggleTower}
-            className="hidden md:inline-flex px-3 py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-xs tracking-wide hover:bg-night-mid transition whitespace-nowrap"
-          >
-            {showTower ? 'Office view' : 'Tower view'}
-          </button>
+          <div className="relative hidden md:inline-flex">
+            <button
+              onClick={onToggleTower}
+              className={
+                'relative inline-flex px-3 py-1.5 rounded-md font-semibold text-xs tracking-wide transition whitespace-nowrap ' +
+                (attentionTower
+                  ? 'bg-tower-gold/15 border border-tower-gold/70 text-tower-gold animate-nav-pulse'
+                  : 'bg-night-mid/80 border border-tower-gold/40 text-tower-gold hover:bg-night-mid')
+              }
+            >
+              {/* Expanding ring overlay — decoration, only while the
+                  post-onboarding attention pulse is active. */}
+              {attentionTower && (
+                <span
+                  aria-hidden
+                  className="absolute inset-0 rounded-md border-2 border-tower-gold/70 animate-nav-pulse-ring pointer-events-none"
+                />
+              )}
+              {showTower ? 'Office view' : 'Tower view'}
+            </button>
+
+            {/* Bouncing "Click here" arrow beneath the button, pointing
+                up at it — desktop mirror of MobileBottomNav's attention
+                arrow (which points down at the bottom-bar Tower slot). */}
+            {attentionTower && (
+              <div
+                aria-hidden
+                className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 flex flex-col items-center text-tower-gold animate-nav-arrow-bounce pointer-events-none"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+                <span className="mt-1 px-2 py-0.5 rounded-full bg-tower-gold text-night-deep text-[10px] font-bold tracking-wide shadow-[0_4px_12px_rgba(168,117,255,0.55)] whitespace-nowrap">
+                  Click here
+                </span>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Auth CTA — always visible; primary action on mobile.

@@ -164,38 +164,6 @@ export function TowerView({
           <FloorClickStrips />
         </div>
       </div>
-
-      {/* The signed-in "current floor" info card used to live here
-          (top-left, showing Floor label + "F1/20 · 0 invites"). It
-          was retired — the same info is already surfaced by the
-          MobileCounterChips strip / the desktop header pill / the
-          YOU marker on the tower image, and a fourth duplicate just
-          added clutter on top of the tower silhouette.
-          The anon/trial CTA card is kept since it's the only way for
-          a non-signed-in visitor to get into the auth flow from here. */}
-      {!signedIn && (
-        // Hidden on mobile — the header's "Claim your team" pill +
-        // MobileBottomNav's "Save my team" hero already give the trial
-        // user two paths into signup, and stacking a third floating
-        // card on top of the tower image was visual noise (the user
-        // explicitly asked for it gone on the small screen). Desktop
-        // keeps the card since it doesn't have the bottom-nav hero.
-        <div
-          className="hidden md:block absolute z-20 rounded-2xl bg-black/70 backdrop-blur-md border border-white/15 max-w-[280px]
-                     top-16 left-4 px-4 py-3"
-          style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
-        >
-          <div className="text-sm text-white/85 mb-2">
-            🔒 Save Your Team
-          </div>
-          <button
-            onClick={onSignIn}
-            className="px-4 py-1.5 rounded-md bg-purple-300 text-[#1a1a2e] font-semibold text-xs tracking-wide hover:bg-purple-200 transition"
-          >
-            Save Your Team
-          </button>
-        </div>
-      )}
     </div>
   )
 }
