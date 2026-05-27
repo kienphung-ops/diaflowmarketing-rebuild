@@ -186,11 +186,14 @@ export default function TowerFloorViewClient({
         />
       </div>
 
-      {/* Mobile: lightweight 2D front-elevation preview. */}
+      {/* Mobile: lightweight 2D front-elevation preview. Read-only —
+          floor previews are static snapshots, so the minifigures can't
+          be dragged/moved (matches the desktop 3D scene's `readonly`). */}
       <Mobile2DScene
         companyName={preview.companyName}
         recruitedCharacters={preview.teammates}
         currentFloor={preview.floor}
+        readonly
       />
 
       {/* Share / Save CTA — bottom-right on desktop. Pre-login users get

@@ -28,7 +28,11 @@ import * as THREE from 'three'
 const POSITION_DESKTOP = new THREE.Vector3(10, 9.5, 10)
 const LOOK_AT_DESKTOP = new THREE.Vector3(0, 0.8, 0)
 const FRUSTUM_HALF_HEIGHT = 5.2
-const ORTHO_ZOOM_MIN = 0.7
+// Lowered floor (was 0.7) so desktop users can pull back further — at
+// 0.7 a back-wall corner stayed clipped on wider viewports; 0.45 widens
+// the ortho frustum ~1.5× more so the whole room (and both wall corners)
+// fit in frame when zoomed all the way out.
+const ORTHO_ZOOM_MIN = 0.45
 const ORTHO_ZOOM_MAX = 1.8
 const WHEEL_STEP_ORTHO = 0.0015
 const PINCH_STEP_ORTHO = 0.005

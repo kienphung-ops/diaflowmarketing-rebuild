@@ -73,6 +73,10 @@ interface Props {
    *  is expected to forward the slug to /api/poke so the visitor /
    *  owner poke flow is identical across breakpoints. */
   onTeammatePoke?: (slug: string) => void
+  /** Read-only mode (floor previews — /tower-view/[floor]). Disables
+   *  the drag-to-move + tap gestures on every minifigure so the scene
+   *  is a static snapshot. Mirrors the desktop 3D scene's `readonly`. */
+  readonly?: boolean
 }
 
 interface PlacedItem {
@@ -94,6 +98,7 @@ export function Mobile2DScene({
   onNpcClick,
   onTeammateClick,
   onTeammatePoke,
+  readonly = false,
 }: Props) {
   // Ref to the outer scene container — passed to each CharacterSprite
   // so its pointer-move handler can compute (clientX, clientY) →
@@ -352,6 +357,7 @@ export function Mobile2DScene({
             hairColor={cfg.hairColor}
             skinColor={cfg.skinColor}
             sceneRef={sceneRef}
+            readonly={readonly}
             onTap={() => onNpcClick?.(slug)}
             onPoke={() => onTeammatePoke?.(slug)}
             onMove={pos => handleCharMove(slug, pos)}
@@ -382,6 +388,7 @@ export function Mobile2DScene({
               hairColor={RECRUIT_HAIR_COLORS[i % RECRUIT_HAIR_COLORS.length]}
               skinColor={RECRUIT_SKIN_COLORS[i % RECRUIT_SKIN_COLORS.length]}
               sceneRef={sceneRef}
+              readonly={readonly}
               onTap={() => onTeammateClick?.(i)}
               onPoke={() => onTeammatePoke?.(slug)}
               onMove={pos => handleCharMove(slug, pos)}
@@ -629,6 +636,7 @@ function CharacterSprite({
   hairColor = '#3b2410',
   skinColor = '#f5cfa8',
   sceneRef,
+  readonly = false,
   onTap,
   onPoke,
   onMove,
@@ -647,6 +655,9 @@ function CharacterSprite({
    *  face shade so older callers still render. */
   skinColor?: string
   sceneRef: React.RefObject<HTMLDivElement | null>
+  /** When true, the figure is a static snapshot — all drag/tap
+   *  gestures are short-circuited (floor-preview readonly mode). */
+  readonly?: boolean
   onTap: () => void
   onPoke: () => void
   onMove: (pos: [number, number, number]) => void
@@ -722,6 +733,9 @@ function CharacterSprite({
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    // Floor-preview readonly: never start a gesture, so the figure
+    // can't be dragged/moved and taps do nothing.
+    if (readonly) return
     // Don't propagate so the scene's outer container doesn't try to
     // interpret this as a backdrop tap.
     e.stopPropagation()
@@ -840,6 +854,11 @@ function CharacterSprite({
   }
 
   function onClick(e: React.MouseEvent<HTMLButtonElement>) {
+    // Floor-preview readonly: swallow the synthetic click too.
+    if (readonly) {
+      e.stopPropagation()
+      return
+    }
     // Safety-net tap handler for the touch-event edge cases where
     // pointerup doesn't fire / drops a frame / is interrupted. On a
     // normal gesture the pointerup handler above already set

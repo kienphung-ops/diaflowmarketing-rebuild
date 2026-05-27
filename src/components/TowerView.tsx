@@ -67,13 +67,12 @@ function floorToMarker(floor: number): { top: number; left: number } {
 export function TowerView({
   signedIn,
   currentFloor,
-  // totalInvites + teamName are still part of the public Props
-  // contract (callers pass them) — they powered the now-retired
-  // top-left info card. Left in the interface so external callers
-  // don't break; intentionally NOT destructured here so eslint
+  // totalInvites + teamName + onSignIn are still part of the public
+  // Props contract (callers pass them) — they powered the now-retired
+  // top-left info card / sign-in CTA. Left in the interface so external
+  // callers don't break; intentionally NOT destructured here so eslint
   // doesn't flag them as unused locals.
   onClose,
-  onSignIn,
 }: TowerViewProps) {
   const marker = useMemo(() => floorToMarker(currentFloor), [currentFloor])
 
