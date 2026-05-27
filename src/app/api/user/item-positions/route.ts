@@ -69,15 +69,25 @@ function sanitize(input: unknown): PositionMap {
   return out
 }
 
-export async function GET() {
+/** Which scene's layout to read/write. The mobile front-elevation 2D
+ *  scene keeps a SEPARATE arrangement from the desktop 3D scene (same
+ *  coordinate system, different default framing), stored in a distinct
+ *  column. `surface=2d` targets it; anything else targets the 3D map. */
+function is2D(surface: unknown): boolean {
+  return surface === '2d' || surface === '2D'
+}
+
+export async function GET(req: NextRequest) {
   const session = await readSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const surface2d = is2D(req.nextUrl.searchParams.get('surface'))
   const u = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { itemPositions: true },
+    select: { itemPositions: true, itemPositions2D: true },
   })
-  return NextResponse.json({ positions: (u?.itemPositions as PositionMap | null) ?? {} })
+  const col = surface2d ? u?.itemPositions2D : u?.itemPositions
+  return NextResponse.json({ positions: (col as PositionMap | null) ?? {} })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -85,11 +95,13 @@ export async function PATCH(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
+  const surface2d = is2D(body.surface)
   // Two call patterns are supported:
   //   { positions: {...} }  → REPLACE the whole map
   //   { merge: {...} }      → MERGE into the existing map (lets the
   //                            client save one item at a time without
   //                            shipping the full set every time)
+  // `surface: '2d'` routes either pattern to the mobile-2D column.
   const replace = body.positions !== undefined
   const merge = body.merge !== undefined
   if (!replace && !merge) {
@@ -105,15 +117,16 @@ export async function PATCH(req: NextRequest) {
   } else {
     const u = await prisma.user.findUnique({
       where: { id: session.userId },
-      select: { itemPositions: true },
+      select: { itemPositions: true, itemPositions2D: true },
     })
-    const existing = (u?.itemPositions as PositionMap | null) ?? {}
+    const existing =
+      ((surface2d ? u?.itemPositions2D : u?.itemPositions) as PositionMap | null) ?? {}
     next = { ...existing, ...sanitize(body.merge) }
   }
 
   await prisma.user.update({
     where: { id: session.userId },
-    data: { itemPositions: next },
+    data: surface2d ? { itemPositions2D: next } : { itemPositions: next },
   })
 
   return NextResponse.json({ success: true, positions: next })

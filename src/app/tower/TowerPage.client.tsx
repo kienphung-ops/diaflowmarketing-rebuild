@@ -144,6 +144,15 @@ export default function TowerPageClient(props: Props) {
   // upgrade — prevents the celebration modal firing when the user
   // navigates Office → Tower → Office.
   const baselineFloorRef = useRef(props.currentFloor)
+  // The SSR-seeded `props.currentFloor` can lag the user's TRUE floor
+  // (the DB column isn't always rewritten the instant a floor is
+  // earned). When it's stale, the first SSE snapshot — which carries
+  // the authoritative live floor — looks like an "upgrade" over the
+  // stale baseline and re-fires the celebration on every mount (e.g.
+  // each time the user returns from a /tower-view floor preview at the
+  // penthouse). So we ignore the SSR seed for celebration purposes and
+  // let the FIRST snapshot establish the real baseline silently.
+  const sawFirstSnapshotRef = useRef(false)
   // Mobile share bottom-sheet — opened from the hero "Invite to climb"
   // tab. Same component as TowerLanding.
   const [mobileShareOpen, setMobileShareOpen] = useState(false)
@@ -204,6 +213,19 @@ export default function TowerPageClient(props: Props) {
   useRealtimeFloor({
     enabled: props.signedIn,
     onSnapshot: data => {
+      // First snapshot of this mount establishes the authoritative
+      // baseline (floor + invites) WITHOUT celebrating — it's just the
+      // server replaying the user's current state on connect, not a
+      // live climb. This is what stops the penthouse celebration from
+      // re-firing every time the user navigates back to /tower (the
+      // SSR-seeded baseline could be stale; the snapshot is truth).
+      if (!sawFirstSnapshotRef.current) {
+        sawFirstSnapshotRef.current = true
+        baselineFloorRef.current = data.currentFloor
+        setLiveCurrentFloor(data.currentFloor)
+        setLiveTotalInvites(data.totalInvites)
+        return
+      }
       // Celebration gate via ref baseline — see comment on
       // baselineFloorRef. Compares against the highest seen floor,
       // NOT the closure'd liveCurrentFloor (which can be stale across

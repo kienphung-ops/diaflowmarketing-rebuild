@@ -66,6 +66,11 @@ model User {
   // (`basic_chair_desk_0`, `_1`, `_2`). Null/empty = use the canonical
   // defaults from FloorItems.tsx ITEMS array.
   itemPositions    Json?
+  // Same shape as `itemPositions`, but the SEPARATE layout for the
+  // mobile 2D front-elevation scene. The 2D and 3D scenes use the same
+  // world-coordinate system but intentionally different default framing,
+  // so each surface gets its own per-user arrangement.
+  itemPositions2D  Json?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 

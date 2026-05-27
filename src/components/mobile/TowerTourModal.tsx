@@ -157,10 +157,22 @@ export function TowerTourModal({
       role="dialog"
       aria-modal="true"
       aria-label="Tower tour"
-      className="md:hidden fixed inset-0 z-40 flex flex-col bg-night-deep"
+      className="md:hidden fixed inset-0 z-40 bg-night-deep"
     >
-      {/* Top header — logo + Skip */}
-      <header className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5">
+      {/* Tower illustration — occupies the TOP region only. The bottom
+          ~40vh is reserved for the sheet so the FULL tower (all floors
+          + the You / Free-beta / Penthouse markers) stays visible above
+          it instead of being covered. The region has a fixed height, so
+          the image (and its markers) never resize between steps — no
+          flicker — while the sheet below stays content-sized (no
+          stretched gap). */}
+      <div className="absolute top-0 inset-x-0 bottom-[290px] overflow-hidden">
+        <TowerIllustration step={step} currentFloor={currentFloor} />
+      </div>
+
+      {/* Top header — logo + Skip. Overlays the image top with a soft
+          scrim so the text reads over the night sky. */}
+      <header className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-night-deep/90 to-transparent">
         <div className="flex items-center gap-2 text-[14px] font-extrabold text-tower-cream">
           <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-white text-night-deep font-black text-[12px] font-serif">
             D
@@ -170,80 +182,82 @@ export function TowerTourModal({
         <button
           type="button"
           onClick={onClose}
-          className="px-3 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-[11.5px] font-semibold text-tower-cream/70 hover:text-tower-cream transition"
+          className="px-3 py-1 rounded-lg bg-white/[0.08] border border-white/10 text-[11.5px] font-semibold text-tower-cream/80 hover:text-tower-cream transition"
         >
           Skip
         </button>
       </header>
 
-      {/* Tower illustration — fills the upper half. Step drives which
-          floor(s) get the highlight ring + label overlays. */}
-      <div className="flex-1 min-h-0 relative overflow-hidden">
-        <TowerIllustration step={step} currentFloor={currentFloor} />
-      </div>
-
-      {/* Bottom sheet — step copy + Back / Next nav. Anchored bottom
-          with rounded top and safe-area padding. */}
+      {/* Bottom sheet — FIXED-height overlay pinned to the bottom edge,
+          sitting flush against the tower's base (the image reserves the
+          same 290px above). Fixed height ⇒ the tower never resizes
+          between steps (no flicker) AND there's no dark gap. The step
+          content is vertically centred so shorter steps stay balanced
+          instead of leaving a stretched gap above the nav. */}
       <div
-        className="shrink-0 bg-night-mid border-t border-white/10 rounded-t-3xl px-5 pt-3"
+        className="absolute bottom-0 inset-x-0 z-10 h-[290px] flex flex-col bg-night-mid/95 backdrop-blur-sm border-t border-white/10 rounded-t-3xl px-5 pt-3"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
-        <div className="flex justify-center pt-1 pb-3" aria-hidden>
+        <div className="flex justify-center pt-1 pb-3 shrink-0" aria-hidden>
           <div className="w-9 h-1 rounded-full bg-white/20" />
         </div>
 
-        <div className="text-center text-[10.5px] font-bold uppercase tracking-[0.1em] text-purple-300 mb-2">
-          Step {step} of 4
-        </div>
-
-        <div className="text-center mb-4">{stepCopy[step]}</div>
-
-        {/* Step-4 hero CTA — branches on login state. Both flows close
-            the tour first; parent opens the relevant sheet right after. */}
-        {isLastStep ? (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                onClose()
-                if (signedIn) onShare?.()
-                else onSave?.()
-              }}
-              className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[14.5px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition mb-2"
-            >
-              {signedIn
-                ? 'Share to start climbing →'
-                : 'Save my team to start climbing →'}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full text-center text-[12px] text-tower-cream/55 underline-offset-2 hover:underline py-1"
-            >
-              Skip — I&apos;ll explore first
-            </button>
-          </>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3 | 4) : 1))}
-              disabled={step === 1}
-              className="px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 text-tower-cream/85 font-semibold text-[12px] transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ← Back
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : 4))}
-              className="px-4 py-3 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[12px] shadow-[0_6px_16px_rgba(168,117,255,0.35)] hover:shadow-[0_10px_22px_rgba(168,117,255,0.45)] transition"
-            >
-              {step === 1 && 'Next: Floor 3 →'}
-              {step === 2 && 'Next: penthouse →'}
-              {step === 3 && 'Next: how to climb →'}
-            </button>
+        {/* Centred content block — step label + copy + nav travel
+            together, so a short step is balanced rather than stretched. */}
+        <div className="flex-1 min-h-0 flex flex-col justify-center">
+          <div className="text-center text-[10.5px] font-bold uppercase tracking-[0.1em] text-purple-300 mb-2">
+            Step {step} of 4
           </div>
-        )}
+
+          <div className="text-center mb-4">{stepCopy[step]}</div>
+
+          {/* Step-4 hero CTA — branches on login state. Both flows close
+              the tour first; parent opens the relevant sheet right after. */}
+          {isLastStep ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose()
+                  if (signedIn) onShare?.()
+                  else onSave?.()
+                }}
+                className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[14.5px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition mb-2"
+              >
+                {signedIn
+                  ? 'Share to start climbing →'
+                  : 'Save my team to start climbing →'}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full text-center text-[12px] text-tower-cream/55 underline-offset-2 hover:underline py-1"
+              >
+                Skip — I&apos;ll explore first
+              </button>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3 | 4) : 1))}
+                disabled={step === 1}
+                className="px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 text-tower-cream/85 font-semibold text-[12px] transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ← Back
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : 4))}
+                className="px-4 py-3 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[12px] shadow-[0_6px_16px_rgba(168,117,255,0.35)] hover:shadow-[0_10px_22px_rgba(168,117,255,0.45)] transition"
+              >
+                {step === 1 && 'Next: Floor 3 →'}
+                {step === 2 && 'Next: penthouse →'}
+                {step === 3 && 'Next: how to climb →'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>,
     document.body,

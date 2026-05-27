@@ -99,6 +99,9 @@ interface Props {
    *  Drives the rendered item positions when present; empty map
    *  falls back to FloorItems' canonical layout. */
   serverItemPositions: Record<string, [number, number, number]>
+  /** Separate per-user layout for the mobile 2D scene
+   *  (`User.itemPositions2D`). */
+  serverItemPositions2D: Record<string, [number, number, number]>
 }
 
 export default function TowerLanding(props: Props) {
@@ -160,6 +163,10 @@ export default function TowerLanding(props: Props) {
   // there's no setIsNavigating(false) — the overlay disappears with
   // the rest of the page when /tower mounts.
   const [isNavigating, setIsNavigating] = useState(false)
+  // Breakpoint — desktop arranges the 3D scene (RoomArranger), mobile
+  // arranges the 2D scene in place. Declared early so the arrange
+  // handlers below can branch on it.
+  const isDesktop = useIsDesktop()
   // Arrange-your-room feature. `itemPositions` is the live map driving
   // the scene (initially seeded from the server, mutated by the
   // arrange-mode drag handler). `arrangeMode` is the boolean toggle
@@ -168,8 +175,15 @@ export default function TowerLanding(props: Props) {
   const [itemPositions, setItemPositions] = useState<Record<string, [number, number, number]>>(
     () => ({ ...props.serverItemPositions }),
   )
+  // Separate layout for the mobile 2D scene — desktop arranges the 3D
+  // map above; mobile arranges this one (the two scenes share a
+  // coordinate system but use different default framing).
+  const [itemPositions2D, setItemPositions2D] = useState<Record<string, [number, number, number]>>(
+    () => ({ ...props.serverItemPositions2D }),
+  )
   const [arrangeMode, setArrangeMode] = useState(false)
   const arrangeSnapshotRef = useRef<Record<string, [number, number, number]>>({})
+  const arrangeSnapshot2DRef = useRef<Record<string, [number, number, number]>>({})
   const [arrangeSaving, setArrangeSaving] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   // Reset-position signal — bumped by MySquadDrawer / TeammateEditModal
@@ -197,6 +211,12 @@ export default function TowerLanding(props: Props) {
   // positive when the closure / setState batching landed before the
   // ref was bumped, surfacing the upgrade modal on every return trip.
   const baselineFloorRef = useRef(props.currentFloor)
+  // The SSR-seeded `props.currentFloor` can lag the user's TRUE floor,
+  // so the first SSE snapshot (authoritative) would look like an
+  // "upgrade" over a stale baseline and re-fire the celebration on
+  // every mount. We therefore let the FIRST snapshot establish the
+  // real baseline silently — no celebration / invite toast on it.
+  const sawFirstSnapshotRef = useRef(false)
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
@@ -211,23 +231,40 @@ export default function TowerLanding(props: Props) {
   // stable across renders.
   const handleStartArrange = useCallback(() => {
     if (!props.signedIn) return
+    // Snapshot BOTH layouts so Cancel reverts whichever surface the
+    // user ends up editing (desktop = 3D map, mobile = 2D map).
     arrangeSnapshotRef.current = { ...itemPositions }
+    arrangeSnapshot2DRef.current = { ...itemPositions2D }
     setArrangeMode(true)
     setSquadOpen(false) // close the drawer so the room is visible
-  }, [props.signedIn, itemPositions])
+  }, [props.signedIn, itemPositions, itemPositions2D])
 
   const handleCancelArrange = useCallback(() => {
     setItemPositions({ ...arrangeSnapshotRef.current })
+    setItemPositions2D({ ...arrangeSnapshot2DRef.current })
     setArrangeMode(false)
   }, [])
 
+  // Live drag update from the mobile 2D arranger.
+  const handleItemMove2D = useCallback(
+    (uid: string, world: [number, number, number]) => {
+      setItemPositions2D(prev => ({ ...prev, [uid]: world }))
+    },
+    [],
+  )
+
   const handleSaveArrange = useCallback(async () => {
     setArrangeSaving(true)
+    // Save whichever surface is active: desktop edits the 3D map,
+    // mobile edits the 2D map (routed via `surface: '2d'`).
+    const body = isDesktop
+      ? { positions: itemPositions }
+      : { surface: '2d', positions: itemPositions2D }
     try {
       const r = await fetch('/api/user/item-positions', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ positions: itemPositions }),
+        body: JSON.stringify(body),
       })
       if (!r.ok) throw new Error('save failed')
       pushToast({ title: 'Room saved ✓', tone: 'success' })
@@ -243,7 +280,7 @@ export default function TowerLanding(props: Props) {
     } finally {
       setArrangeSaving(false)
     }
-  }, [itemPositions, pushToast])
+  }, [isDesktop, itemPositions, itemPositions2D, pushToast])
 
   const handleResetTeammatePosition = useCallback((id: string) => {
     // `id` is a recruited teammate id; map index → "recruited-N" slug
@@ -424,6 +461,20 @@ export default function TowerLanding(props: Props) {
   useRealtimeFloor({
     enabled: !isTrial,
     onSnapshot: data => {
+      // First snapshot of this mount = authoritative baseline. Commit
+      // it silently (no celebration / no invite toast) so a stale SSR
+      // floor can't masquerade as a fresh climb on every mount.
+      if (!sawFirstSnapshotRef.current) {
+        sawFirstSnapshotRef.current = true
+        baselineFloorRef.current = data.currentFloor
+        setServerState(prev => ({
+          ...prev,
+          currentFloor: data.currentFloor,
+          totalInvites: data.totalInvites,
+          unlockedItemKeys: data.unlockedItemKeys,
+        }))
+        return
+      }
       // Celebration gate: only fire when the snapshot strictly exceeds
       // the highest floor observed during this mount (initial baseline
       // = props.currentFloor from SSR). This survives SSE reconnects,
@@ -608,7 +659,7 @@ export default function TowerLanding(props: Props) {
   //   desktop → Mia speech bubble over the office + the MySquadDrawer
   //             slides open so the user picks their next move (tour /
   //             rewards / save). No Tower-button pulse on desktop.
-  const isDesktop = useIsDesktop()
+  //             (`isDesktop` is declared near the top of the component.)
 
   const handleLeoDone = useCallback(() => {
     persist({ ...trial, onboardingStep: 'done' })
@@ -1068,6 +1119,11 @@ export default function TowerLanding(props: Props) {
         // handleTeammatePoke does the right thing for both
         // breakpoints.
         onTeammatePoke={handleTeammatePoke}
+        // Per-user 2D layout + in-place arrange (mobile only — desktop
+        // uses the 3D RoomArranger overlay below).
+        itemPositionOverrides={itemPositions2D}
+        arrangeMode={arrangeMode && !isDesktop}
+        onItemMove={handleItemMove2D}
       />
 
       <MySquadFloatingButton visible={onboardingComplete} onClick={() => setSquadOpen(true)} />
@@ -1152,14 +1208,15 @@ export default function TowerLanding(props: Props) {
       {/* Tower navigation overlay — see useState comment above. */}
       {isNavigating && <ViewTransitionOverlay label="Loading tower view…" />}
 
-      {/* Arrange-your-room overlay — fullscreen edit mode launched
-          from the MySquadDrawer button. Persists positions via PATCH
-          /api/user/item-positions on Save; restores the pre-edit
-          snapshot on Cancel. Signed-in users only — trial sessions
-          don't have a DB row to persist into. */}
+      {/* Arrange-your-room — DESKTOP uses the fullscreen 3D RoomArranger
+          overlay. MOBILE arranges the 2D scene in place (items draggable
+          via Mobile2DScene above) + a bottom toolbar below. Persists via
+          PATCH /api/user/item-positions on Save; restores the pre-edit
+          snapshot on Cancel. Signed-in users only — trial sessions don't
+          have a DB row to persist into. */}
       {props.signedIn && (
         <RoomArranger
-          open={arrangeMode}
+          open={arrangeMode && isDesktop}
           currentFloor={effective.currentFloor}
           companyName={effective.teamName}
           positions={itemPositions}
@@ -1168,6 +1225,44 @@ export default function TowerLanding(props: Props) {
           onCancel={handleCancelArrange}
           saving={arrangeSaving}
         />
+      )}
+
+      {/* Mobile 2D arrange toolbar — top banner (instructions) + bottom
+          Save/Cancel bar. Shown only while arranging on a phone; the
+          items themselves are dragged on the 2D scene above. */}
+      {props.signedIn && arrangeMode && !isDesktop && (
+        <div className="md:hidden">
+          <div
+            className="fixed inset-x-0 top-0 z-40 bg-night-mid/95 backdrop-blur-md border-b border-white/10 px-4 py-2.5 text-center"
+            style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}
+          >
+            <div className="text-[13px] font-bold text-tower-cream">Arrange your room</div>
+            <div className="text-[11px] text-tower-cream/60 mt-0.5">
+              Drag any item to move it. Save when you’re happy.
+            </div>
+          </div>
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 bg-night-mid/95 backdrop-blur-md border-t border-white/10 px-4 pt-3 flex items-center gap-3"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <button
+              type="button"
+              onClick={handleCancelArrange}
+              disabled={arrangeSaving}
+              className="flex-1 px-4 py-3 rounded-xl border border-white/15 text-tower-cream/85 font-semibold text-sm disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveArrange}
+              disabled={arrangeSaving}
+              className="flex-1 px-4 py-3 rounded-xl bg-tower-gold text-night-deep font-extrabold text-sm shadow-[0_8px_20px_rgba(251,191,36,0.35)] disabled:opacity-60"
+            >
+              {arrangeSaving ? 'Saving…' : 'Save layout'}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Onboarding modals — only render once the per-step delay has

@@ -153,6 +153,11 @@ export default function FloorVisitorClient(props: Props) {
   // the current floor on every reconnect AND on every page-to-page
   // remount — is a baseline, not an upgrade trigger.
   const baselineFloorRef = useRef(props.visitorCurrentFloor)
+  // The SSR-seeded floor can lag the visitor's TRUE floor, so the first
+  // SSE snapshot would look like an "upgrade" and re-fire the
+  // celebration on every mount. Let the FIRST snapshot establish the
+  // real baseline silently.
+  const sawFirstSnapshotRef = useRef(false)
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
@@ -204,6 +209,16 @@ export default function FloorVisitorClient(props: Props) {
   useRealtimeFloor({
     enabled: props.visitorSignedIn,
     onSnapshot: data => {
+      // First snapshot of this mount = authoritative baseline; commit
+      // it silently so a stale SSR floor can't masquerade as a fresh
+      // climb and re-fire the celebration on every mount.
+      if (!sawFirstSnapshotRef.current) {
+        sawFirstSnapshotRef.current = true
+        baselineFloorRef.current = data.currentFloor
+        setLiveVisitorFloor(data.currentFloor)
+        setLiveVisitorInvites(data.totalInvites)
+        return
+      }
       // Celebration gate via ref baseline — see baselineFloorRef
       // comment. Compares against the highest seen floor, NOT the
       // closure'd liveVisitorFloor (stale across reconnects + remounts).

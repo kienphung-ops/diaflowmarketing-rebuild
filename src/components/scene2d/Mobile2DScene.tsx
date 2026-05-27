@@ -81,6 +81,17 @@ interface Props {
    *  index pops a one-shot "Hi, I'm <name>!" speech bubble above that
    *  recruit — fired by the parent on a bulk add. */
   greetSignals?: Record<number, number>
+  /** Per-user item layout overrides (world coords, same shape as the
+   *  3D scene's). Keyed by `${itemKey}_${index}` or the bare item key.
+   *  Drives the "Arrange your room" layout on mobile. */
+  itemPositionOverrides?: Record<string, [number, number, number]>
+  /** When true, every item sprite becomes draggable so the user can
+   *  rearrange the room. Characters go static. */
+  arrangeMode?: boolean
+  /** Fires while an item is dragged in arrange mode — `uid` is
+   *  `${itemKey}_${index}`, `world` is the new world position derived
+   *  from the drop point. Parent updates its 2D-layout state. */
+  onItemMove?: (uid: string, world: [number, number, number]) => void
 }
 
 interface PlacedItem {
@@ -91,6 +102,9 @@ interface PlacedItem {
   width: number
   height: number
   onWall: boolean
+  /** World coords backing this sprite — fed to inverseProjectToWorld
+   *  during arrange-drag so the unchanged axis is preserved. */
+  worldPos: [number, number, number]
 }
 
 export function Mobile2DScene({
@@ -104,6 +118,9 @@ export function Mobile2DScene({
   onTeammatePoke,
   readonly = false,
   greetSignals,
+  itemPositionOverrides,
+  arrangeMode = false,
+  onItemMove,
 }: Props) {
   // Ref to the outer scene container — passed to each CharacterSprite
   // so its pointer-move handler can compute (clientX, clientY) →
@@ -155,26 +172,34 @@ export function Mobile2DScene({
       }
       for (let i = 0; i < qty; i++) {
         const offset = item.offsetStep ?? [0, 0, 0]
-        const pos: [number, number, number] = [
+        const uid = `${item.key}_${i}`
+        const def: [number, number, number] = [
           item.position[0] + offset[0] * i,
           item.position[1] + offset[1] * i,
           item.position[2] + offset[2] * i,
         ]
+        // Per-user override wins: per-instance key first, then the bare
+        // key for instance 0 (matches the 3D renderer's lookup order).
+        const override =
+          itemPositionOverrides?.[uid] ??
+          (i === 0 ? itemPositionOverrides?.[item.key] : undefined)
+        const pos = override ?? def
         const { xPct, yPct, onWall } = projectToScreen(pos)
         const size = SPRITE_SIZES[item.key] ?? { w: 40, h: 40 }
         out.push({
-          uid: `${item.key}_${i}`,
+          uid,
           key: item.key,
           xPct,
           yPct,
           width: size.w,
           height: size.h,
           onWall,
+          worldPos: pos,
         })
       }
     }
     return out
-  }, [quantityByKey, currentFloor])
+  }, [quantityByKey, currentFloor, itemPositionOverrides])
 
   // Items that always paint last (on top of everything else),
   // regardless of their floor depth. The coffee mug sits on a desk
@@ -326,10 +351,20 @@ export function Mobile2DScene({
         </div>
       )}
 
-      {/* Item sprites — absolutely positioned by projected x/y % */}
-      {renderOrder.map(item => {
-        const renderer = SPRITES[item.key]
-        return (
+      {/* Item sprites — absolutely positioned by projected x/y %. In
+          arrange mode each becomes a draggable handle; otherwise it's a
+          static, non-interactive decoration. */}
+      {renderOrder.map(item =>
+        arrangeMode ? (
+          <DraggableItem2D
+            key={item.uid}
+            item={item}
+            companyName={companyName}
+            currentFloor={currentFloor}
+            sceneRef={sceneRef}
+            onMove={onItemMove}
+          />
+        ) : (
           <div
             key={item.uid}
             className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
@@ -341,10 +376,12 @@ export function Mobile2DScene({
             }}
             aria-hidden
           >
-            {renderer ? renderer({ companyName, currentFloor }) : <PlaceholderSprite />}
+            {SPRITES[item.key]
+              ? SPRITES[item.key]({ companyName, currentFloor })
+              : <PlaceholderSprite />}
           </div>
-        )
-      })}
+        ),
+      )}
 
       {/* Characters — rendered AFTER items so they always paint on
           top of the floor decor in the same row. Each character is
@@ -362,7 +399,7 @@ export function Mobile2DScene({
             hairColor={cfg.hairColor}
             skinColor={cfg.skinColor}
             sceneRef={sceneRef}
-            readonly={readonly}
+            readonly={readonly || arrangeMode}
             onTap={() => onNpcClick?.(slug)}
             onPoke={() => onTeammatePoke?.(slug)}
             onMove={pos => handleCharMove(slug, pos)}
@@ -393,7 +430,7 @@ export function Mobile2DScene({
               hairColor={RECRUIT_HAIR_COLORS[i % RECRUIT_HAIR_COLORS.length]}
               skinColor={RECRUIT_SKIN_COLORS[i % RECRUIT_SKIN_COLORS.length]}
               sceneRef={sceneRef}
-              readonly={readonly}
+              readonly={readonly || arrangeMode}
               greetingSignal={greetSignals?.[i] ?? 0}
               onTap={() => onTeammateClick?.(i)}
               onPoke={() => onTeammatePoke?.(slug)}
@@ -402,6 +439,83 @@ export function Mobile2DScene({
           )
         })}
     </div>
+  )
+}
+
+/**
+ * A single draggable item sprite for "Arrange your room" mode. Pointer
+ * drag converts the cursor's scene-relative % into a new world position
+ * (via inverseProjectToWorld, preserving the irrelevant axis), reporting
+ * it to the parent each move. A gold ring marks it as grabbable.
+ */
+function DraggableItem2D({
+  item,
+  companyName,
+  currentFloor,
+  sceneRef,
+  onMove,
+}: {
+  item: PlacedItem
+  companyName: string | null
+  currentFloor: number
+  sceneRef: React.RefObject<HTMLDivElement | null>
+  onMove?: (uid: string, world: [number, number, number]) => void
+}) {
+  const pointerIdRef = useRef<number | null>(null)
+  const renderer = SPRITES[item.key]
+
+  function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    e.stopPropagation()
+    try {
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    } catch {
+      /* capture unsupported — drag still works while finger stays on */
+    }
+    pointerIdRef.current = e.pointerId
+  }
+  function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+    if (pointerIdRef.current !== e.pointerId) return
+    const rect = sceneRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100
+    onMove?.(item.uid, inverseProjectToWorld(xPct, yPct, item.worldPos))
+  }
+  function onPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
+    if (pointerIdRef.current !== e.pointerId) return
+    pointerIdRef.current = null
+    try {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {
+      /* nothing captured */
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      aria-label={`Move ${item.key.replace(/_/g, ' ')}`}
+      className="absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing"
+      style={{
+        left: `${item.xPct}%`,
+        top: `${item.yPct}%`,
+        width: item.width,
+        height: item.height,
+        touchAction: 'none',
+      }}
+    >
+      <span
+        aria-hidden
+        className="absolute -inset-1 rounded-md ring-2 ring-tower-gold/70 bg-tower-gold/10"
+      />
+      <span className="absolute inset-0 pointer-events-none">
+        {renderer ? renderer({ companyName, currentFloor }) : <PlaceholderSprite />}
+      </span>
+    </button>
   )
 }
 

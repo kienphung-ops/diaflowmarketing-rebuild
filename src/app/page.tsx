@@ -24,6 +24,8 @@ export default async function Home() {
   // Per-user item position overrides (Arrange-your-room feature).
   // Empty `{}` falls through to the canonical defaults in FloorItems.
   let serverItemPositions: Record<string, [number, number, number]> = {}
+  // Separate per-user layout for the mobile 2D scene.
+  let serverItemPositions2D: Record<string, [number, number, number]> = {}
 
   // Track whether the session JWT actually resolves to an existing
   // user row. A valid JWT can still point to a deleted / wiped user
@@ -59,6 +61,7 @@ export default async function Home() {
         // Per-user "Arrange your room" overrides — see User.itemPositions
         // comment in schema.prisma for the shape.
         itemPositions: true,
+        itemPositions2D: true,
       },
     })
     if (u) {
@@ -91,6 +94,9 @@ export default async function Home() {
       if (u.itemPositions && typeof u.itemPositions === 'object' && !Array.isArray(u.itemPositions)) {
         serverItemPositions = u.itemPositions as Record<string, [number, number, number]>
       }
+      if (u.itemPositions2D && typeof u.itemPositions2D === 'object' && !Array.isArray(u.itemPositions2D)) {
+        serverItemPositions2D = u.itemPositions2D as Record<string, [number, number, number]>
+      }
     }
   }
 
@@ -111,6 +117,7 @@ export default async function Home() {
       serverRecommendedRole={serverRecommendedRole}
       serverReason={serverReason}
       serverItemPositions={serverItemPositions}
+      serverItemPositions2D={serverItemPositions2D}
     />
   )
 }
