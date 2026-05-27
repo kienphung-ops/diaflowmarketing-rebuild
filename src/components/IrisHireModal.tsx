@@ -208,11 +208,10 @@ export function IrisHireModal({
         </div>
 
         <div className="px-7 pb-7 pt-2 text-center">
-          {/* Iris pixel portrait — shared TeammatePortrait keeps the
-              identity consistent with the 2D minifigure on the office
-              floor. `slug="iris"` selects the dark navy suit + red
-              tie + lapel overlay automatically. */}
-          <div className="flex justify-center mb-3">
+          {/* Iris pixel portrait — MOBILE ONLY. On desktop the modal
+              floats right beside Iris's live minifigure, so repeating
+              the portrait inside is redundant; drop it there. */}
+          <div className="md:hidden flex justify-center mb-3">
             <TeammatePortrait slug="iris" />
           </div>
 

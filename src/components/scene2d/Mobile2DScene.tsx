@@ -77,6 +77,10 @@ interface Props {
    *  the drag-to-move + tap gestures on every minifigure so the scene
    *  is a static snapshot. Mirrors the desktop 3D scene's `readonly`. */
   readonly?: boolean
+  /** Per-recruit greeting nonces (recruit index → counter). Bumping an
+   *  index pops a one-shot "Hi, I'm <name>!" speech bubble above that
+   *  recruit — fired by the parent on a bulk add. */
+  greetSignals?: Record<number, number>
 }
 
 interface PlacedItem {
@@ -99,6 +103,7 @@ export function Mobile2DScene({
   onTeammateClick,
   onTeammatePoke,
   readonly = false,
+  greetSignals,
 }: Props) {
   // Ref to the outer scene container — passed to each CharacterSprite
   // so its pointer-move handler can compute (clientX, clientY) →
@@ -389,6 +394,7 @@ export function Mobile2DScene({
               skinColor={RECRUIT_SKIN_COLORS[i % RECRUIT_SKIN_COLORS.length]}
               sceneRef={sceneRef}
               readonly={readonly}
+              greetingSignal={greetSignals?.[i] ?? 0}
               onTap={() => onTeammateClick?.(i)}
               onPoke={() => onTeammatePoke?.(slug)}
               onMove={pos => handleCharMove(slug, pos)}
@@ -637,6 +643,7 @@ function CharacterSprite({
   skinColor = '#f5cfa8',
   sceneRef,
   readonly = false,
+  greetingSignal = 0,
   onTap,
   onPoke,
   onMove,
@@ -658,6 +665,10 @@ function CharacterSprite({
   /** When true, the figure is a static snapshot — all drag/tap
    *  gestures are short-circuited (floor-preview readonly mode). */
   readonly?: boolean
+  /** One-shot greeting nonce. Each time this value changes to a truthy
+   *  number, the sprite pops a "Hi, I'm <name>!" speech bubble (bulk
+   *  add introduction). 0 / unchanged = silent. */
+  greetingSignal?: number
   onTap: () => void
   onPoke: () => void
   onMove: (pos: [number, number, number]) => void
@@ -731,6 +742,14 @@ function CharacterSprite({
     setSparkleId(n => n + 1)
     setBounceId(n => n + 1)
   }
+
+  // Bulk-add greeting — when the parent bumps `greetingSignal`, the
+  // sprite introduces itself. Guarded by `> 0` so the initial mount
+  // (signal 0) stays silent; only a real bump speaks.
+  useEffect(() => {
+    if (greetingSignal > 0) fireSpeech(`Hi, I'm ${name}!`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [greetingSignal])
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     // Floor-preview readonly: never start a gesture, so the figure

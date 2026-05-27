@@ -76,6 +76,10 @@ interface Props {
    *  is done, Iris floats a persistent "👋 ready to hire…" nudge above
    *  her head — desktop mirror of the mobile Iris hint. */
   slotsAvailable?: number
+  /** Per-recruit greeting nonces (recruit index → counter). Bumping an
+   *  index pops a one-shot "Hi, I'm <name>!" speech bubble above that
+   *  minifigure — fired by the parent on a bulk add. */
+  recruitGreetSignals?: Record<number, number>
 }
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -186,6 +190,7 @@ export function OfficeScene({
   onTeammatePoke,
   miaRole,
   slotsAvailable,
+  recruitGreetSignals,
 }: Props) {
   // `unlockedItemKeys` is no longer consumed here — FloorItems reads
   // its config straight from /api/floors via useFloorItems. Kept on
@@ -497,6 +502,10 @@ export function OfficeScene({
                   draggingSlugRef={dragSlugRef}
                   onPoke={handlePokeChar}
                   pokeSignal={pokeSignals[slug] ?? 0}
+                  // Bulk-add greeting — bumping this nonce pops a
+                  // "Hi, I'm <name>!" bubble above the new recruit.
+                  greetingSignal={recruitGreetSignals?.[i] ?? 0}
+                  greetingText={`Hi, I'm ${cfg.name}!`}
                 />
               )
             })}

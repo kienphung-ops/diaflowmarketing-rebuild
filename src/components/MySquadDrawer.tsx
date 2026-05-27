@@ -444,7 +444,11 @@ export function MySquadDrawer({
             </div>
 
             <Link
-              href="/tower"
+              // `?tour=1` forces the Tower Tour to open on arrival even
+              // if the user has already seen it once (the auto-open is
+              // otherwise gated by a localStorage "seen" flag). /tower
+              // reads this param and opens the 4-step tour.
+              href="/tower?tour=1"
               onClick={onClose}
               className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
             >

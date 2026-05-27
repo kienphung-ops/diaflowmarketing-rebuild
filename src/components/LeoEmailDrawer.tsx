@@ -116,9 +116,10 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
           ×
         </button>
 
-        {/* Leo pixel portrait — matches the 2D minifigure on the floor
-            so the modal reads as "Leo speaking". */}
-        <div className="flex justify-center mb-3">
+        {/* Leo pixel portrait — MOBILE ONLY. On desktop the card floats
+            right beside Leo's live minifigure, so repeating the portrait
+            inside is redundant; drop it there. */}
+        <div className="md:hidden flex justify-center mb-3">
           <TeammatePortrait slug="leo" />
         </div>
 

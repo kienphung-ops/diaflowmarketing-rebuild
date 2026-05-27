@@ -47,9 +47,9 @@ export function MiaWelcomeBubble({
   visible,
   onDismiss,
   miaRole,
-  invitesToNext,
-  nextFloorId,
-  durationMs = 3000,
+  // invitesToNext,
+  // nextFloorId,
+  durationMs = 10000,
 }: Props) {
   // Local fade-in/out state — driven by `visible` from the parent so
   // the parent owns the lifecycle but the bubble still gets a smooth
@@ -86,23 +86,23 @@ export function MiaWelcomeBubble({
   // Compose the "Tap the Tower ↓" CTA line. The bubble's job is to
   // nudge the user toward the Tower button (which is pulsing in the
   // bottom nav) so they can see what they're climbing.
-  const hasNextFloor =
-    typeof invitesToNext === 'number' &&
-    typeof nextFloorId === 'number' &&
-    invitesToNext > 0
-  const ctaLine = hasNextFloor ? (
-    <>
-      Tap{' '}
-      <span className="text-purple-500 font-semibold">🏆 Tower</span>{' '}
-      to see Floor {nextFloorId} ↓
-    </>
-  ) : (
-    <>
-      Tap{' '}
-      <span className="text-purple-500 font-semibold">🏆 Tower</span>{' '}
-      to see your climb ↓
-    </>
-  )
+  // const hasNextFloor =
+  //   typeof invitesToNext === 'number' &&
+  //   typeof nextFloorId === 'number' &&
+  //   invitesToNext > 0
+  // const ctaLine = hasNextFloor ? (
+  //   <>
+  //     Tap{' '}
+  //     <span className="text-purple-500 font-semibold">🏆 Tower</span>{' '}
+  //     to see Floor {nextFloorId} ↓
+  //   </>
+  // ) : (
+  //   <>
+  //     Tap{' '}
+  //     <span className="text-purple-500 font-semibold">🏆 Tower</span>{' '}
+  //     to see your climb ↓
+  //   </>
+  // )
 
   return (
     <div
@@ -130,7 +130,8 @@ export function MiaWelcomeBubble({
         </div>
         {/* Main message + downward arrow toward the Tower button */}
         <div className="text-[13.5px] leading-snug font-medium text-center">
-          Welcome to your office! {ctaLine}
+         Welcome to your office. Ready for the tower tour? 
+         {/* {ctaLine} */}
         </div>
 
         {/* Downward tail — pure CSS triangle so the bubble visually

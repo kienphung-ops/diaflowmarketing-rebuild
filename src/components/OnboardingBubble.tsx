@@ -211,10 +211,10 @@ export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
         <p className="text-[14px] text-tower-cream/70 leading-relaxed mb-2.5">
           Diaflow is launching{' '}
           <strong className="text-tower-cream font-semibold">AI Teammate</strong>{' '}
-          this summer — real AI workers, not just chat.
+          this summer — real AI workers that do the work for you, not just chat.
         </p>
-        <p className="text-[14px] text-tower-cream/85 font-semibold leading-relaxed mb-4">
-          Every teammate you earn is yours at launch.
+        <p className="text-[14px] text-tower-cream/85 leading-relaxed mb-4">
+          Hire your starter team now. Climb the tower by inviting friends. <span className="font-semibold">Every teammate you earn is yours at launch.</span>
         </p>
         <form
           onSubmit={e => {

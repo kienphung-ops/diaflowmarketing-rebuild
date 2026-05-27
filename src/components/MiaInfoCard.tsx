@@ -172,10 +172,10 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
           ×
         </button>
 
-        {/* Mia pixel portrait — matches the 2D minifigure on the floor
-            so the modal reads as "Mia speaking". Same shared component
-            the other character-tap modals use. */}
-        <div className="flex justify-center mb-3">
+        {/* Mia pixel portrait — MOBILE ONLY. On desktop the card floats
+            right next to Mia's live minifigure, so repeating the
+            portrait inside is redundant; drop it there. */}
+        <div className="md:hidden flex justify-center mb-3">
           <TeammatePortrait slug="mia" />
         </div>
 

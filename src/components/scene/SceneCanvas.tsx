@@ -56,6 +56,10 @@ interface Props {
    *  is done) Iris floats a "👋 ready to hire…" nudge — desktop mirror
    *  of the mobile Iris hint. */
   slotsAvailable?: number
+  /** Per-recruit greeting nonces (index in customRecruits → counter).
+   *  Bumping an index makes that recruited minifigure pop a
+   *  "Hi, I'm <name>!" speech bubble once — used on a bulk add. */
+  recruitGreetSignals?: Record<number, number>
 }
 
 export function SceneCanvas(props: Props) {

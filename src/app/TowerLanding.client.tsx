@@ -32,6 +32,8 @@ import {
   RECRUIT_SKIN_COLORS,
 } from '@/components/scene2d/Mobile2DScene'
 import { MiaWelcomeBubble } from '@/components/mobile/MiaWelcomeBubble'
+import { DesktopWelcomeBubble } from '@/components/DesktopWelcomeBubble'
+import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { Mobile2DScene } from '@/components/scene2d/Mobile2DScene'
 import { EmailVerifyModal } from '@/components/EmailVerifyModal'
 import { ToastStack, type ToastMessage } from '@/components/Toast'
@@ -138,6 +140,12 @@ export default function TowerLanding(props: Props) {
   // mounts the nav.
   const [mobileShareOpen, setMobileShareOpen] = useState(false)
   const [bulkAddOpen, setBulkAddOpen] = useState(false)
+  // Per-recruit "greeting" nonce. Keyed by the recruit's index in
+  // customRecruits; bumping an index makes that minifigure pop a
+  // "Hi, I'm <name>!" speech bubble above its head once. Used by a
+  // BULK add (≥2 teammates) so each new face introduces itself in the
+  // scene. (A single add opens the richer TeammateBubble instead.)
+  const [recruitGreetSignals, setRecruitGreetSignals] = useState<Record<number, number>>({})
   // Iris recruiting popup — replaces the old MySquadDrawer-on-Iris-
   // click behaviour. Has two states driven by slot availability;
   // see IrisHireModal for the copy.
@@ -594,17 +602,33 @@ export default function TowerLanding(props: Props) {
   // We also flip `showMiaWelcomeBubble` on so the post-Leo white speech
   // bubble fades in over the office canvas for ~3s. The bubble owns its
   // own auto-dismiss timer; we just need to fire the initial signal.
+  // Breakpoint gate — the post-Leo nudge diverges by platform:
+  //   mobile  → floating MiaWelcomeBubble + a pulsing Tower button in
+  //             the bottom nav ("go see what you're climbing").
+  //   desktop → Mia speech bubble over the office + the MySquadDrawer
+  //             slides open so the user picks their next move (tour /
+  //             rewards / save). No Tower-button pulse on desktop.
+  const isDesktop = useIsDesktop()
+
   const handleLeoDone = useCallback(() => {
     persist({ ...trial, onboardingStep: 'done' })
-    setShowMiaWelcomeBubble(true)
-    setAttentionTower(true)
-  }, [trial])
+    if (isDesktop) {
+      setShowDesktopWelcome(true)
+      setSquadOpen(true)
+    } else {
+      setShowMiaWelcomeBubble(true)
+      setAttentionTower(true)
+    }
+  }, [trial, isDesktop])
 
   // Post-Leo welcome bubble — mobile-only nudge that appears the
   // instant onboarding completes. State lives here (not in the bubble
   // itself) so the timer keeps running even if the bubble re-mounts
   // mid-fade, and so other call sites could trigger it later if needed.
   const [showMiaWelcomeBubble, setShowMiaWelcomeBubble] = useState(false)
+  // Desktop counterpart — persistent Mia bubble shown alongside the
+  // opened MySquadDrawer. Dismissed by clicking the bubble.
+  const [showDesktopWelcome, setShowDesktopWelcome] = useState(false)
 
   // Post-Leo Tower attention pulse — once onboarding finishes we want
   // the user's next move to be "open the tower and see what you're
@@ -731,21 +755,45 @@ export default function TowerLanding(props: Props) {
     }
   }
 
+  // After teammates land in the scene, decide how to celebrate them:
+  //   • exactly 1  → open the rich TeammateBubble for that teammate
+  //                  (so the user can read its launch-day promise + edit).
+  //   • 2 or more  → pop a lightweight "Hi, I'm <name>!" speech bubble
+  //                  above each new minifigure's head (both scenes).
+  // `startIdx` is the recruit's index in customRecruits BEFORE the add,
+  // so the appended rows occupy startIdx … startIdx + added.length - 1.
+  function celebrateAdded(added: ServerRecruit[], startIdx: number) {
+    if (added.length === 0) return
+    if (added.length === 1) {
+      setBubbleTeammate(added[0])
+      return
+    }
+    setRecruitGreetSignals(prev => {
+      const next = { ...prev }
+      added.forEach((_, i) => {
+        const idx = startIdx + i
+        next[idx] = (next[idx] ?? 0) + 1
+      })
+      return next
+    })
+    pushToast({
+      title: `Added ${added.length} teammates`,
+      tone: 'success',
+    })
+  }
+
   function handleBulkAdd(drafts: { name: string; role: string }[]) {
     if (drafts.length === 0) return
+    // Index where the new rows will land (count of existing customs).
+    const startIdx = customRecruits.length
     if (isTrial) {
-      setRecruits(prev => [
-        ...prev,
-        ...drafts.map((d, i) => ({
-          id: `trial-bulk-${Date.now()}-${i}`,
-          name: d.name,
-          role: d.role,
-        })),
-      ])
-      pushToast({
-        title: `Added ${drafts.length} teammate${drafts.length === 1 ? '' : 's'}`,
-        tone: 'success',
-      })
+      const newRows: ServerRecruit[] = drafts.map((d, i) => ({
+        id: `trial-bulk-${Date.now()}-${i}`,
+        name: d.name,
+        role: d.role,
+      }))
+      setRecruits(prev => [...prev, ...newRows])
+      celebrateAdded(newRows, startIdx)
       return
     }
     // Signed-in: single POST to /api/recruit/bulk. That endpoint
@@ -764,10 +812,7 @@ export default function TowerLanding(props: Props) {
         const added = (j?.teammates ?? []) as ServerRecruit[]
         if (added.length > 0) {
           setRecruits(prev => [...prev, ...added])
-          pushToast({
-            title: `Added ${added.length} teammate${added.length === 1 ? '' : 's'}`,
-            tone: 'success',
-          })
+          celebrateAdded(added, startIdx)
         }
       })
       .catch(() => {})
@@ -989,6 +1034,9 @@ export default function TowerLanding(props: Props) {
           // Open-slot count drives Iris's "👋 ready to hire…" head nudge
           // (desktop parity with the mobile 2D scene).
           slotsAvailable={slotsAvailable}
+          // Per-recruit greeting nonces — bumped on a BULK add so each
+          // new minifigure pops "Hi, I'm <name>!" above its head.
+          recruitGreetSignals={recruitGreetSignals}
           resetSignal={resetSignal}
         />
       </div>
@@ -1004,6 +1052,8 @@ export default function TowerLanding(props: Props) {
         currentFloor={effective.currentFloor}
         miaRole={miaRole}
         slotsAvailable={slotsAvailable}
+        // Bulk-add greeting nonces — same map the 3D scene uses.
+        greetSignals={recruitGreetSignals}
         onNpcClick={slug => {
           if (slug === 'iris') setIrisModalOpen(true)
           else setActiveNpcModal(slug)
@@ -1040,6 +1090,16 @@ export default function TowerLanding(props: Props) {
             miaRole={trial.recommendedRole}
             invitesToNext={welcomeBubbleInvitesToNext}
             nextFloorId={effective.currentFloor + 1}
+          />
+
+          {/* Desktop counterpart — Mia greets over the office while the
+              MySquadDrawer (opened in handleLeoDone) lets the user pick
+              their next move. Persistent; click to dismiss. hidden on
+              mobile internally. */}
+          <DesktopWelcomeBubble
+            visible={showDesktopWelcome}
+            onDismiss={() => setShowDesktopWelcome(false)}
+            miaRole={miaRole}
           />
 
           {/* MobileProgressPill ("🎁 Floor lamp · Floor 2 · 1 invite

@@ -102,8 +102,13 @@ export function TeammateBubble({ open, teammate, anchorSlug, bodyColor, hairColo
       {/* Recruit pixel portrait — same shared component as the
           default-NPC modals. Colours come from the parent (cycled
           RECRUIT_BODY/HAIR/SKIN palettes) so the portrait matches the
-          on-floor 2D minifigure exactly. */}
-      <div className="flex justify-center pt-3 pb-1">
+          on-floor 2D minifigure exactly.
+
+          MOBILE ONLY (`md:hidden`): on desktop the bubble already
+          floats right next to the live 3D minifigure, so repeating the
+          portrait inside the card is redundant — drop it there and let
+          the card lead with the name. */}
+      <div className="md:hidden flex justify-center pt-3 pb-1">
         <TeammatePortrait
           bodyColor={bodyColor}
           hairColor={hairColor}
@@ -112,7 +117,7 @@ export function TeammateBubble({ open, teammate, anchorSlug, bodyColor, hairColo
           height={62}
         />
       </div>
-      <div className="flex items-start gap-2 px-4 pt-1 pb-1.5">
+      <div className="flex items-start gap-2 px-4 pt-1 md:pt-4 pb-1.5">
         <div className="flex-1 min-w-0">
           <span className="text-sm font-bold truncate">{teammate.name}</span>
           <span className="mx-1.5 text-tower-cream/40">·</span>
@@ -140,7 +145,7 @@ export function TeammateBubble({ open, teammate, anchorSlug, bodyColor, hairColo
         </button>
       </div>
       <div className="px-4 pb-4 text-sm text-tower-cream/90 leading-relaxed">
-        <span>Hi, I&apos;m {teammate.name}! </span>
+        <span>👋Hi, I&apos;m {teammate.name}! </span>
         <span className="font-semibold">When Diaflow launches,</span>{' '}
         <span>{promise}</span>
       </div>

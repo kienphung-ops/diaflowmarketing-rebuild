@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { TowerView } from '@/components/TowerView'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
 import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
@@ -80,6 +80,15 @@ export default function TowerPageClient(props: Props) {
       /* ignore — storage disabled */
     }
   }, [])
+
+  // Explicit "Take the tower tour" entry — MySquadDrawer links here
+  // with `?tour=1` to force the tour open regardless of the seen flag.
+  // Reacts to searchParams so it also fires when the user is already on
+  // /tower and the query changes (same-route navigation).
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('tour') === '1') setTourOpen(true)
+  }, [searchParams])
   // Persist "tour seen" the moment the tour closes so the next visit
   // doesn't auto-open it. Replay still works because the button below
   // calls setTourOpen(true) directly without clearing the flag.
