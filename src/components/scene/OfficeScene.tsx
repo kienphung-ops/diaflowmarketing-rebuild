@@ -11,6 +11,7 @@ import { StaticCamera } from './camera/StaticCamera'
 import { Floor } from './environment/Floor'
 import { Walls } from './environment/Walls'
 import { FloorItems } from './environment/FloorItems'
+import { SpinArcade3D, SPIN_ARCADE_3D_DEFAULT, SPIN_ARCADE_KEY } from './SpinArcade3D'
 import { Lighting } from './environment/Lighting'
 import { Character } from './characters/Character'
 import { CHARACTERS, EMPTY_DESK_POSITION } from './characters/characters.config'
@@ -80,6 +81,13 @@ interface Props {
    *  index pops a one-shot "Hi, I'm <name>!" speech bubble above that
    *  minifigure — fired by the parent on a bulk add. */
   recruitGreetSignals?: Record<number, number>
+  /** Spin wheel (GRO-5): clicking the in-room arcade fires this. When
+   *  omitted the arcade renders as plain decor (e.g. floor previews). */
+  onArcadeClick?: () => void
+  /** Live spin-token count — drives the arcade badge + glow. */
+  spinTokens?: number
+  /** Anonymous teaser — paints the arcade's gold "FREE SPIN" badge. */
+  spinTeaser?: boolean
 }
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -191,6 +199,9 @@ export function OfficeScene({
   miaRole,
   slotsAvailable,
   recruitGreetSignals,
+  onArcadeClick,
+  spinTokens = 0,
+  spinTeaser = false,
 }: Props) {
   // `unlockedItemKeys` is no longer consumed here — FloorItems reads
   // its config straight from /api/floors via useFloorItems. Kept on
@@ -444,6 +455,22 @@ export function OfficeScene({
             <Floor />
             <Walls companyName={companyName ?? undefined} currentFloor={currentFloor} />
             <FloorItems currentFloor={currentFloor} positionOverrides={itemPositionOverrides} />
+
+            {/* Spin-wheel arcade — interactive in-room object. Its
+                position honours the "Arrange your room" override
+                (key `spin_arcade_0`), falling back to the canonical
+                default. Skipped on read-only floor previews since the
+                spin entry is owner-specific. */}
+            {!readonly && (
+              <SpinArcade3D
+                position={
+                  itemPositionOverrides?.[SPIN_ARCADE_KEY] ?? SPIN_ARCADE_3D_DEFAULT
+                }
+                tokens={spinTokens}
+                teaser={spinTeaser}
+                onClick={onArcadeClick}
+              />
+            )}
 
             {/* Desks come from FloorItems' basic_chair_desk × quantity now —
                 no per-character Desk render here. Characters stand

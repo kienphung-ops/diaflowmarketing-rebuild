@@ -92,6 +92,13 @@ interface Props {
    *  `${itemKey}_${index}`, `world` is the new world position derived
    *  from the drop point. Parent updates its 2D-layout state. */
   onItemMove?: (uid: string, world: [number, number, number]) => void
+  /** Spin wheel (GRO-5): tapping the always-on in-room arcade fires
+   *  this. Omitted on read-only floor previews. */
+  onArcadeClick?: () => void
+  /** Live spin-token count — drives the arcade badge. */
+  spinTokens?: number
+  /** Anonymous teaser — gold "FREE SPIN" badge on the arcade. */
+  spinTeaser?: boolean
 }
 
 interface PlacedItem {
@@ -121,6 +128,9 @@ export function Mobile2DScene({
   itemPositionOverrides,
   arrangeMode = false,
   onItemMove,
+  onArcadeClick,
+  spinTokens = 0,
+  spinTeaser = false,
 }: Props) {
   // Ref to the outer scene container — passed to each CharacterSprite
   // so its pointer-move handler can compute (clientX, clientY) →
@@ -438,7 +448,155 @@ export function Mobile2DScene({
             />
           )
         })}
+
+      {/* Spin-wheel arcade — always-on interactive item. Position
+          honours the "Arrange your room" override (key spin_arcade_0)
+          and becomes draggable in arrange mode. Hidden on read-only
+          previews. */}
+      {!readonly && onArcadeClick && (
+        <Arcade2D
+          worldPos={
+            itemPositionOverrides?.[SPIN_ARCADE_2D_KEY] ??
+            itemPositionOverrides?.['spin_arcade'] ??
+            SPIN_ARCADE_2D_DEFAULT
+          }
+          tokens={spinTokens}
+          teaser={spinTeaser}
+          companyName={companyName}
+          currentFloor={currentFloor}
+          arrangeMode={arrangeMode}
+          sceneRef={sceneRef}
+          onClick={onArcadeClick}
+          onMove={onItemMove}
+        />
+      )}
     </div>
+  )
+}
+
+/** Default world position of the 2D spin arcade (front-left of the
+ *  floor) + the override key the arrange feature stores it under. */
+export const SPIN_ARCADE_2D_DEFAULT: [number, number, number] = [-4.0, -0.55, 3.0]
+const SPIN_ARCADE_2D_KEY = 'spin_arcade_0'
+
+/**
+ * The spin arcade as an always-on 2D item, positioned by world coords
+ * (so it shares the arrange-room system). Two modes:
+ *   - normal  → a tappable cabinet (opens the spin modal) with a badge
+ *               above showing the spin count / gold "FREE SPIN" teaser.
+ *   - arrange → a draggable handle (gold ring) that reports its new
+ *               world position via onMove('spin_arcade_0', …).
+ */
+function Arcade2D({
+  worldPos,
+  tokens,
+  teaser,
+  companyName,
+  currentFloor,
+  arrangeMode,
+  sceneRef,
+  onClick,
+  onMove,
+}: {
+  worldPos: [number, number, number]
+  tokens: number
+  teaser: boolean
+  companyName: string | null
+  currentFloor: number
+  arrangeMode: boolean
+  sceneRef: React.RefObject<HTMLDivElement | null>
+  onClick: () => void
+  onMove?: (uid: string, world: [number, number, number]) => void
+}) {
+  const size = SPRITE_SIZES['arcade_machine'] ?? { w: 36, h: 60 }
+  const renderer = SPRITES['arcade_machine']
+  const active = teaser || tokens > 0
+  const { xPct, yPct } = projectToScreen(worldPos)
+  const pointerIdRef = useRef<number | null>(null)
+
+  const W = size.w * 1.4
+  const H = size.h * 1.4
+
+  const sprite = (
+    <span
+      className="block mx-auto"
+      style={{
+        width: W,
+        height: H,
+        filter: active ? 'drop-shadow(0 0 14px rgba(168,85,247,0.7))' : 'none',
+      }}
+    >
+      {renderer ? renderer({ companyName, currentFloor }) : <PlaceholderSprite />}
+    </span>
+  )
+
+  // ── Arrange mode: draggable handle ──────────────────────────────
+  if (arrangeMode) {
+    return (
+      <button
+        type="button"
+        aria-label="Move spin arcade"
+        onPointerDown={e => {
+          e.stopPropagation()
+          try {
+            ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+          } catch {
+            /* capture unsupported */
+          }
+          pointerIdRef.current = e.pointerId
+        }}
+        onPointerMove={e => {
+          if (pointerIdRef.current !== e.pointerId) return
+          const rect = sceneRef.current?.getBoundingClientRect()
+          if (!rect) return
+          const cx = ((e.clientX - rect.left) / rect.width) * 100
+          const cy = ((e.clientY - rect.top) / rect.height) * 100
+          onMove?.('spin_arcade_0', inverseProjectToWorld(cx, cy, worldPos))
+        }}
+        onPointerUp={e => {
+          if (pointerIdRef.current !== e.pointerId) return
+          pointerIdRef.current = null
+          try {
+            ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+          } catch {
+            /* nothing captured */
+          }
+        }}
+        onPointerCancel={() => {
+          pointerIdRef.current = null
+        }}
+        className="absolute -translate-x-1/2 -translate-y-full cursor-grab active:cursor-grabbing"
+        style={{ left: `${xPct}%`, top: `${yPct}%`, touchAction: 'none' }}
+      >
+        <span aria-hidden className="absolute -inset-1 rounded-md ring-2 ring-tower-gold/70 bg-tower-gold/10" />
+        <span className="relative block">{sprite}</span>
+      </button>
+    )
+  }
+
+  // ── Normal mode: tappable spin entry ────────────────────────────
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={teaser ? 'Try your free spin' : `Open spin wheel (${tokens} spins)`}
+      className="absolute z-10 -translate-x-1/2 -translate-y-full pointer-events-auto active:scale-95 transition"
+      style={{ left: `${xPct}%`, top: `${yPct}%`, touchAction: 'manipulation' }}
+    >
+      <span
+        className={
+          'block mx-auto mb-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide shadow ' +
+          (teaser
+            ? 'bg-gradient-to-r from-tower-gold to-pink-400 text-night-deep animate-nav-pulse'
+            : tokens > 0
+              ? 'bg-purple-500 text-white animate-nav-pulse'
+              : 'bg-night-deep/85 text-tower-cream/70 border border-white/15')
+        }
+      >
+        {teaser ? '🎁 FREE SPIN' : tokens > 0 ? `🎰 ${tokens} ${tokens === 1 ? 'spin' : 'spins'}` : '🎰 SPIN'}
+      </span>
+      {sprite}
+    </button>
   )
 }
 

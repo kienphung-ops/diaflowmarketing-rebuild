@@ -32,6 +32,7 @@ import {
 } from '@/lib/auth'
 import { computeFloorForInvites } from '@/lib/floors'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
+import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
 import {
   buildRedirectUri,
@@ -107,12 +108,26 @@ export async function GET(req: NextRequest) {
 
   // ── Find or create the user ───────────────────────────────────────
   try {
-    const userId = await findOrCreateUserFromGoogle({
+    const { id: userId, isNew } = await findOrCreateUserFromGoogle({
       profile,
       carryover: decoded,
       ip: getClientIp(req),
       country: getCountry(req),
     })
+
+    // Carry the anonymous teaser spin onto BRAND-NEW accounts only — a
+    // returning user logging in via Google shouldn't absorb a fresh
+    // anon spin from this browser. Best-effort; never blocks login.
+    if (isNew) {
+      const anonId = req.cookies.get('diaflow_anon_id')?.value
+      if (anonId) {
+        try {
+          await migrateAnonSpin(userId, anonId)
+        } catch (e) {
+          console.warn('[oauth/google/callback] anon spin migrate failed:', (e as Error).message)
+        }
+      }
+    }
 
     const jwt = await createSessionJwt(userId)
     const res = NextResponse.redirect(new URL('/', req.nextUrl.origin))
@@ -149,7 +164,7 @@ async function findOrCreateUserFromGoogle({
   carryover: OAuthStatePayload
   ip?: string
   country?: string
-}): Promise<string> {
+}): Promise<{ id: string; isNew: boolean }> {
   const normalisedEmail = profile.email.trim().toLowerCase()
 
   // Branch 1: googleId already linked.
@@ -157,7 +172,7 @@ async function findOrCreateUserFromGoogle({
     where: { googleId: profile.sub },
     select: { id: true },
   })
-  if (byGoogleId) return byGoogleId.id
+  if (byGoogleId) return { id: byGoogleId.id, isNew: false }
 
   // Branch 2: email exists, link Google to it.
   const byEmail = await prisma.user.findUnique({
@@ -184,7 +199,7 @@ async function findOrCreateUserFromGoogle({
           byEmail.emailVerified ?? (profile.email_verified ? new Date() : null),
       },
     })
-    return byEmail.id
+    return { id: byEmail.id, isNew: false }
   }
 
   // Branch 3: brand-new account. Mirror the email signup handler.
@@ -260,6 +275,8 @@ async function findOrCreateUserFromGoogle({
           where: { id: inviter.id },
           data: { totalInvites: newTotal, currentFloor: newFloor },
         })
+        // Spin economy: +1 spin to the inviter for the referral signup.
+        await grantReferralSpinTx(tx, inviter.id)
       }
 
       return created.id
@@ -286,7 +303,7 @@ async function findOrCreateUserFromGoogle({
   }
 
   void invalidateLeaderboard(inviter?.id ?? null, userId)
-  return userId
+  return { id: userId, isNew: true }
 }
 
 function getClientIp(req: NextRequest): string | undefined {

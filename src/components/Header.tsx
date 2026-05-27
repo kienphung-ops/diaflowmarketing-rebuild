@@ -40,6 +40,10 @@ interface Props {
    *  opens). When omitted, the button falls back to copy-to-clipboard
    *  via ReferralCopyButton. */
   onShareClimb?: () => void
+  /** Spin-wheel token count — mirrored into the desktop stats pill so
+   *  the user can see how many spins they have from any floor. Omit (or
+   *  pass undefined) to hide the spin segment entirely. */
+  spinTokens?: number
 }
 
 export function Header({
@@ -56,6 +60,7 @@ export function Header({
   hideAuthCta,
   attentionTower,
   onShareClimb,
+  spinTokens,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -102,6 +107,13 @@ export function Header({
           <span className="mx-1.5 md:mx-2 opacity-40">·</span>
           <span className="text-tower-gold font-semibold">{teammateCount}/{maxTeammates}</span>{' '}
           teammates
+          {typeof spinTokens === 'number' && spinTokens > 0 && (
+            <>
+              <span className="mx-1.5 md:mx-2 opacity-40">·</span>
+              <span className="text-tower-gold font-semibold">🎰 {spinTokens}</span>{' '}
+              {spinTokens === 1 ? 'spin' : 'spins'}
+            </>
+          )}
           {!signedIn && <span className="ml-2 opacity-60 hidden md:inline">(trial)</span>}
         </div>
 

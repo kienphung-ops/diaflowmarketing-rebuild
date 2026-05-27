@@ -27,6 +27,7 @@ import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
 import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
 import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
 import { ShareModal } from '@/components/ShareModal'
+import { SpinModal } from '@/components/spin/SpinModal'
 import {
   RECRUIT_BODY_COLORS,
   RECRUIT_HAIR_COLORS,
@@ -685,6 +686,44 @@ export default function TowerLanding(props: Props) {
   // opened MySquadDrawer. Dismissed by clicking the bubble.
   const [showDesktopWelcome, setShowDesktopWelcome] = useState(false)
 
+  // ── Spin wheel (GRO-5) ───────────────────────────────────────────
+  // `spinOpen` toggles the wheel modal. `spinTokens` drives the arcade
+  // badge + top-bar pill (signed-in). `anonSpun` tracks whether this
+  // browser already used its one free teaser spin (anonymous only).
+  const [spinOpen, setSpinOpen] = useState(false)
+  const [spinTokens, setSpinTokens] = useState(0)
+  const [anonSpun, setAnonSpun] = useState(false)
+
+  // Load the spin entry-point state once per mount.
+  //   signed-in → GET /api/spin for the live token count.
+  //   anonymous → GET /api/spin/anon to know if the free spin is spent.
+  useEffect(() => {
+    const ac = new AbortController()
+    if (props.signedIn) {
+      fetch('/api/spin', { cache: 'no-store', signal: ac.signal })
+        .then(r => (r.ok ? r.json() : null))
+        .then((s: { tokens?: number } | null) => {
+          if (!ac.signal.aborted && s && typeof s.tokens === 'number') setSpinTokens(s.tokens)
+        })
+        .catch(() => {})
+    } else {
+      fetch('/api/spin/anon', { cache: 'no-store', signal: ac.signal })
+        .then(r => (r.ok ? r.json() : null))
+        .then((j: { spun?: boolean } | null) => {
+          if (!ac.signal.aborted && j?.spun) setAnonSpun(true)
+        })
+        .catch(() => {})
+    }
+    return () => ac.abort()
+  }, [props.signedIn])
+
+  // Personal invite link — used by the spin modal's share tasks + the
+  // anonymous save hook. Mirrors the ShareModal/MobileShareSheet derivation.
+  const spinInviteUrl =
+    props.signedIn && props.referralCode && origin
+      ? `${origin}/floor/${props.referralCode}`
+      : null
+
   // Post-Leo Tower attention pulse — once onboarding finishes we want
   // the user's next move to be "open the tower and see what you're
   // climbing." MobileBottomNav paints a pulsing ring around the Tower
@@ -1032,6 +1071,8 @@ export default function TowerLanding(props: Props) {
         }
         // Desktop "Share to climb" → centered ShareModal. Signed-in only.
         onShareClimb={props.signedIn ? () => setShareModalOpen(true) : undefined}
+        // Spin token count in the desktop stats pill (signed-in only).
+        spinTokens={props.signedIn ? spinTokens : undefined}
       />
 
       {/* Mobile-only counter chip strip. Slides in directly below the
@@ -1095,6 +1136,10 @@ export default function TowerLanding(props: Props) {
           // new minifigure pops "Hi, I'm <name>!" above its head.
           recruitGreetSignals={recruitGreetSignals}
           resetSignal={resetSignal}
+          // Spin arcade — in-room interactive object (front lounge).
+          onArcadeClick={onboardingComplete ? () => setSpinOpen(true) : undefined}
+          spinTokens={spinTokens}
+          spinTeaser={!props.signedIn && !anonSpun}
         />
       </div>
 
@@ -1130,9 +1175,29 @@ export default function TowerLanding(props: Props) {
         itemPositionOverrides={itemPositions2D}
         arrangeMode={arrangeMode && !isDesktop}
         onItemMove={handleItemMove2D}
+        // Spin arcade — always-on interactive item (front-left corner).
+        onArcadeClick={onboardingComplete ? () => setSpinOpen(true) : undefined}
+        spinTokens={spinTokens}
+        spinTeaser={!props.signedIn && !anonSpun}
       />
 
       <MySquadFloatingButton visible={onboardingComplete} onClick={() => setSquadOpen(true)} />
+
+      <SpinModal
+        open={spinOpen}
+        onClose={() => setSpinOpen(false)}
+        mode={props.signedIn ? 'auth' : 'anon'}
+        inviteUrl={spinInviteUrl}
+        teammateCount={computeTeammateCount(recruits)}
+        onSaveTeam={() => {
+          setSpinOpen(false)
+          setShowSignupModal(true)
+        }}
+        onStateChange={s => {
+          setSpinTokens(s.tokens)
+          if (!props.signedIn) setAnonSpun(true)
+        }}
+      />
 
       {/* Mobile shell — replaces the old MobileBottomBar with the
           mockup's three-slot nav + a floating progress pill that

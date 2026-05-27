@@ -270,14 +270,40 @@ export const SPRITES: Record<string, (ctx: SpriteContext) => ReactNode> = {
     <div className="w-full h-full relative">
       {/* Cabinet body */}
       <div className="absolute inset-x-0 inset-y-2 bg-[#7c3aed] rounded-sm border border-[#5a2ac0]" />
-      {/* Marquee */}
-      <div className="absolute inset-x-0 top-0 h-2 bg-[#a855f7] rounded-t-sm shadow-[0_0_8px_rgba(168,85,247,0.7)]" />
-      {/* Screen */}
-      <div className="absolute inset-x-1.5 top-3 h-1/3 bg-[#1a0030] border border-[#2a1a3a] shadow-[inset_0_0_6px_rgba(168,85,247,0.8)]" />
+      {/* Marquee — "SPIN" title so it reads as a prize machine, not a
+          generic arcade. */}
+      <div className="absolute inset-x-0 top-0 h-2.5 bg-[#a855f7] rounded-t-sm shadow-[0_0_8px_rgba(168,85,247,0.7)] flex items-center justify-center">
+        <span className="text-[5px] font-black text-night-deep tracking-[0.15em] leading-none">SPIN</span>
+      </div>
+      {/* Spin WHEEL on the front face — the key differentiator from a
+          plain arcade screen. Conic-gradient 7-segment wheel + a gold
+          pointer at the top. */}
+      <div className="absolute left-1/2 -translate-x-1/2 top-[26%] w-[66%] aspect-square">
+        {/* Pointer */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 -top-[2px] z-10"
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: '3px solid transparent',
+            borderRight: '3px solid transparent',
+            borderTop: '5px solid #fbbf24',
+          }}
+        />
+        {/* Wheel disc */}
+        <div
+          className="w-full h-full rounded-full border border-[#fbbf24] shadow-[0_0_8px_rgba(168,85,247,0.7)]"
+          style={{
+            background:
+              'conic-gradient(#9F8BFF 0deg 51.43deg, #4c3a8c 51.43deg 102.86deg, #6d4bd8 102.86deg 154.29deg, #8b5cf6 154.29deg 205.71deg, #a78bfa 205.71deg 257.14deg, #1f2147 257.14deg 308.57deg, #fbbf24 308.57deg 360deg)',
+          }}
+        />
+        {/* Hub */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#fbbf24] border border-[#1f2147]" />
+      </div>
       {/* Control deck */}
       <div className="absolute inset-x-1 bottom-3 h-1.5 bg-[#3a2a1a] flex items-center justify-evenly">
         <span className="w-1 h-1 rounded-full bg-[#d33b3b]" />
-        <span className="w-1 h-1 rounded-full bg-[#fbbf24]" />
         <span className="w-1 h-1 rounded-full bg-[#22d3ee]" />
       </div>
     </div>

@@ -25,8 +25,21 @@ import { CHARACTERS } from './scene/characters/characters.config'
 import { useFloorItems } from '@/lib/floorsConfigClient'
 import {
   ITEMS,
+  ArcadeMachine,
   type ItemSpec,
 } from './scene/environment/FloorItems'
+import { SPIN_ARCADE_3D_DEFAULT } from './scene/SpinArcade3D'
+
+/** Synthetic catalogue entry for the spin arcade. It's NOT a
+ *  floor-gated decor item (it's the always-on spin entry), but it IS
+ *  user-arrangeable, so we inject it into the arranger's item list so
+ *  it can be dragged. Keyed `spin_arcade` → stored as `spin_arcade_0`
+ *  (matching SPIN_ARCADE_KEY in SpinArcade3D). */
+const ARCADE_SPEC: ItemSpec = {
+  key: 'spin_arcade',
+  position: SPIN_ARCADE_3D_DEFAULT,
+  render: u => <ArcadeMachine unlocked={u} />,
+}
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 
@@ -242,6 +255,9 @@ export function RoomArranger({
       if (!spec) continue
       list.push({ spec, quantity: it.quantity })
     }
+    // Spin arcade — always arrangeable (it's the spin entry, present
+    // from day one regardless of floor).
+    list.push({ spec: ARCADE_SPEC, quantity: 1 })
     return list
   }, [floorItems])
 

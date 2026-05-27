@@ -11,68 +11,47 @@ model EmailCapture {
   email     String
   source    String
   createdAt DateTime @default(now())
+
   @@map("email_captures")
 }
 
 model User {
-  id               String               @id @default(cuid())
-  email            String               @unique
-  first_email      String?
-  passwordHash     String?
-  emailVerified    DateTime?
-  // Google OAuth2 — set on accounts that signed up via "Continue with
-  // Google". `googleId` is the immutable `sub` claim from Google's
-  // id_token; `googleEmail` mirrors the account's Google-side address
-  // for diagnostics (the canonical address lives in `email`). Both
-  // optional so password-only legacy accounts keep working unchanged.
-  googleId         String?              @unique
-  googleEmail      String?
-  recommendedRole  String?
-  reason           String?
-  ipAddress        String?
-  country          String?
-  referralCode     String               @unique
-  // Inviter lock — once `referredByCode` is set on signup, neither it nor
-  // `referredAt` may ever be overwritten by another invite link. Both are
-  // assigned exactly once, when the user record is first created. Login,
-  // re-request of a magic link, and follow-on POSTs with a different `?ref=`
-  // all leave these fields untouched. See guards in:
-  //   src/app/api/auth/signup/route.ts
-  //   src/app/api/auth/request/route.ts
-  referredByCode   String?
-  referredAt       DateTime?
-  referredBy       User?                @relation("UserReferrals", fields: [referredByCode], references: [referralCode])
-  referrals        User[]               @relation("UserReferrals")
-  totalInvites     Int                  @default(0)
-  // Current floor — FK into Floor.id. Column kept as `currentFloor` to
-  // avoid renaming ~50 references across the codebase. The `floor`
-  // relation gives access to invitesRequired / label / maxTeammates
-  // / item list via DB join instead of hardcoded constants.
-  currentFloor     Int                  @default(1)
-  floor            Floor                @relation(fields: [currentFloor], references: [id])
-  teamName         String?
-  teamPurpose      String?
-  // Floor sharing — when true, anyone hitting /floor/<referralCode>
-  // can view this user's floor and interact (poke teammates). Default
-  // false so floors are private until the user opts in.
-  publicVisible    Boolean              @default(false)
-  authTokens       AuthToken[]
-  inviteEvents     InviteEvent[]        @relation("InviterEvents")
-  recruitedTeams   RecruitedTeammate[]
-  // Per-user item position overrides for the user's own room.
-  // Shape: Record<string, [number, number, number]> where the key
-  // is either the canonical item key (`couch`, `floor_lamp`) or
-  // `${itemKey}_${index}` for multi-instance items
-  // (`basic_chair_desk_0`, `_1`, `_2`). Null/empty = use the canonical
-  // defaults from FloorItems.tsx ITEMS array.
-  itemPositions    Json?
-  // Same shape as `itemPositions`, but the SEPARATE layout for the
-  // mobile 2D front-elevation scene. The 2D and 3D scenes use the same
-  // world-coordinate system but intentionally different default framing,
-  // so each surface gets its own per-user arrangement.
-  itemPositions2D  Json?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id              String              @id @default(cuid())
+  email           String              @unique
+  first_email     String?
+  passwordHash    String?
+  emailVerified   DateTime?
+  googleId        String?             @unique
+  googleEmail     String?
+  recommendedRole String?
+  reason          String?
+  ipAddress       String?
+  country         String?
+  referralCode    String              @unique
+  referredByCode  String?
+  referredAt      DateTime?
+  referredBy      User?               @relation("UserReferrals", fields: [referredByCode], references: [referralCode])
+  referrals       User[]              @relation("UserReferrals")
+  totalInvites    Int                 @default(0)
+  currentFloor    Int                 @default(1)
+  floor           Floor               @relation(fields: [currentFloor], references: [id])
+  teamName        String?
+  teamPurpose     String?
+  publicVisible   Boolean             @default(false)
+  authTokens      AuthToken[]
+  inviteEvents    InviteEvent[]       @relation("InviterEvents")
+  recruitedTeams  RecruitedTeammate[]
+  itemPositions   Json?
+  itemPositions2D Json?
+  spinTokens      Int                 @default(0)
+  spinCreditCents Int                 @default(0)
+  lastDailySpinAt DateTime?
+  spinResults     SpinResult[]
+  spinGrants      SpinGrant[]
+  taskCompletions TaskCompletion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([referralCode])
   @@map("users")
@@ -125,19 +104,15 @@ model InviteEvent {
 // a user on floor N has all items from floors 1..N (handled in the
 // query side, not stored per-user).
 model Floor {
-  id              Int          @id
+  id              Int         @id
   invitesRequired Int
   label           String
   maxTeammates    Int
   product_reward  String?
-  // Each floor can unlock multiple items in a single beat (e.g. F1
-  // unlocks BOTH the picture frame AND the office desk). Stored as a
-  // Postgres text array so consumers can render each entry as its
-  // own badge / cell without parsing a delimiter. Empty `[]` is the
-  // valid "no special unlock copy" case.
-  unlock_items   String[]    @default([])
+  unlock_items    String[]    @default([])
   items           FloorItem[]
   users           User[]
+
   @@map("floor")
 }
 
@@ -150,6 +125,7 @@ model Item {
   key    String      @unique
   label  String
   floors FloorItem[]
+
   @@map("items")
 }
 
@@ -170,33 +146,17 @@ model FloorItem {
 }
 
 model RecruitedTeammate {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // `slug` is set for the 3 default NPCs (`iris`, `mia`, `leo`) so the
-  // frontend can look up their visual config (animations, colors,
-  // position) from characters.config.ts. Null for user-recruited
-  // teammates which use generic appearance.
-  slug       String?
-  name       String
-  role       String
-  pokes      Int      @default(0)
-  // True for the 3 seeded default NPCs — these rows can't be renamed
-  // or deleted via /api/recruit/[id]. Enforced in the route handlers.
-  isDefault  Boolean  @default(false)
-  // "Launch-day promise" — the per-role one-liner the speech bubble
-  // surfaces ("I will handle your calendar, draft emails…"). Populated
-  // by the Diaflow process API (builder a7eSxQk9eE) on create + on
-  // role-change. Stays null while the background fetch is in flight
-  // after a bulk add — the bubble falls back to a generic line in
-  // that case. Always sourced from the RoleDescription cache so two
-  // teammates with the same role share the same sentence.
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug        String?
+  name        String
+  role        String
+  pokes       Int      @default(0)
+  isDefault   Boolean  @default(false)
   description String?
-  createdAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-  // One slug per user (defaults are unique per user; nullable slug
-  // allows many custom teammates to coexist since Postgres treats
-  // NULLs as distinct in a unique index).
   @@unique([userId, slug])
   @@index([userId])
   @@map("recruited_teammates")
@@ -212,17 +172,110 @@ model RecruitedTeammate {
 // only consumer is /api/recruit + /api/recruit/[id], which read the
 // row to populate RecruitedTeammate.description.
 model RoleDescription {
-  // Lowercased role text — the cache key. Always lookup with
-  // `role.trim().toLowerCase()`.
   role        String   @id
-  // Original casing — handy for analytics + admin tooling. Not used
-  // for lookups.
   displayRole String
-  // The Diaflow API output, e.g. "I will handle your calendar,
-  // draft emails, and chase follow-ups."
   description String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@map("role_descriptions")
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Spin wheel (GRO-5) — Tower arcade reward system
+// ════════════════════════════════════════════════════════════════════
+
+// NOTE: `source` (SpinGrant) and `wedge` (SpinResult / AnonymousSpin)
+// are plain TEXT columns, NOT Postgres enums — enums are painful to
+// migrate. The backend owns the canonical value sets + validation; see
+// src/lib/spin/constants.ts. Canonical values:
+//   source: "daily" | "referral" | "task" | "spin_again"
+//   wedge:  "cash_50c" | "cash_1" | "cash_2" | "cash_3" | "cash_5"
+//           | "spin_again" | "jackpot"
+
+// SpinGrant — append-only ledger of every spin TOKEN credited to a
+// user, with source attribution. The user's live balance lives in
+// User.spinTokens; this table is the audit trail / analytics source.
+model SpinGrant {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "daily" | "referral" | "task" | "spin_again" (validated in BE).
+  source    String
+  amount    Int      @default(1)
+  // Set only when source = "task" — the one-time task key that earned
+  // this grant ("share_linkedin" or "share_x" in V1). Null otherwise.
+  taskKey   String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([source])
+  @@map("spin_grants")
+}
+
+// SpinResult — append-only ledger of every wheel spin OUTCOME. Covers
+// both authenticated spins (userId set) and anonymous teaser spins
+// (anonId set, userId null until migrated on signup).
+model SpinResult {
+  id        String   @id @default(cuid())
+  // Null for anonymous pre-signup spins; backfilled to the new user id
+  // when the anonymous session migrates on signup.
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Cookie id of the anonymous spinner (null for authenticated spins).
+  anonId    String?
+  // "cash_50c" | ... | "spin_again" | "jackpot" (validated in BE).
+  wedge     String
+  // Cash actually credited for this spin, in cents AFTER cap logic
+  // (0 for spin_again, and 0 when a cash/jackpot wedge is nulled by the
+  // $50 cap). The face value of the wedge is implied by `wedge`.
+  cashCents Int      @default(0)
+  // True when this spin was the free re-spin granted by a spin_again
+  // wedge (did not consume a banked token).
+  isRespin  Boolean  @default(false)
+  // True when a cash/jackpot wedge was downgraded because the user had
+  // already hit the $50 cap — recorded for history, nothing added.
+  capped    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([anonId])
+  @@map("spin_results")
+}
+
+// TaskCompletion — one-time task ledger. The unique (userId, taskKey)
+// constraint is the server-side guarantee that each task pays out at
+// most once per user, for life.
+model TaskCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskKey     String
+  completedAt DateTime @default(now())
+
+  @@unique([userId, taskKey])
+  @@index([userId])
+  @@map("task_completions")
+}
+
+// AnonymousSpin — server-side record for the pre-login teaser spin.
+// One row per browser cookie (cookieId @unique enforces "1 free spin
+// per browser"). The won amount + the cookie's assembled-team count
+// are held here until signup, when the row is migrated onto the new
+// user account (migratedToUserId set) and the cash counts toward the
+// $50 cap from minute one.
+model AnonymousSpin {
+  id               String    @id @default(cuid())
+  cookieId         String    @unique
+  ipAddress        String?
+  // Same canonical wedge strings as SpinResult.wedge (validated in BE).
+  wedge            String
+  cashCents        Int       @default(0)
+  teammateCount    Int       @default(0)
+  migratedToUserId String?
+  migratedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([ipAddress])
+  @@map("anonymous_spins")
 }

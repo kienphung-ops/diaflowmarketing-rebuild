@@ -60,6 +60,12 @@ interface Props {
    *  Bumping an index makes that recruited minifigure pop a
    *  "Hi, I'm <name>!" speech bubble once — used on a bulk add. */
   recruitGreetSignals?: Record<number, number>
+  /** Spin wheel (GRO-5) — clicking the in-room arcade fires this. */
+  onArcadeClick?: () => void
+  /** Live spin-token count for the arcade badge + glow. */
+  spinTokens?: number
+  /** Anonymous teaser — gold "FREE SPIN" badge on the arcade. */
+  spinTeaser?: boolean
 }
 
 export function SceneCanvas(props: Props) {

@@ -51,7 +51,9 @@ export const ITEMS_2D: Item2DConfig[] = [
     offsetStep: [2.5, 0, 0],
   },
   { key: 'neon_sign', position: [-2.0, 3.20, -5.29] },
-  { key: 'arcade_machine', position: [1.40, -0.35, -5.34] },
+  // `arcade_machine` is no longer floor-gated decor — it's the spin
+  // entry point, rendered ALWAYS as an interactive sprite in
+  // Mobile2DScene (see <Arcade2D>). Removed here to avoid duplication.
   { key: 'floor_ceiling_windows', position: [4.87, 2.27, -5.34] },
   { key: 'tea_table', position: [4.23, -0.55, 4.05] },
   { key: 'living_wall', position: [1.08, 1.49, -5.34] },

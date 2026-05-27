@@ -27,6 +27,7 @@ import {
   createSessionJwt,
   generateReferralCode,
 } from '@/lib/auth'
+import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { computeFloorForInvites } from '@/lib/floors'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
@@ -192,6 +193,10 @@ export async function POST(req: NextRequest) {
             where: { id: inviter.id },
             data: { totalInvites: newTotal, currentFloor: newFloor },
           })
+          // Spin economy: a successful referral signup grants the
+          // inviter +1 spin token. Granted immediately (no email-verify
+          // gate) to match the floor-climb invite credit above.
+          await grantReferralSpinTx(tx, inviter.id)
         }
 
         return u
@@ -225,6 +230,19 @@ export async function POST(req: NextRequest) {
     // few ms after the user gets their session cookie is fine; the
     // 60s TTL is the backstop anyway.
     void invalidateLeaderboard(inviter?.id ?? null, createdUser.id)
+
+    // Carry over the anonymous teaser spin (if this browser used its
+    // free spin pre-signup): adds the capped cash to the new account
+    // and marks the AnonymousSpin row migrated. Best-effort — never
+    // blocks signup if it fails.
+    const anonId = req.cookies.get('diaflow_anon_id')?.value
+    if (anonId) {
+      try {
+        await migrateAnonSpin(createdUser.id, anonId)
+      } catch (e) {
+        console.warn('[auth/signup] anon spin migrate failed:', (e as Error).message)
+      }
+    }
 
     const jwt = await createSessionJwt(createdUser.id)
     const res = NextResponse.json({ success: true })
