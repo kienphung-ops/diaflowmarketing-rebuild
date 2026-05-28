@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { CelebrationModal } from '@/components/CelebrationModal'
 import { SignupModal } from '@/components/SignupModal'
@@ -27,6 +27,7 @@ import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
 import { MobileCounterChips } from '@/components/mobile/MobileCounterChips'
 import { MobileShareSheet } from '@/components/mobile/MobileShareSheet'
 import { ShareModal } from '@/components/ShareModal'
+import { SaveSuccessModal } from '@/components/SaveSuccessModal'
 import { SpinModal } from '@/components/spin/SpinModal'
 import {
   RECRUIT_BODY_COLORS,
@@ -109,6 +110,16 @@ interface Props {
 export default function TowerLanding(props: Props) {
   const isTrial = !props.signedIn
   const router = useRouter()
+  // Query-param trigger: /tower's MySquadDrawer routes the user back
+  // here with `?arrange=1` when they hit "Arrange your room", so we
+  // auto-enter arrange mode on mount. One-shot via a ref so a stale
+  // query on later renders doesn't reopen the toolbar.
+  const searchParams = useSearchParams()
+  const arrangeAutoTriggeredRef = useRef(false)
+  // SaveSuccess popup — fired once when the user lands back here with
+  // `?just_signed_up=1` (email signup or new-account Google OAuth).
+  const [saveSuccessOpen, setSaveSuccessOpen] = useState(false)
+  const saveSuccessTriggeredRef = useRef(false)
 
   const [trial, setTrial] = useState<TrialState>(() => ({
     ...defaultTrialState(),
@@ -243,6 +254,39 @@ export default function TowerLanding(props: Props) {
     setArrangeMode(true)
     setSquadOpen(false) // close the drawer so the room is visible
   }, [props.signedIn, itemPositions, itemPositions2D])
+
+  // Auto-arrange trigger from `/tower → /?arrange=1`. Runs once when the
+  // query is present + the user is signed in; we then strip the query
+  // (history.replaceState) so a refresh doesn't reopen the toolbar.
+  useEffect(() => {
+    if (arrangeAutoTriggeredRef.current) return
+    if (!props.signedIn) return
+    if (searchParams.get('arrange') !== '1') return
+    arrangeAutoTriggeredRef.current = true
+    handleStartArrange()
+    try {
+      window.history.replaceState({}, '', '/')
+    } catch {
+      /* ignore — older browsers / non-standard history APIs */
+    }
+  }, [searchParams, props.signedIn, handleStartArrange])
+
+  // Post-signup congrats popup. Triggered by `?just_signed_up=1` set by
+  // the SignupModal redirect + the Google OAuth callback (new account
+  // branch only). Strips the query after firing so refresh doesn't
+  // replay it.
+  useEffect(() => {
+    if (saveSuccessTriggeredRef.current) return
+    if (!props.signedIn) return
+    if (searchParams.get('just_signed_up') !== '1') return
+    saveSuccessTriggeredRef.current = true
+    setSaveSuccessOpen(true)
+    try {
+      window.history.replaceState({}, '', '/')
+    } catch {
+      /* ignore */
+    }
+  }, [searchParams, props.signedIn])
 
   const handleCancelArrange = useCallback(() => {
     setItemPositions({ ...arrangeSnapshotRef.current })
@@ -577,9 +621,14 @@ export default function TowerLanding(props: Props) {
   )
   // X-close on Iris modal — advance without a team name. `trial.teamName`
   // stays null and MiaBubble will fall back to "Your team".
+  // Iris onboarding gate — the team name is required to advance past
+  // this step. × / backdrop CLOSE the bubble but DO NOT advance the
+  // step (boss feedback: only a real submission counts). The bubble
+  // re-opens on the next page load because `trial.onboardingStep`
+  // hasn't moved, so a dismissed step isn't permanently skippable.
   const handleIrisSkip = useCallback(() => {
-    persist({ ...trial, onboardingStep: nextOnboardingStep('iris') })
-  }, [trial])
+    setOnboardingModalVisible(false)
+  }, [])
 
   // True from the moment Mia's job submit fires until the Diaflow
   // upstream returns (or fails). Drives the "Hang on…" hint inside
@@ -640,9 +689,11 @@ export default function TowerLanding(props: Props) {
     },
     [trial]
   )
+  // Same gate as handleIrisSkip — × / backdrop close but don't
+  // advance past 'mia'. User must submit the job role to proceed.
   const handleMiaSkip = useCallback(() => {
-    persist({ ...trial, onboardingStep: nextOnboardingStep('mia') })
-  }, [trial])
+    setOnboardingModalVisible(false)
+  }, [])
 
   // Mia's intro card has no input — clicking "Meet your next teammate"
   // (or the X close) advances to Leo. Same handler for both.
@@ -1105,9 +1156,18 @@ export default function TowerLanding(props: Props) {
           itemPositionOverrides={itemPositions}
           onFloorClick={() => {}}
           onNpcClick={slug => {
-            // Iris used to open MySquadDrawer; now opens the dedicated
-            // hire-or-share recruiting prompt (IrisHireModal). Other
-            // NPCs (Mia, Leo) still route to their own modals.
+            // During onboarding, clicking the ACTIVE-step character
+            // reopens the bubble if the user dismissed it with × /
+            // backdrop (the close path doesn't advance the step, so
+            // they need a way back to the prompt). Non-active NPCs
+            // during onboarding do nothing (they shouldn't be visible
+            // until their step anyway). Post-onboarding falls through
+            // to the regular hire / info modals.
+            if (isTrial && activeStep !== 'done') {
+              const stepCharacter = activeStep === 'mia-info' ? 'mia' : activeStep
+              if (slug === stepCharacter) setOnboardingModalVisible(true)
+              return
+            }
             if (slug === 'iris') setIrisModalOpen(true)
             else setActiveNpcModal(slug)
           }}
@@ -1157,6 +1217,12 @@ export default function TowerLanding(props: Props) {
         // Bulk-add greeting nonces — same map the 3D scene uses.
         greetSignals={recruitGreetSignals}
         onNpcClick={slug => {
+          // Mobile 2D — same onboarding reopen logic as the 3D scene.
+          if (isTrial && activeStep !== 'done') {
+            const stepCharacter = activeStep === 'mia-info' ? 'mia' : activeStep
+            if (slug === stepCharacter) setOnboardingModalVisible(true)
+            return
+          }
           if (slug === 'iris') setIrisModalOpen(true)
           else setActiveNpcModal(slug)
         }}
@@ -1550,6 +1616,27 @@ export default function TowerLanding(props: Props) {
       />
 
       {showSignupModal && <SignupModal onClose={() => setShowSignupModal(false)} />}
+
+      {/* Post-signup congrats — opens once when the user lands here
+          with `?just_signed_up=1`. Closing it ("Back to my office")
+          drops the user into their saved scene. */}
+      <SaveSuccessModal
+        open={saveSuccessOpen}
+        onClose={() => setSaveSuccessOpen(false)}
+        teamName={effective.teamName ?? null}
+        teammates={recruits.map(r => ({ name: r.name, role: r.role, slug: r.slug ?? null }))}
+        currentFloor={effective.currentFloor}
+        totalInvites={effective.totalInvites}
+        nextFloor={
+          welcomeBubbleNextFloor
+            ? {
+                id: welcomeBubbleNextFloor.id,
+                invitesRequired: welcomeBubbleNextFloor.invitesRequired,
+              }
+            : null
+        }
+        inviteUrl={spinInviteUrl}
+      />
 
       <EmailVerifyModal
         open={emailVerifyOpen}

@@ -72,20 +72,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Per-IP stampede guard.
+    // Per-anon-session rate guard. Keyed by the `diaflow_anon_id`
+    // cookie (each browser session has its own value), NOT by IP —
+    // NAT / corporate / mobile carriers collapse many real users onto
+    // a single egress IP, and an IP-keyed limit would punish them as
+    // one shared identity. Cookie-based gives each browser its own
+    // bucket, and the AnonymousSpin.cookieId UNIQUE constraint
+    // already enforces "1 free teaser spin per browser" as the
+    // primary anti-abuse mechanism.
     const ip = getClientIp(req)
-    if (ip) {
-      const rl = await checkRateLimit({
-        key: `anon-spin-ip:${ip}`,
-        limit: ANON_SPINS_PER_IP_PER_DAY,
-        windowSec: 86_400,
-      })
-      if (!rl.allowed) {
-        return NextResponse.json(
-          { error: 'Too many spins from this connection. Try again later.' },
-          { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
-        )
-      }
+    const rateKey = existingCookie || cookieId
+    const rl = await checkRateLimit({
+      key: `anon-spin-session:${rateKey}`,
+      limit: ANON_SPINS_PER_IP_PER_DAY,
+      windowSec: 86_400,
+    })
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many spins from this session. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
+      )
     }
 
     const body = await req.json().catch(() => ({}))

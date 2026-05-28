@@ -66,6 +66,9 @@ interface Props {
   spinTokens?: number
   /** Anonymous teaser — gold "FREE SPIN" badge on the arcade. */
   spinTeaser?: boolean
+  /** Tower-view ghosting — see OfficeScene props. */
+  solidTeammateCount?: number
+  ghostItemKeys?: ReadonlySet<string>
 }
 
 export function SceneCanvas(props: Props) {

@@ -30,6 +30,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFloorItems } from '@/lib/floorsConfigClient'
+import { setAnchorPosition } from '@/lib/anchorPositions'
 import type { RecruitedCharacter } from '@/components/scene/OfficeScene'
 import {
   ITEMS_2D,
@@ -99,6 +100,12 @@ interface Props {
   spinTokens?: number
   /** Anonymous teaser — gold "FREE SPIN" badge on the arcade. */
   spinTeaser?: boolean
+  /** Tower-view ghosting: recruited teammates with index >=
+   *  `solidTeammateCount` render at half opacity ("future slot the
+   *  viewer hasn't unlocked yet"). Undefined = no ghosting. */
+  solidTeammateCount?: number
+  /** Item keys to render at half opacity (ghosted preview). */
+  ghostItemKeys?: ReadonlySet<string>
 }
 
 interface PlacedItem {
@@ -131,6 +138,8 @@ export function Mobile2DScene({
   onArcadeClick,
   spinTokens = 0,
   spinTeaser = false,
+  solidTeammateCount,
+  ghostItemKeys,
 }: Props) {
   // Ref to the outer scene container — passed to each CharacterSprite
   // so its pointer-move handler can compute (clientX, clientY) →
@@ -383,6 +392,10 @@ export function Mobile2DScene({
               top: `${item.yPct}%`,
               width: item.width,
               height: item.height,
+              // Tower-view ghosting: items the viewer hasn't unlocked
+              // yet render at half opacity so the preview reads as a
+              // teaser rather than a state the viewer already has.
+              opacity: ghostItemKeys?.has(item.key) ? 0.35 : undefined,
             }}
             aria-hidden
           >
@@ -429,6 +442,10 @@ export function Mobile2DScene({
         .slice(0, RECRUIT_2D_POSITIONS.length)
         .map((rc, i) => {
           const slug = `recruited-${i}`
+          // Tower-view ghosting — recruited slots beyond what the
+          // viewer has unlocked render translucent.
+          const isGhost =
+            typeof solidTeammateCount === 'number' && i >= solidTeammateCount
           return (
             <CharacterSprite
               key={slug}
@@ -445,6 +462,7 @@ export function Mobile2DScene({
               onTap={() => onTeammateClick?.(i)}
               onPoke={() => onTeammatePoke?.(slug)}
               onMove={pos => handleCharMove(slug, pos)}
+              dimmed={isGhost}
             />
           )
         })}
@@ -920,6 +938,7 @@ function CharacterSprite({
   onPoke,
   onMove,
   hint,
+  dimmed = false,
 }: {
   slug: string
   name: string
@@ -948,8 +967,26 @@ function CharacterSprite({
    *  "👋 ready to hire…" for Iris when slots are open). Hidden when
    *  unset so most sprites stay silent. */
   hint?: string
+  /** Tower-view ghosting — when true the entire button renders at
+   *  half opacity ("future teammate slot"). */
+  dimmed?: boolean
 }) {
   const { xPct, yPct } = projectToScreen(worldPos)
+
+  // Mirror the character's screen pixel into the shared anchor store so
+  // floating bubbles (e.g. MiaWelcomeBubble) can follow this minifigure
+  // via `useAnchorPosition(slug)`. The 2D scene is `fixed inset-0`, so
+  // viewport-relative pixels work directly. Update whenever the
+  // projected percentage changes (drag / arrange / wander).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setAnchorPosition(
+      slug,
+      (xPct / 100) * window.innerWidth,
+      (yPct / 100) * window.innerHeight,
+    )
+  }, [slug, xPct, yPct])
+
   // Gesture state — captured at pointerdown, mutated on pointermove,
   // consulted at pointerup to decide tap vs drag. `moved` flips true
   // the first time the pointer crosses the DRAG_THRESHOLD so we
@@ -1184,6 +1221,7 @@ function CharacterSprite({
       className="absolute z-10 -translate-x-1/2 -translate-y-full pointer-events-auto group cursor-grab active:cursor-grabbing"
       style={{
         left: `${xPct}%`,
+        opacity: dimmed ? 0.35 : undefined,
         top: `${yPct}%`,
         touchAction: 'none',
       }}

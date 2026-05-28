@@ -216,6 +216,16 @@ export function TowerTourDesktop({
           {/* Footer nav. */}
           {isLastStep ? (
             <div className="pt-5">
+              {/* Skip link sits ABOVE the primary CTA on the final
+                  step — keeps the soft "not now" out of the way of the
+                  hand reaching for the bold purple Save button. */}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full text-center text-[12.5px] text-tower-cream/55 hover:text-tower-cream/80 underline-offset-2 hover:underline py-2 mb-2"
+              >
+                Skip — I&apos;ll explore first
+              </button>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -236,13 +246,6 @@ export function TowerTourDesktop({
                   {signedIn ? 'Share to start climbing →' : 'Save my team to start climbing →'}
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full text-center text-[12.5px] text-tower-cream/55 hover:text-tower-cream/80 underline-offset-2 hover:underline py-2 mt-2"
-              >
-                Skip — I&apos;ll explore first
-              </button>
             </div>
           ) : (
             <div className="pt-5 flex items-center gap-3">

@@ -102,7 +102,10 @@ export function SignupModal({ onClose }: Props) {
       } catch {
         /* ignore */
       }
-      window.location.assign('/')
+      // `?just_signed_up=1` triggers the SaveSuccessModal on the home
+      // page (TowerLanding reads the query, opens the modal, then
+      // strips the param so a refresh doesn't replay it).
+      window.location.assign('/?just_signed_up=1')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -157,10 +160,7 @@ export function SignupModal({ onClose }: Props) {
         </div>
 
         {/* Header row — small "Save my team" label + × close. */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[12px] font-semibold text-tower-cream/55 tracking-wide">
-            Save my team
-          </span>
+        <div className="flex items-end justify-end mb-3">
           <button
             onClick={onClose}
             aria-label="Close"

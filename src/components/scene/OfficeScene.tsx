@@ -88,6 +88,13 @@ interface Props {
   spinTokens?: number
   /** Anonymous teaser — paints the arcade's gold "FREE SPIN" badge. */
   spinTeaser?: boolean
+  /** Tower-view ghosting: recruited teammates with index >=
+   *  `solidTeammateCount` render as translucent ghosts (slots the
+   *  viewer hasn't unlocked yet). Undefined = no ghosting. */
+  solidTeammateCount?: number
+  /** Item keys to ghost regardless of the floor's unlocked state.
+   *  Mirrors FloorItems' `ghostItemKeys`. */
+  ghostItemKeys?: ReadonlySet<string>
 }
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -202,6 +209,8 @@ export function OfficeScene({
   onArcadeClick,
   spinTokens = 0,
   spinTeaser = false,
+  solidTeammateCount,
+  ghostItemKeys,
 }: Props) {
   // `unlockedItemKeys` is no longer consumed here — FloorItems reads
   // its config straight from /api/floors via useFloorItems. Kept on
@@ -266,11 +275,17 @@ export function OfficeScene({
 
   const handleSelect = useCallback(
     (slug: string) => {
-      if (onboardingStep !== 'done') return
+      // NPC taps always reach the parent — during onboarding the
+      // parent uses the click to RE-OPEN the dismissed onboarding
+      // bubble (when X / backdrop closed it without advancing); once
+      // onboarding is done it routes to the regular hire / info modal.
+      // Recruited-teammate taps stay onboarding-gated since they
+      // shouldn't appear before the user has added any.
       if (slug === 'iris' || slug === 'mia' || slug === 'leo') {
         onNpcClick?.(slug)
         return
       }
+      if (onboardingStep !== 'done') return
       if (slug.startsWith('recruited-')) {
         const idx = parseInt(slug.slice('recruited-'.length), 10)
         if (!Number.isNaN(idx)) onTeammateClick?.(idx)
@@ -454,7 +469,11 @@ export function OfficeScene({
         <group>
             <Floor />
             <Walls companyName={companyName ?? undefined} currentFloor={currentFloor} />
-            <FloorItems currentFloor={currentFloor} positionOverrides={itemPositionOverrides} />
+            <FloorItems
+              currentFloor={currentFloor}
+              positionOverrides={itemPositionOverrides}
+              ghostItemKeys={ghostItemKeys}
+            />
 
             {/* Spin-wheel arcade — interactive in-room object. Its
                 position honours the "Arrange your room" override
@@ -518,6 +537,11 @@ export function OfficeScene({
             {recruitedConfigs.map((cfg, i) => {
               const slug = `recruited-${i}`
               const charPos = positions[slug] ?? cfg.position
+              // Tower-view ghosting: characters beyond `solidTeammateCount`
+              // are slots the viewer hasn't unlocked yet — they render
+              // translucent as a preview teaser. Undefined = no ghosting.
+              const isGhost =
+                typeof solidTeammateCount === 'number' && i >= solidTeammateCount
               return (
                 <Character
                   key={slug}
@@ -533,6 +557,7 @@ export function OfficeScene({
                   // "Hi, I'm <name>!" bubble above the new recruit.
                   greetingSignal={recruitGreetSignals?.[i] ?? 0}
                   greetingText={`Hi, I'm ${cfg.name}!`}
+                  dimmed={isGhost}
                 />
               )
             })}

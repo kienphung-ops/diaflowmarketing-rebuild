@@ -268,7 +268,6 @@ model AnonymousSpin {
   id               String    @id @default(cuid())
   cookieId         String    @unique
   ipAddress        String?
-  // Same canonical wedge strings as SpinResult.wedge (validated in BE).
   wedge            String
   cashCents        Int       @default(0)
   teammateCount    Int       @default(0)

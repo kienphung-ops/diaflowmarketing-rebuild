@@ -7,7 +7,8 @@ import { SceneSkeleton } from '@/components/fallback/SceneSkeleton'
 import { Mobile2DScene } from '@/components/scene2d/Mobile2DScene'
 import { ShareModal } from '@/components/ShareModal'
 import { SignupModal } from '@/components/SignupModal'
-import { useFloor } from '@/lib/floorsConfigClient'
+import { useFloor, useFloorsConfig } from '@/lib/floorsConfigClient'
+import { DEFAULT_NPC_COUNT } from '@/lib/floors'
 import type { FloorPreview } from '@/lib/towerFloorPreview'
 
 const SceneCanvas = dynamic(
@@ -58,6 +59,32 @@ export default function TowerFloorViewClient({
     : 0
   // Invites still needed to reach THIS (locked) floor.
   const invitesAway = Math.max(0, preview.invitesRequired - viewerTotalInvites)
+
+  // ── Ghosting (tower-view preview) ────────────────────────────────
+  // When the viewer peeks at a floor ABOVE their own, items + teammate
+  // slots they haven't yet unlocked render at half opacity ("future
+  // perks" preview). The owner's actual unlocked set is derived from
+  // every floor at-or-below `viewerCurrentFloor` in the live floors
+  // config. Anonymous viewers behave like floor-1 viewers (their
+  // `viewerCurrentFloor` is seeded to 1 server-side).
+  const allFloors = useFloorsConfig()
+  const viewerFloorCfg = useFloor(viewerCurrentFloor)
+  const isLockedPeek = preview.floor > viewerCurrentFloor
+  const viewerMaxTeammates = viewerFloorCfg?.maxTeammates ?? DEFAULT_NPC_COUNT
+  const solidTeammateCount = isLockedPeek
+    ? Math.max(0, viewerMaxTeammates - DEFAULT_NPC_COUNT)
+    : undefined
+  const ghostItemKeys = isLockedPeek
+    ? (() => {
+        const owned = new Set<string>()
+        for (const f of allFloors) {
+          if (f.id <= viewerCurrentFloor) {
+            for (const it of f.items) owned.add(it.key)
+          }
+        }
+        return new Set(preview.unlockedItemKeys.filter(k => !owned.has(k)))
+      })()
+    : undefined
 
   // Personal share link — only resolvable client-side (needs origin).
   const [origin, setOrigin] = useState('')
@@ -183,6 +210,11 @@ export default function TowerFloorViewClient({
           unlockedItemKeys={preview.unlockedItemKeys}
           onFloorClick={() => {}}
           readonly
+          // Tower-view ghost: items + teammates beyond the viewer's
+          // real floor render translucent so the preview reads as
+          // "future perks", not what they already have.
+          solidTeammateCount={solidTeammateCount}
+          ghostItemKeys={ghostItemKeys}
         />
       </div>
 
@@ -194,6 +226,8 @@ export default function TowerFloorViewClient({
         recruitedCharacters={preview.teammates}
         currentFloor={preview.floor}
         readonly
+        solidTeammateCount={solidTeammateCount}
+        ghostItemKeys={ghostItemKeys}
       />
 
       {/* Share / Save CTA — bottom-right on desktop. Pre-login users get

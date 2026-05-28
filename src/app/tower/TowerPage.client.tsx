@@ -478,6 +478,20 @@ export default function TowerPageClient(props: Props) {
           props.signedIn && !emailVerified ? () => setEmailVerifyOpen(true) : undefined
         }
         rank={rank}
+        // Arrange-your-room: signed-in only. Tower view doesn't have
+        // its own arrange overlay (it'd cover the building image), so
+        // we route back to the office view with `?arrange=1` and let
+        // TowerLanding auto-enter arrange mode (works for desktop's 3D
+        // RoomArranger and mobile's in-place 2D arrange alike).
+        onArrangeRoom={
+          props.signedIn
+            ? () => {
+                setSquadOpen(false)
+                setIsNavigating(true)
+                router.push('/?arrange=1')
+              }
+            : undefined
+        }
         // Owner-side floor activity — `ownerName: null` flips the
         // drawer's pill label from "Visiting <name>" to "Your floor".
         visiting={

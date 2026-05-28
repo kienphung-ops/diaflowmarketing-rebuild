@@ -141,10 +141,15 @@ export function HowItWorksModal({
             <h2 className="text-[17px] md:text-lg font-extrabold leading-tight">
               Every floor, every unlock
             </h2>
-            <p className="text-[11.5px] md:text-xs text-tower-cream/55 mt-0.5 leading-relaxed">
-              {inviteUrl
-                ? 'Climb by inviting friends.'
-                : '20 floors. Climb by inviting friends.'}
+            <p className="text-[11.5px] md:text-xs text-tower-cream/55 mt-1.5 leading-relaxed">
+              Climb by inviting friends. Every floor unlocks an AI Teammate and
+              new office gear. Real perks at{' '}
+              <span className="text-amber-300 font-semibold">Floor 3 (free beta)</span>{' '}
+              and{' '}
+              <span className="text-amber-300 font-semibold">Floor 7 (a month of Pro)</span>.{' '}
+              <span className="text-amber-300 font-semibold">
+                Whatever you earn is yours to keep when we launch.
+              </span>
             </p>
           </div>
           <button

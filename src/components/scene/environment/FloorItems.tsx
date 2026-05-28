@@ -1234,9 +1234,14 @@ interface Props {
    *      (used for the multi-copy `basic_chair_desk` slots).
    *  Empty / undefined → use the canonical ITEMS positions. */
   positionOverrides?: Record<string, [number, number, number]>
+  /** Floor-preview ghosting (tower-view): keys listed here render at
+   *  LOCKED_OPACITY even when the floor config marks them unlocked. Used
+   *  when a low-floor visitor peeks at a higher floor — items they
+   *  haven't yet earned should appear ghosted previews. */
+  ghostItemKeys?: ReadonlySet<string>
 }
 
-export function FloorItems({ currentFloor, positionOverrides }: Props) {
+export function FloorItems({ currentFloor, positionOverrides, ghostItemKeys }: Props) {
   // PER-FLOOR semantic: each floor's row in floor_items lists exactly
   // the items that floor owns, with quantities. We trust that list
   // verbatim for the CURRENT floor (rendered at full opacity) and
@@ -1261,8 +1266,15 @@ export function FloorItems({ currentFloor, positionOverrides }: Props) {
       if (info.has(it.key)) continue
       info.set(it.key, { unlocked: false, quantity: it.quantity })
     }
+    // Override unlocked → false for any item the caller wants ghosted
+    // (tower-view floor preview, keys above the viewer's real floor).
+    if (ghostItemKeys && ghostItemKeys.size > 0) {
+      info.forEach((v, k) => {
+        if (ghostItemKeys.has(k)) info.set(k, { ...v, unlocked: false })
+      })
+    }
     return info
-  }, [floorItems, nextFloorItems])
+  }, [floorItems, nextFloorItems, ghostItemKeys])
 
   return (
     <group>

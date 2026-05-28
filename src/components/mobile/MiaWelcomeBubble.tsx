@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAnchorPosition } from '@/lib/anchorPositions'
 
 /**
  * Mia's "Welcome — save us before you leave" speech bubble.
@@ -51,6 +52,13 @@ export function MiaWelcomeBubble({
   // nextFloorId,
   durationMs = 10000,
 }: Props) {
+  // Subscribe to Mia's live screen pixel so the bubble floats above
+  // her head wherever she walks (auto-wander) or is dragged. Mobile2DScene
+  // writes anchor positions for each character every render, so the
+  // module-scoped store has a fresh pixel by the time we mount.
+  // We always subscribe to keep hook order stable across visibility flips.
+  const anchorRef = useAnchorPosition(visible ? 'mia' : null)
+
   // Local fade-in/out state — driven by `visible` from the parent so
   // the parent owns the lifecycle but the bubble still gets a smooth
   // opacity transition (instead of popping in/out).
@@ -76,66 +84,64 @@ export function MiaWelcomeBubble({
 
   if (!visible) return null
 
-  // Label normalisation — uppercase + role fallback. Strip any leading
-  // article ("an AI Recruiter" → "AI RECRUITER") so the eyebrow reads
-  // tight at the smaller font size.
-  const labelRole =
-    (miaRole ?? '').trim().replace(/^(an?|the)\s+/i, '').toUpperCase() ||
-    'AI TEAMMATE'
-
-  // Compose the "Tap the Tower ↓" CTA line. The bubble's job is to
-  // nudge the user toward the Tower button (which is pulsing in the
-  // bottom nav) so they can see what they're climbing.
-  // const hasNextFloor =
-  //   typeof invitesToNext === 'number' &&
-  //   typeof nextFloorId === 'number' &&
-  //   invitesToNext > 0
-  // const ctaLine = hasNextFloor ? (
-  //   <>
-  //     Tap{' '}
-  //     <span className="text-purple-500 font-semibold">🏆 Tower</span>{' '}
-  //     to see Floor {nextFloorId} ↓
-  //   </>
-  // ) : (
-  //   <>
-  //     Tap{' '}
-  //     <span className="text-purple-500 font-semibold">🏆 Tower</span>{' '}
-  //     to see your climb ↓
-  //   </>
-  // )
+  // `miaRole` is no longer rendered (eyebrow removed per the new
+  // mockup) but the prop stays on the interface for backwards-compat
+  // with the parent's call site.
+  void miaRole
 
   return (
     <div
+      ref={anchorRef}
       className={
         // md:hidden so desktop doesn't see the floating bubble (the
-        // MySquadDrawer side panel covers the same nudge there).
-        // Positioned just below the counter chips strip + a healthy
-        // safe-area buffer so it sits above the office wall.
-        'md:hidden fixed inset-x-3 z-30 flex justify-center ' +
-        'top-[calc(96px+env(safe-area-inset-top))] pointer-events-none ' +
+        // DesktopWelcomeBubble covers the same nudge there).
+        // Anchored to Mia — the rAF loop writes `translate3d(...)` onto
+        // this wrapper every frame, placing it at her feet pixel. The
+        // inner bubble then offsets ABOVE her head with the tail
+        // pointing down at her.
+        'md:hidden fixed top-0 left-0 z-30 pointer-events-none ' +
         'transition-opacity duration-300 ' +
         (mounted ? 'opacity-100' : 'opacity-0')
       }
       role="status"
       aria-live="polite"
-      onClick={onDismiss}
+      style={{ willChange: 'transform' }}
     >
       <div
-        className="pointer-events-auto relative bg-white text-night-deep rounded-2xl px-4 py-3 max-w-[320px] shadow-[0_16px_40px_rgba(0,0,0,0.45)]"
-        style={{ animation: 'mia-welcome-pop 280ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+        onClick={onDismiss}
+        className="pointer-events-auto absolute bg-night-mid border border-white/10 text-tower-cream rounded-2xl px-4 py-3 pr-9 w-[260px] shadow-[0_16px_40px_rgba(0,0,0,0.45)]"
+        style={{
+          // Horizontally centred on Mia, lifted ABOVE her head so the
+          // downward tail points at the figure. ~95px clears the head
+          // + name tag with a touch of breathing room.
+          transform: 'translate(-50%, calc(-100% - 95px))',
+          animation: 'mia-welcome-pop 280ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
       >
-        {/* Eyebrow — Mia's identity + role pulled from props */}
-        <div className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-purple-500 mb-1 text-center">
-          <span aria-hidden>💁</span> MIA · {labelRole}
-        </div>
-        {/* Main message + downward arrow toward the Tower button */}
+        {/* × close — top right (matches the desktop welcome bubble's
+            dismiss affordance). */}
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation()
+            onDismiss()
+          }}
+          aria-label="Dismiss"
+          className="absolute top-1.5 right-1.5 w-6 h-6 inline-flex items-center justify-center rounded-md text-tower-cream/55 hover:text-tower-cream hover:bg-white/5 text-base leading-none transition"
+        >
+          ×
+        </button>
+
+        {/* Main message — second clause highlighted in purple. */}
         <div className="text-[13.5px] leading-snug font-medium text-center">
-         Welcome to your office. Ready for the tower tour? 
-         {/* {ctaLine} */}
+          Welcome to your office.{' '}
+          <span className="text-purple-300 font-semibold">
+            Ready for the tower tour?
+          </span>
         </div>
 
-        {/* Downward tail — pure CSS triangle so the bubble visually
-            anchors to the office canvas below. */}
+        {/* Downward tail — colour matches `bg-night-mid` (#1a1a2e) so
+            the bubble visually anchors to the office canvas below. */}
         <div
           aria-hidden
           className="absolute -bottom-2 left-1/2 -translate-x-1/2"
@@ -144,7 +150,7 @@ export function MiaWelcomeBubble({
             height: 0,
             borderLeft: '8px solid transparent',
             borderRight: '8px solid transparent',
-            borderTop: '8px solid #ffffff',
+            borderTop: '8px solid #1a1a2e',
           }}
         />
       </div>

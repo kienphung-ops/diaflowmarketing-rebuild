@@ -134,19 +134,57 @@ function floorFrame(floor: number): FrameGeom {
   }
 }
 
-/** Vertical centre of a floor (for the YOU marker). */
+/** Vertical centre of a floor — used by hover/view affordances that
+ *  anchor on the chevron polygon itself (e.g. the "View F<N>" pill that
+ *  floats next to a hovered chevron). */
 function floorTopPct(floor: number): number {
-  const g = FLOOR_FRAMES[Math.max(1, Math.min(TOTAL_FLOORS, floor))]
+  const idx = Math.max(1, Math.min(TOTAL_FLOORS, floor))
+  const g = FLOOR_FRAMES[idx]
   if (g) return (g.top + g.bottom) / 2
-  const measured = FLOOR_TOP_PCT[Math.max(1, Math.min(TOTAL_FLOORS, floor))]
+  const measured = FLOOR_TOP_PCT[idx]
   if (typeof measured === 'number') return measured
   return linearTopPct(floor)
+}
+
+/** Y-position for the YOU marker — centered in the chevron polygon
+ *  AT the building's centre column (where the YOU pill is drawn).
+ *
+ *  `FLOOR_FRAMES[N]` describes the chevron band as a polygon with TWO
+ *  V-shaped edges (top + bottom), both dipping down by `chevron` % at
+ *  the centre. So at the building's centre column, the polygon
+ *  vertically spans `g.top + g.chevron` (top dip) to `g.bottom +
+ *  g.chevron` (bottom apex). Taking the midpoint of THAT range parks
+ *  the pill visually inside the chevron outline regardless of how
+ *  deep the V dips for that floor. Using `(top+bottom)/2` alone (the
+ *  side-corner mid) leaves the pill above the polygon at the centre
+ *  column — which is why earlier versions read as "one floor too
+ *  high". The pill's own translate(-100%) means top:% becomes its
+ *  bottom edge, so the pill body extends UP into the polygon. */
+function youMarkerTopPct(floor: number): number {
+  const idx = Math.max(1, Math.min(TOTAL_FLOORS, floor))
+  const g = FLOOR_FRAMES[idx]
+  if (g) {
+    // Calibrated against two hand-tuned reference points from the
+    // live bitmap:
+    //
+    //   Floor 20 → top = 16.3 → (16.3 − 12.35) / 5.5 = 0.718
+    //   Floor 1  → top = 91.3 → (91.3 − 85.52) / 7.9 = 0.732
+    //
+    // The ratio `(top − g.bottom) / g.chevron` ≈ 0.725 generalises
+    // across the band, so the marker now lands inside the chevron
+    // polygon at the centre column for every floor (verified visually
+    // at both ends). If FLOOR_FRAMES or the bitmap ever shifts, dial
+    // the factor in again by picking two reference floors and
+    // recomputing the ratio.
+    return Math.min(95, g.bottom + g.chevron * 0.725)
+  }
+  return floorTopPct(floor)
 }
 
 function floorToMarker(floor: number): { top: number; left: number } {
   const t = (Math.max(1, Math.min(TOTAL_FLOORS, floor)) - 1) / (TOTAL_FLOORS - 1)
   return {
-    top: floorTopPct(floor),
+    top: youMarkerTopPct(floor),
     left: BOTTOM_LEFT_PCT + t * (TOP_LEFT_PCT - BOTTOM_LEFT_PCT),
   }
 }
@@ -305,6 +343,7 @@ export function TowerView({
           )}
         </div>
       </div>
+
     </div>
   )
 }

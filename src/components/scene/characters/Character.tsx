@@ -61,11 +61,15 @@ interface CharacterProps {
    *  "👋 ready to hire…" when a teammate slot is open). Desktop mirror
    *  of the mobile CharacterSprite `hint`. Null/undefined = no pill. */
   hint?: string | null
+  /** Tower-view preview: when true, the entire body renders translucent
+   *  to signal "future slot the viewer hasn't unlocked yet". */
+  dimmed?: boolean
 }
 
 export const Character = memo(function Character({
   config, model, onSelect, isSelected, positionOverride,
   onDragStart, draggingSlugRef, onPoke, pokeSignal, greetingSignal, greetingText, spawnSignal, spawnGreeting, hint,
+  dimmed = false,
 }: CharacterProps) {
   const pos = positionOverride ?? config.position
 
@@ -348,7 +352,7 @@ export const Character = memo(function Character({
         pointerDownRef.current = null
       }}
     >
-      {model ?? <CharacterBody config={config} hovered={hovered || isSelected} />}
+      {model ?? <CharacterBody config={config} hovered={hovered || isSelected} dimmed={dimmed} />}
       {(() => {
         // ── Beacon trigger ──────────────────────────────────────────
         // The badge switches from a head-floating label to a wall-top

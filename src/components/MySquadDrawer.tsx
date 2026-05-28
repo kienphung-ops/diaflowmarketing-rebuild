@@ -473,51 +473,62 @@ export function MySquadDrawer({
               </button>
             </div>
 
-            <Link
-              // `?tour=1` forces the Tower Tour to open on arrival even
-              // if the user has already seen it once (the auto-open is
-              // otherwise gated by a localStorage "seen" flag). /tower
-              // reads this param and opens the 4-step tour.
-              href="/tower?tour=1"
-              onClick={onClose}
-              className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
-            >
-              <span className="text-lg leading-none shrink-0" aria-hidden>
-                🏢
-              </span>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="text-[12.5px] font-bold text-tower-cream leading-tight">
-                  Take the tower tour
-                </div>
-                <div className="text-[10.5px] text-tower-cream/55 mt-0.5">
-                  60 sec walkthrough
-                </div>
+            {/* Explore section — pushed well below the Save card with a
+                section label so the trial user reads "Save my team" as
+                the focal action and these as a softer secondary path.
+                The mt-10 + parent space-y-5 stack the gap to ~3.5rem of
+                breathing room separating focal vs explore. */}
+            <div className="mt-10 space-y-2.5">
+              <div className="text-[10px] uppercase tracking-[0.08em] font-bold text-tower-cream/45 pl-1">
+                Explore
               </div>
-              <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
-                ›
-              </span>
-            </Link>
 
-            <button
-              type="button"
-              onClick={() => setHowItWorksOpen(true)}
-              className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
-            >
-              <span className="text-lg leading-none shrink-0" aria-hidden>
-                🎁
-              </span>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="text-[12.5px] font-bold text-tower-cream leading-tight">
-                  See all 20 floor rewards
+              <Link
+                // `?tour=1` forces the Tower Tour to open on arrival even
+                // if the user has already seen it once (the auto-open is
+                // otherwise gated by a localStorage "seen" flag). /tower
+                // reads this param and opens the 4-step tour.
+                href="/tower?tour=1"
+                onClick={onClose}
+                className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
+              >
+                <span className="text-lg leading-none shrink-0" aria-hidden>
+                  🏢
+                </span>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-[12.5px] font-bold text-tower-cream leading-tight">
+                    Take the tower tour
+                  </div>
+                  <div className="text-[10.5px] text-tower-cream/55 mt-0.5">
+                    60 sec walkthrough
+                  </div>
                 </div>
-                <div className="text-[10.5px] text-tower-cream/55 mt-0.5">
-                  Free beta at Floor 3
+                <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
+                  ›
+                </span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setHowItWorksOpen(true)}
+                className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
+              >
+                <span className="text-lg leading-none shrink-0" aria-hidden>
+                  🎁
+                </span>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-[12.5px] font-bold text-tower-cream leading-tight">
+                    See all 20 floor rewards
+                  </div>
+                  <div className="text-[10.5px] text-tower-cream/55 mt-0.5">
+                    Free beta at Floor 3
+                  </div>
                 </div>
-              </div>
-              <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
-                ›
-              </span>
-            </button>
+                <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
+                  ›
+                </span>
+              </button>
+            </div>
           </>
         )}
 
@@ -648,6 +659,25 @@ export function MySquadDrawer({
                 : '👑 Top floor'}
             </span>
           </div>
+          {/* Personal invite URL — text-field display with a small copy
+              affordance to the right. Shown above the X/LinkedIn/Copy
+              row so the user can both READ the link and quick-copy
+              without going through a network share. */}
+          {inviteUrl && (
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex-1 min-w-0 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-[12px] text-tower-cream/75 font-mono truncate">
+                {inviteUrl.replace(/^https?:\/\//, '')}
+              </div>
+              <button
+                onClick={handleCopy}
+                aria-label="Copy invite link"
+                title={copied ? 'Copied' : 'Copy link'}
+                className="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-md bg-night-deep/80 border border-white/10 text-tower-cream/80 hover:text-tower-cream hover:border-white/20 transition"
+              >
+                {copied ? <span aria-hidden>✓</span> : <LinkIcon />}
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => handleShare('x')}
@@ -689,47 +719,39 @@ export function MySquadDrawer({
         </div>
         )}
 
-        {/* Quick actions — 2-column card grid (Section 2, screen 9).
-            Hidden pre-login. */}
-        {referralCode && (
-        <div className={`grid gap-2 ${onArrangeRoom ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <button
-            type="button"
-            onClick={() => setHowItWorksOpen(true)}
-            className="flex flex-col items-center justify-center gap-1 px-3 py-3.5 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
-          >
-            <span className="text-base leading-none" aria-hidden>ⓘ</span>
-            <span className="text-[12px] font-semibold">How it works</span>
-          </button>
-          {onArrangeRoom && (
-            <button
-              type="button"
-              onClick={onArrangeRoom}
-              className="flex flex-col items-center justify-center gap-1 px-3 py-3.5 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
+        {/* Quick actions (How it works / Arrange room) + Discord CTA
+            for SIGNED-IN users now live in the pinned footer at the
+            drawer bottom — see the footer block right after this
+            scroll container. Only trial / pre-login users get an
+            inline Discord card below so they retain a community
+            fallback when the post-login quick-actions are absent. */}
+        {!referralCode && (
+          <div className="text-center">
+            {/* Pre-login: rendered as a plain hyperlink (icon + underlined
+                text) instead of the solid Discord-blue button used post-
+                login. Trial users don't have a saved account yet, so the
+                drawer's focal CTA is "Save my team" — Discord stays
+                quietly available as a community fallback link. */}
+            <a
+              href={DISCORD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[#a5b4fc] hover:text-[#c7d2fe] underline-offset-2 hover:underline text-sm font-medium transition"
             >
-              <span className="text-base leading-none" aria-hidden>🪄</span>
-              <span className="text-[12px] font-semibold">Arrange room</span>
-            </button>
-          )}
-        </div>
+              <svg
+                width="16"
+                height="12"
+                viewBox="0 0 71 55"
+                fill="currentColor"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden
+              >
+                <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.44077 45.4204 0.52529C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.52529C25.5141 0.44336 25.4218 0.40110 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C7.41596 50.7066 14.2196 53.9330 20.8952 56.0834C20.9876 56.1127 21.0857 56.0806 21.1445 56.0074C22.7586 53.8321 24.2017 51.5327 25.4414 49.1156C25.5026 48.9988 25.4442 48.8594 25.3183 48.8143C23.0568 47.9498 20.9009 46.9023 18.8254 45.7017C18.6864 45.6195 18.6752 45.4225 18.8030 45.3260C19.2317 45.0054 19.6605 44.6733 20.0701 44.3383C20.1347 44.2844 20.2243 44.2731 20.2998 44.3073C32.3202 49.7978 45.4020 49.7978 57.2796 44.3073C57.3551 44.2703 57.4447 44.2816 57.5121 44.3355C57.9217 44.6705 58.3505 45.0054 58.7820 45.3260C58.9098 45.4225 58.9014 45.6195 58.7624 45.7017C56.6869 46.9247 54.5310 47.9498 52.2667 48.8115C52.1408 48.8566 52.0852 48.9988 52.1464 49.1156C53.4085 51.5299 54.8516 53.8265 56.4349 56.0046C56.4937 56.0806 56.5946 56.1127 56.6870 56.0834C63.3933 53.9330 70.1970 50.7066 77.2272 45.5576C77.2804 45.5182 77.3140 45.4590 77.3196 45.3942C78.8187 30.0731 74.8719 16.7700 67.0575 4.9823C67.0380 4.9429 67.0044 4.9147 66.9624 4.8978ZM25.7628 37.2926C22.2211 37.2926 19.3038 34.0454 19.3038 30.0645C19.3038 26.0836 22.1648 22.8364 25.7628 22.8364C29.3889 22.8364 32.2779 26.1120 32.2218 30.0645C32.2218 34.0454 29.3608 37.2926 25.7628 37.2926ZM45.3311 37.2926C41.7895 37.2926 38.8721 34.0454 38.8721 30.0645C38.8721 26.0836 41.7331 22.8364 45.3311 22.8364C48.9573 22.8364 51.8462 26.1120 51.7901 30.0645C51.7901 34.0454 48.9573 37.2926 45.3311 37.2926Z" />
+              </svg>
+              <span className="underline">Join us on Discord</span>
+            </a>
+          </div>
         )}
-
-        {/* Discord CTA — sits inline directly under the quick-actions
-            grid (Section 2, screen 9), not pinned to the drawer footer.
-            Shown for BOTH pre- and post-login, so the trial user has
-            a community fallback even when the floor/share/quick-action
-            block above is hidden. */}
-        <a
-          href={DISCORD_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold transition"
-        >
-          <svg width="18" height="14" viewBox="0 0 71 55" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-            <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.44077 45.4204 0.52529C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.52529C25.5141 0.44336 25.4218 0.40110 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C7.41596 50.7066 14.2196 53.9330 20.8952 56.0834C20.9876 56.1127 21.0857 56.0806 21.1445 56.0074C22.7586 53.8321 24.2017 51.5327 25.4414 49.1156C25.5026 48.9988 25.4442 48.8594 25.3183 48.8143C23.0568 47.9498 20.9009 46.9023 18.8254 45.7017C18.6864 45.6195 18.6752 45.4225 18.8030 45.3260C19.2317 45.0054 19.6605 44.6733 20.0701 44.3383C20.1347 44.2844 20.2243 44.2731 20.2998 44.3073C32.3202 49.7978 45.4020 49.7978 57.2796 44.3073C57.3551 44.2703 57.4447 44.2816 57.5121 44.3355C57.9217 44.6705 58.3505 45.0054 58.7820 45.3260C58.9098 45.4225 58.9014 45.6195 58.7624 45.7017C56.6869 46.9247 54.5310 47.9498 52.2667 48.8115C52.1408 48.8566 52.0852 48.9988 52.1464 49.1156C53.4085 51.5299 54.8516 53.8265 56.4349 56.0046C56.4937 56.0806 56.5946 56.1127 56.6870 56.0834C63.3933 53.9330 70.1970 50.7066 77.2272 45.5576C77.2804 45.5182 77.3140 45.4590 77.3196 45.3942C78.8187 30.0731 74.8719 16.7700 67.0575 4.9823C67.0380 4.9429 67.0044 4.9147 66.9624 4.8978ZM25.7628 37.2926C22.2211 37.2926 19.3038 34.0454 19.3038 30.0645C19.3038 26.0836 22.1648 22.8364 25.7628 22.8364C29.3889 22.8364 32.2779 26.1120 32.2218 30.0645C32.2218 34.0454 29.3608 37.2926 25.7628 37.2926ZM45.3311 37.2926C41.7895 37.2926 38.8721 34.0454 38.8721 30.0645C38.8721 26.0836 41.7331 22.8364 45.3311 22.8364C48.9573 22.8364 51.8462 26.1120 51.7901 30.0645C51.7901 34.0454 48.9573 37.2926 45.3311 37.2926Z" />
-          </svg>
-          Join us on Discord
-        </a>
 
         {/* Invited-by card — moved down from the top per user
             feedback. Only renders when the server sealed an inviter
@@ -766,6 +788,47 @@ export function MySquadDrawer({
           </div>
         )} */}
       </div>
+
+      {/* Signed-in footer — pinned to the bottom of the drawer.
+          Holds the two quick-action cards (How it works / Arrange your
+          room) and the Discord CTA so they're always reachable without
+          scrolling, mirroring the new mockup. Hidden for trial users
+          (their inline Discord card lives inside the scroll above). */}
+      {referralCode && (
+        <div className="shrink-0 border-t border-white/10 bg-night-mid/95 px-6 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2.5">
+          <div className={`grid gap-2 ${onArrangeRoom ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <button
+              type="button"
+              onClick={() => setHowItWorksOpen(true)}
+              className="flex items-center justify-center gap-1 px-3 py-3 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
+            >
+              <span className="text-base leading-none" aria-hidden>ⓘ</span>
+              <span className="text-[12px] font-semibold">How it works</span>
+            </button>
+            {onArrangeRoom && (
+              <button
+                type="button"
+                onClick={onArrangeRoom}
+                className="flex items-center justify-center gap-1 px-3 py-3 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
+              >
+                <span className="text-base leading-none" aria-hidden>🪄</span>
+                <span className="text-[12px] font-semibold">Arrange your room</span>
+              </button>
+            )}
+          </div>
+          <a
+            href={DISCORD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold transition"
+          >
+            <svg width="18" height="14" viewBox="0 0 71 55" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+              <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.44077 45.4204 0.52529C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.52529C25.5141 0.44336 25.4218 0.40110 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C7.41596 50.7066 14.2196 53.9330 20.8952 56.0834C20.9876 56.1127 21.0857 56.0806 21.1445 56.0074C22.7586 53.8321 24.2017 51.5327 25.4414 49.1156C25.5026 48.9988 25.4442 48.8594 25.3183 48.8143C23.0568 47.9498 20.9009 46.9023 18.8254 45.7017C18.6864 45.6195 18.6752 45.4225 18.8030 45.3260C19.2317 45.0054 19.6605 44.6733 20.0701 44.3383C20.1347 44.2844 20.2243 44.2731 20.2998 44.3073C32.3202 49.7978 45.4020 49.7978 57.2796 44.3073C57.3551 44.2703 57.4447 44.2816 57.5121 44.3355C57.9217 44.6705 58.3505 45.0054 58.7820 45.3260C58.9098 45.4225 58.9014 45.6195 58.7624 45.7017C56.6869 46.9247 54.5310 47.9498 52.2667 48.8115C52.1408 48.8566 52.0852 48.9988 52.1464 49.1156C53.4085 51.5299 54.8516 53.8265 56.4349 56.0046C56.4937 56.0806 56.5946 56.1127 56.6870 56.0834C63.3933 53.9330 70.1970 50.7066 77.2272 45.5576C77.2804 45.5182 77.3140 45.4590 77.3196 45.3942C78.8187 30.0731 74.8719 16.7700 67.0575 4.9823C67.0380 4.9429 67.0044 4.9147 66.9624 4.8978ZM25.7628 37.2926C22.2211 37.2926 19.3038 34.0454 19.3038 30.0645C19.3038 26.0836 22.1648 22.8364 25.7628 22.8364C29.3889 22.8364 32.2779 26.1120 32.2218 30.0645C32.2218 34.0454 29.3608 37.2926 25.7628 37.2926ZM45.3311 37.2926C41.7895 37.2926 38.8721 34.0454 38.8721 30.0645C38.8721 26.0836 41.7331 22.8364 45.3311 22.8364C48.9573 22.8364 51.8462 26.1120 51.7901 30.0645C51.7901 34.0454 48.9573 37.2926 45.3311 37.2926Z" />
+            </svg>
+            Join us on Discord
+          </a>
+        </div>
+      )}
 
       <HowItWorksModal
         open={howItWorksOpen}

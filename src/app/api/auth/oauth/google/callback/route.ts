@@ -130,7 +130,11 @@ export async function GET(req: NextRequest) {
     }
 
     const jwt = await createSessionJwt(userId)
-    const res = NextResponse.redirect(new URL('/', req.nextUrl.origin))
+    // New accounts land back home with `?just_signed_up=1` so the
+    // SaveSuccessModal pops up. Existing-user logins skip the param so
+    // they don't see a congrats popup every sign-in.
+    const redirectUrl = new URL(isNew ? '/?just_signed_up=1' : '/', req.nextUrl.origin)
+    const res = NextResponse.redirect(redirectUrl)
     attachSessionCookie(res, jwt)
     // Burn the state cookie now that we've consumed it.
     res.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', { path: '/', maxAge: 0 })
