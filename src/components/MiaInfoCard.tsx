@@ -68,9 +68,15 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
   // Only follow the live character position on desktop. On mobile
   // we render as a bottom sheet — the rAF transform loop would just
   // fight the sheet anchor, so we skip it entirely there.
+  // `flipEdge` flips the card to Mia's LEFT if her right side would
+  // clip the viewport (covers cases where she wanders near the right
+  // wall) and clamps vertically on overflow. The hook owns the full
+  // placement under this mode — no static `translate(...)` on the
+  // inner card.
   const isDesktop = useIsDesktop()
   const anchorRef = useAnchorPosition(
     open && isDesktop ? anchorSlug ?? null : null,
+    { flipEdge: true, vCenter: true, gap: 28 },
   )
   const anchored = !!anchorSlug && isDesktop
 
@@ -147,14 +153,9 @@ export function MiaInfoCard({ open, onClose, recommendedRole, reason, loading, a
               ? 'md:pointer-events-auto md:w-[min(420px,calc(100vw-32px))] md:max-w-md'
               : 'md:max-w-md md:mx-auto')
           }
-          style={
-            anchored
-              ? // Same offset trick used by the other anchored pop-ups:
-                // shift the card's left edge to sit beside the
-                // character + lift the vertical centre to head height.
-                { transform: 'translate(28px, -50%)' }
-              : undefined
-          }
+          // No static transform — `flipEdge` on useAnchorPosition
+          // owns the full placement (gap + vertical centre + edge
+          // flip when the right side would clip).
         >
         {/* Mobile sheet grip — hidden on desktop. */}
         <div className="md:hidden flex justify-center -mt-1 mb-3" aria-hidden>

@@ -69,6 +69,10 @@ interface Props {
   /** Tower-view ghosting — see OfficeScene props. */
   solidTeammateCount?: number
   ghostItemKeys?: ReadonlySet<string>
+  /** Slugs to freeze (skip in the auto-wander pick). TowerLanding
+   *  passes the set of slugs whose bubble / info / edit modal is
+   *  currently open so those characters stop drifting mid-interaction. */
+  lockedSlugs?: ReadonlySet<string>
 }
 
 export function SceneCanvas(props: Props) {

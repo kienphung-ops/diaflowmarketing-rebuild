@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SpinWheel, type WheelWedge } from './SpinWheel'
+import { SpinWheel, type SpinWheelHandle, type WheelWedge } from './SpinWheel'
 import {
   SHARE_DWELL_SECONDS,
   SPIN_CREDIT_CAP_CENTS,
@@ -111,9 +111,14 @@ export function SpinModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Wheel control
-  const [spinToken, setSpinToken] = useState(0)
-  const [wheelTarget, setWheelTarget] = useState<Wedge | null>(null)
+  // Wheel control — imperative handle drives startSpin / lockTo / reset
+  // directly. We previously held `spinToken` + `wheelTarget` as React
+  // state and let SpinWheel diff them, but under React 18 batching the
+  // two props would land in the same commit on a fast-API path and the
+  // wheel skipped the free-spin phase entirely. The imperative API
+  // makes the ordering deterministic: startSpin() runs synchronously on
+  // click, lockTo() runs later when the API response lands.
+  const wheelRef = useRef<SpinWheelHandle>(null)
   // The full server-decided sequence (1 or 2 outcomes for a spin_again
   // chain). `seqIdx` tracks which one the wheel is currently resolving.
   const seqRef = useRef<SpinOutcome[]>([])
@@ -183,14 +188,11 @@ export function SpinModal({
     setShownOutcome(null)
     setAnonResult(null)
     // Reset the wheel so a fresh open never replays the prior spin's
-    // animation. Without this, `spinToken` from the previous session
-    // sits in state at e.g. 2 while SpinWheel's `prevToken.current`
-    // remounts at 0 — the diff makes SpinWheel re-animate to the
-    // last `wheelTarget`. Wiping both here (plus the seq refs)
-    // makes the next open render the wheel idle, exactly as the user
-    // expects after closing a settled spin.
-    setWheelTarget(null)
-    setSpinToken(0)
+    // animation. The imperative API guarantees the wheel sits idle at
+    // 0deg until the user clicks SPIN (SpinWheel is also unmounted by
+    // `if (!open) return null`, so the ref starts fresh each open —
+    // this call is belt-and-suspenders for HMR / fast re-open).
+    wheelRef.current?.reset()
     setRespinFlash(false)
     seqRef.current = []
     seqIdxRef.current = 0
@@ -230,14 +232,17 @@ export function SpinModal({
     if (loading || phase === 'spinning') return
     setError(null)
     setLoading(true)
-    // OPTIMISTIC: flip the UI to the spinning state IMMEDIATELY so the
-    // SPIN button label changes to "Spinning…" the moment the user
-    // clicks — no waiting on the API roundtrip. The actual wheel
-    // animation still waits for the server-returned target (we can't
-    // animate to a wedge without knowing which one), but the button
-    // change gives instant "I clicked, system is processing" feedback
-    // and hides most of the perceived latency.
+    // OPTIMISTIC: flip phase + START THE WHEEL IMMEDIATELY in free-spin
+    // mode (no target yet). The wheel rotates at a steady fast pace
+    // while the API call is in flight; once the server returns the
+    // chosen wedge we call `lockTo(wedge)` and the wheel brakes into
+    // that wedge. Hides API latency completely from the user — no
+    // more "click, wait, then wheel finally spins" gap on flaky
+    // connections. The imperative call here runs synchronously before
+    // the await, so the rAF loop is already pushing the wheel forward
+    // by the time the network request leaves the browser.
     setPhase('spinning')
+    wheelRef.current?.startSpin()
     try {
       const r = await fetch('/api/spin', { method: 'POST' })
       const j = await r.json().catch(() => ({}))
@@ -264,10 +269,10 @@ export function SpinModal({
       onStateChange?.({ tokens: j.tokens, creditCents: j.creditCents })
       seqRef.current = results
       seqIdxRef.current = 0
-      // Phase is already 'spinning' (set above) — now provide the
-      // target + bump spinToken so SpinWheel actually starts animating.
-      setWheelTarget(results[0].wedge)
-      setSpinToken(t => t + 1)
+      // Engage the brake — the rAF loop transitions from constant
+      // free-spin speed to cubic-ease-out into the target wedge with
+      // matched initial velocity (no visible discontinuity).
+      wheelRef.current?.lockTo(results[0].wedge)
     } catch {
       setError('Network error — try again')
       setLoading(false)
@@ -282,6 +287,11 @@ export function SpinModal({
     if (loading || phase === 'spinning') return
     setError(null)
     setLoading(true)
+    // Same optimistic flow as the auth spin — wheel starts free-spinning
+    // immediately, brakes onto the server-returned wedge when the
+    // /api/spin/anon response arrives.
+    setPhase('spinning')
+    wheelRef.current?.startSpin()
     try {
       const r = await fetch('/api/spin/anon', {
         method: 'POST',
@@ -296,6 +306,7 @@ export function SpinModal({
           setPhase('result')
         } else {
           setError(j.error ?? 'Spin failed')
+          setPhase('idle')
         }
         setLoading(false)
         return
@@ -304,12 +315,13 @@ export function SpinModal({
       seqRef.current = [{ ...result, isRespin: false, capped: false }]
       seqIdxRef.current = 0
       setAnonResult({ ...result, isRespin: false, capped: false })
-      setPhase('spinning')
-      setWheelTarget(result.wedge)
-      setSpinToken(t => t + 1)
+      // Wheel is already free-spinning — engaging the brake here
+      // transitions the rAF loop from constant-speed to ease-out.
+      wheelRef.current?.lockTo(result.wedge)
     } catch {
       setError('Network error — try again')
       setLoading(false)
+      setPhase('idle')
     }
   }, [loading, phase, teammateCount])
 
@@ -380,8 +392,11 @@ export function SpinModal({
     setRespinFlash(false)
     seqIdxRef.current = idx + 1
     setPhase('spinning')
-    setWheelTarget(next.wedge)
-    setSpinToken(t => t + 1)
+    // We already know the target wedge (server pre-resolved both
+    // outcomes), so we go straight into the lock animation from the
+    // wheel's current resting angle. The 4-turns-min brake gives the
+    // user a satisfying spin even though there's no free phase.
+    wheelRef.current?.lockTo(next.wedge)
   }, [])
 
   // ── Daily claim ───────────────────────────────────────────────────
@@ -497,8 +512,7 @@ export function SpinModal({
         <div className="flex flex-col items-center shrink-0">
           <div className="relative">
             <SpinWheel
-              spinToken={spinToken}
-              target={wheelTarget}
+              ref={wheelRef}
               onLanded={handleLanded}
               wedges={wedges}
               size={260}

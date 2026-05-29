@@ -31,10 +31,14 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
   // Only bind the live-anchor ref on desktop — on mobile we render
   // as a bottom sheet anchored to the viewport, not to the
   // character, so the transform-per-frame loop would just fight the
-  // sheet's position.
+  // sheet's position. `flipEdge` flips the card to the character's
+  // LEFT when the right side would clip the viewport (common when
+  // a teammate is dragged near the right wall) and clamps vertically
+  // on overflow. The hook owns the full placement under this mode.
   const isDesktop = useIsDesktop()
   const anchorRef = useAnchorPosition(
     open && isDesktop ? anchorSlug ?? null : null,
+    { flipEdge: true, vCenter: true, gap: 28 },
   )
   const anchored = !!anchorSlug && isDesktop
   const [name, setName] = useState('')
@@ -121,7 +125,8 @@ export function TeammateEditModal({ open, teammate, onClose, onSave, onDelete, o
             ? 'md:pointer-events-auto md:w-[min(360px,calc(100vw-32px))] md:max-w-sm'
             : 'md:max-w-sm md:mx-auto')
         }
-        style={anchored ? { transform: 'translate(28px, -50%)' } : undefined}
+        // No static transform — `flipEdge` on useAnchorPosition owns
+        // the full placement (gap + vertical centre + edge flip).
       >
         {/* Mobile sheet grip */}
         <div className="md:hidden flex justify-center -mt-1 mb-3" aria-hidden>

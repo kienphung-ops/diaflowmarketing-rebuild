@@ -95,6 +95,12 @@ interface Props {
   /** Item keys to ghost regardless of the floor's unlocked state.
    *  Mirrors FloorItems' `ghostItemKeys`. */
   ghostItemKeys?: ReadonlySet<string>
+  /** Slugs to exclude from the auto-wander pick. Used by TowerLanding
+   *  to freeze a teammate while the user has an info/edit bubble open
+   *  next to them — without this, the bubble's character-anchored
+   *  position keeps drifting mid-conversation. Accepts ANY character
+   *  slug (`'iris'|'mia'|'leo'|'recruited-N'`). */
+  lockedSlugs?: ReadonlySet<string>
 }
 
 const FLOOR_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -211,6 +217,7 @@ export function OfficeScene({
   spinTeaser = false,
   solidTeammateCount,
   ghostItemKeys,
+  lockedSlugs,
 }: Props) {
   // `unlockedItemKeys` is no longer consumed here — FloorItems reads
   // its config straight from /api/floors via useFloorItems. Kept on
@@ -412,6 +419,18 @@ export function OfficeScene({
   // onboarding (Iris/Mia/Leo are pinned to scripted positions for the
   // narrative). The character being actively dragged by the user is
   // also excluded so the auto-pick doesn't fight the cursor.
+  //
+  // `lockedSlugs` (from TowerLanding) holds any slug whose bubble /
+  // info / edit card is currently open — that character must stay
+  // still so the anchored card doesn't drift mid-conversation. Read
+  // via a ref so the live lock set is consulted on each tick without
+  // having to tear down the interval whenever the user opens/closes a
+  // bubble.
+  const lockedSlugsRef = useRef<ReadonlySet<string> | undefined>(lockedSlugs)
+  useEffect(() => {
+    lockedSlugsRef.current = lockedSlugs
+  }, [lockedSlugs])
+
   useEffect(() => {
     if (readonly) return
     if (isOnboarding) return
@@ -427,9 +446,15 @@ export function OfficeScene({
         pool.push(`recruited-${i}`)
       }
       // Drop the currently-dragged slug (if any) so the cursor doesn't
-      // fight an autonomous nudge mid-drag.
+      // fight an autonomous nudge mid-drag. ALSO drop any slug the
+      // parent has marked as locked (open bubble / edit modal / NPC
+      // info card) so the anchored card doesn't keep chasing a
+      // wandering target.
       const dragSlug = dragSlugRef.current
-      const eligible = dragSlug ? pool.filter(s => s !== dragSlug) : pool
+      const locked = lockedSlugsRef.current
+      const eligible = pool.filter(
+        s => s !== dragSlug && !(locked && locked.has(s)),
+      )
       if (eligible.length === 0) return
 
       const slug = eligible[Math.floor(Math.random() * eligible.length)]

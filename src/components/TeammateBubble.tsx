@@ -61,9 +61,15 @@ export function TeammateBubble({ open, teammate, anchorSlug, bodyColor, hairColo
   // Anchor to the live character position ONLY on desktop. On
   // mobile we render as a bottom sheet, where a per-frame transform
   // would just fight the sheet's bottom-anchored position.
+  // `flipEdge` makes the hook flip the card to the character's
+  // LEFT when the right side would clip the viewport (common when
+  // a teammate stands near the right wall) and vertically clamp on
+  // overflow. The hook OWNS the placement here — the inner card
+  // must not add its own static `translate(...)` offset.
   const isDesktop = useIsDesktop()
   const anchorRef = useAnchorPosition(
     open && isDesktop ? anchorSlug ?? null : null,
+    { flipEdge: true, vCenter: true, gap: 28 },
   )
   const anchored = !!anchorSlug && isDesktop
 
@@ -205,13 +211,9 @@ export function TeammateBubble({ open, teammate, anchorSlug, bodyColor, hairColo
         <div
           onClick={e => e.stopPropagation()}
           className="pointer-events-auto w-[min(280px,calc(100vw-32px))] bg-night-mid border border-white/10 rounded-2xl shadow-2xl text-tower-cream"
-          style={
-            anchored
-              ? // Offset so the bubble sits just to the right of the
-                // character's head, vertically centred on the head's y.
-                { transform: 'translate(28px, -50%)' }
-              : undefined
-          }
+          // No static transform here — the anchor hook's `flipEdge`
+          // mode owns the full placement (gap + vertical centre +
+          // edge flip on tight viewports).
         >
           {cardBody}
         </div>

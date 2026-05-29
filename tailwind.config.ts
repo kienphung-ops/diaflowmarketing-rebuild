@@ -76,6 +76,18 @@ const config: Config = {
           '30%':  { opacity: '1', transform: 'translate(-50%, -22px) scale(1)' },
           '100%': { opacity: '0', transform: 'translate(-50%, -64px) scale(0.95)' },
         },
+        // Continuous wheel spin during the API-roundtrip "free" phase.
+        // Single 0→360° rotation per iteration with infinite repeat
+        // keeps the browser's animation pipeline interpolating real
+        // angles (not the short-path matrix decomposition you get when
+        // a CSS transition sees `rotate(0)` and `rotate(43200deg)` as
+        // identical matrices and barely moves). The wheel takes the
+        // explicit angle interpolation between keyframes, so it
+        // visually rotates at a smooth 2 turns / sec.
+        'wheel-freespin': {
+          'from': { transform: 'rotate(0deg)' },
+          'to':   { transform: 'rotate(360deg)' },
+        },
       },
       animation: {
         'onboarding-pop':     'onboarding-pop 240ms cubic-bezier(0.16, 1, 0.3, 1)',
@@ -86,6 +98,7 @@ const config: Config = {
         'nav-arrow-bounce':   'nav-arrow-bounce 1s ease-in-out infinite',
         'credit-bump':        'credit-bump 900ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         'credit-rise':        'credit-rise 3000ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
+        'wheel-freespin':     'wheel-freespin 500ms linear infinite',
       },
     },
   },

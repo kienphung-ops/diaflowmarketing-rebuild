@@ -103,13 +103,16 @@ function ModalShell({
           (anchored
             ? // Anchored desktop card — fixed comfortable width beside
               // the character. Re-enable pointer events the wrapper
-              // dropped so the card stays interactive.
+              // dropped so the card stays interactive. `wide` is sized
+              // generously so an embedded YouTube iframe (16:9) reads
+              // as a real watch-this-now affordance instead of a
+              // postage-stamp preview.
               'md:pointer-events-auto ' +
               (wide
-                ? 'md:w-[min(520px,calc(100vw-32px))] '
+                ? 'md:w-[min(720px,calc(100vw-32px))] '
                 : 'md:w-[min(420px,calc(100vw-32px))] ')
             : // Centered fallback.
-              (wide ? 'md:max-w-2xl md:mx-auto ' : 'md:max-w-md md:mx-auto '))
+              (wide ? 'md:max-w-3xl md:mx-auto ' : 'md:max-w-md md:mx-auto '))
         }
         style={{
           boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
@@ -535,18 +538,26 @@ interface LeoProps {
 }
 
 export function LeoBubble({ onContinue }: LeoProps) {
-  // Resolve YouTube URL from env. Embed URL is the only flavour needed
-  // now — the "Watch on YouTube" link was removed per the Section 1 /
-  // step 4 mockup (the inline play button covers the same path).
-  const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL)
+  // Resolve YouTube embed URL from the BARE VIDEO ID in env. The
+  // "Watch on YouTube" link was removed per the Section 1 / step 4
+  // mockup, so only the embed flavour is consumed here. Parameter
+  // set comes from `requirements/youtube_frame_rule.md` — see
+  // `lib/youtubeUrl.ts`.
+  const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_ID)
 
   return (
     <ModalShell onClose={onContinue} wide step={4} anchorSlug="leo">
       <div>
         {/* Embedded YouTube iframe driven by NEXT_PUBLIC_YOUTUBE_URL.
             16:9 aspect ratio + purple glow underneath so the video
-            doesn't look pasted onto the dark surface. */}
-        <div className="relative mb-4">
+            doesn't look pasted onto the dark surface.
+            On mobile we bleed past the ModalShell's px-6 side padding
+            (`-mx-6`) so the video stretches edge-to-edge of the
+            bottom sheet — a phone-sized 16:9 needs every pixel of
+            horizontal space to feel like a real watch surface.
+            Desktop keeps the inset because the modal is already wide
+            enough that the video looks generous without bleeding. */}
+        <div className="relative -mx-6 md:mx-0 mb-4">
           <div
             aria-hidden
             className="absolute -inset-2 rounded-2xl opacity-50 blur-2xl"
@@ -555,11 +566,22 @@ export function LeoBubble({ onContinue }: LeoProps) {
                 'radial-gradient(circle at 50% 70%, rgba(168,117,255,0.35), transparent 65%)',
             }}
           />
-          <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-video bg-black">
+          <div className="relative rounded-none md:rounded-xl overflow-hidden border border-white/10 aspect-video bg-black">
+            {/* iframe attributes mirror the canonical embed template
+                in `requirements/youtube_frame_rule.md`:
+                  - `allow` includes `autoplay` so the embed can honour
+                    a user-initiated play gesture without re-prompting
+                  - `referrerPolicy="strict-origin-when-cross-origin"`
+                    matches what YouTube's official embed code ships
+                The embed URL itself already carries the
+                clean-embed parameter set (controls=0, rel=0,
+                iv_load_policy=3, modestbranding=1, disablekb=1) — see
+                `lib/youtubeUrl.ts`. */}
             <iframe
               src={video.embed}
-              title="Diaflow intro"
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               className="w-full h-full"
             />

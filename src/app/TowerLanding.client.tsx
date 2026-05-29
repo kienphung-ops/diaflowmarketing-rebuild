@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/Header'
@@ -442,6 +442,19 @@ export default function TowerLanding(props: Props) {
   // Threaded into MiaInfoCard so clicking Mia mid-backfill shows the
   // loading spinner instead of the stale default skills list.
   const [signedInBackfillLoading, setSignedInBackfillLoading] = useState(false)
+  // Live recommendation that the backfill effect writes when its
+  // /api/job-summary response lands. `props.serverRecommendedRole` and
+  // `props.serverReason` are snapshots from the initial RSC render and
+  // can't refresh without a page reload — `liveRecommendation` lets us
+  // light up the Mia bubble + downstream UI the moment the backfill
+  // succeeds, without waiting for the user to navigate.
+  const [liveRecommendation, setLiveRecommendation] = useState<{
+    recommendedRole: string | null
+    reason: string | null
+  }>({
+    recommendedRole: props.serverRecommendedRole ?? null,
+    reason: props.serverReason ?? null,
+  })
 
   // Signed-in backfill — when the user has a `teamPurpose` (job text)
   // on file but no Diaflow-derived `recommendedRole` / `reason`, fire
@@ -461,10 +474,24 @@ export default function TowerLanding(props: Props) {
       body: JSON.stringify({ job: props.serverTeamPurpose }),
       signal: ac.signal,
     })
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: { success?: boolean; recommendedRole?: string; reason?: string } | null) => {
+        // Mirror the result into `liveRecommendation` so the Mia bubble
+        // re-renders with the personalised copy immediately. The route
+        // ALSO persisted it to User.recommendedRole/User.reason server-
+        // side, so subsequent page loads pick it up from props — this
+        // state is just bridging the gap until that reload.
+        if (data?.success && data.recommendedRole && data.reason) {
+          setLiveRecommendation({
+            recommendedRole: data.recommendedRole,
+            reason: data.reason,
+          })
+        }
+      })
       .catch(err => {
         // Silent — the backfill is best-effort. Next mount will retry.
         if ((err as Error).name !== 'AbortError') {
-          /* swallow */
+          console.warn('[job-summary backfill] failed:', err)
         }
       })
       .finally(() => {
@@ -702,6 +729,17 @@ export default function TowerLanding(props: Props) {
           const latest = readTrialState() ?? advanced
           persist({
             ...latest,
+            recommendedRole: data.recommendedRole,
+            reason: data.reason,
+          })
+          // Also mirror into `liveRecommendation` so the signed-in
+          // path renders the new values immediately if this Mia
+          // submit was kicked off by a signed-in flow (e.g. handled
+          // by the same route that ALSO persists to User). For pure
+          // anon users `trial.recommendedRole` above is what the
+          // bubble reads, but updating both keeps the two surfaces
+          // in lockstep regardless of session state.
+          setLiveRecommendation({
             recommendedRole: data.recommendedRole,
             reason: data.reason,
           })
@@ -1116,6 +1154,34 @@ export default function TowerLanding(props: Props) {
     ? recruits.find(r => r.slug === 'mia')?.role ?? null
     : trial.recommendedRole
 
+  // ─── Wander lock set ─────────────────────────────────────────────
+  // Slugs of characters that currently have a bubble / edit modal /
+  // NPC info card open above them. Threaded into the 3D scene so the
+  // auto-wander loop SKIPS these characters — without this, the
+  // anchored card chases a wandering target every 5 s and the user
+  // can't read the bubble.
+  //
+  // Each source maps to a single slug:
+  //   - bubbleTeammate  → `recruited-{idx}` (TeammateBubble; only
+  //                       custom recruits get this state)
+  //   - editingTeammate → `recruited-{idx}` (TeammateEditModal)
+  //   - activeNpcModal  → 'mia' | 'leo' (MiaInfoCard / LeoEmailDrawer)
+  //   - irisModalOpen   → 'iris' (IrisHireModal)
+  const wanderLockedSlugs = useMemo(() => {
+    const set = new Set<string>()
+    if (bubbleTeammate) {
+      const idx = customRecruits.findIndex(r => r.id === bubbleTeammate.id)
+      if (idx >= 0) set.add(`recruited-${idx}`)
+    }
+    if (editingTeammate) {
+      const idx = customRecruits.findIndex(r => r.id === editingTeammate.id)
+      if (idx >= 0) set.add(`recruited-${idx}`)
+    }
+    if (activeNpcModal) set.add(activeNpcModal)
+    if (irisModalOpen) set.add('iris')
+    return set
+  }, [bubbleTeammate, editingTeammate, activeNpcModal, irisModalOpen, customRecruits])
+
   // ─── Owner's own floor stats — feed the MySquad "Your floor" pill.
   // `observe` mode polls /api/floor/[code]/visitors WITHOUT registering
   // the owner as a visitor of themselves, so they get a clean count
@@ -1239,6 +1305,12 @@ export default function TowerLanding(props: Props) {
           // new minifigure pops "Hi, I'm <name>!" above its head.
           recruitGreetSignals={recruitGreetSignals}
           resetSignal={resetSignal}
+          // Freeze any teammate whose bubble / info / edit card is
+          // currently open — OfficeScene's wander loop skips these
+          // slugs so the anchored card doesn't chase a wandering
+          // target. Desktop only (mobile uses the 2D scene which has
+          // no wander behaviour).
+          lockedSlugs={wanderLockedSlugs}
           // Spin arcade — in-room interactive object (front lounge).
           onArcadeClick={handleArcadeClick}
           spinTokens={spinTokens}
@@ -1596,9 +1668,14 @@ export default function TowerLanding(props: Props) {
         onClose={() => setActiveNpcModal(null)}
         anchorSlug="mia"
         recommendedRole={
-          props.signedIn ? props.serverRecommendedRole : trial.recommendedRole
+          // Signed-in: prefer `liveRecommendation` (updated by the
+          // backfill effect on response landing) over the stale RSC
+          // prop. Trial: read from localStorage-backed trial state.
+          props.signedIn ? liveRecommendation.recommendedRole : trial.recommendedRole
         }
-        reason={props.signedIn ? props.serverReason : trial.reason}
+        reason={
+          props.signedIn ? liveRecommendation.reason : trial.reason
+        }
         // True while either the trial-onboarding job-summary call OR
         // the signed-in backfill is in flight — the modal swaps to a
         // spinner so clicking Mia mid-call shows progress instead of

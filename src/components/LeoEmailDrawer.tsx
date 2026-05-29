@@ -31,15 +31,25 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
   // Anchor follows the character ONLY on desktop. On mobile we
   // render as a bottom sheet — the per-frame transform loop would
   // just fight the sheet's bottom-edge position.
+  // Edge-aware mode (`flipEdge`): when the character is near the
+  // right viewport edge (Leo in particular spawns at the right side
+  // of the room), the hook flips the card to the LEFT of the
+  // character so it never clips off-screen. `vCenter` aligns the
+  // card vertically on the character's head. With these on, the
+  // hook OWNS the placement — the inner card must NOT add its own
+  // static `translate(...)` offset (otherwise the two transforms
+  // stack and the card drifts off the character).
   const isDesktop = useIsDesktop()
   const anchorRef = useAnchorPosition(
     open && isDesktop ? anchorSlug ?? null : null,
+    { flipEdge: true, vCenter: true, gap: 28 },
   )
   const anchored = !!anchorSlug && isDesktop
   // Same env-driven helper LeoBubble uses — keeps the two Leo modals
-  // in sync. Falls back to the canonical Diaflow intro when
-  // NEXT_PUBLIC_YOUTUBE_URL isn't set (see lib/youtubeUrl).
-  const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_URL)
+  // in sync. Reads the BARE VIDEO ID from NEXT_PUBLIC_YOUTUBE_ID and
+  // falls back to the canonical Diaflow intro when the env is blank
+  // (see lib/youtubeUrl).
+  const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_ID)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -95,13 +105,19 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
             'relative bg-night-mid border-t border-tower-gold/30 text-tower-cream shadow-2xl ' +
             'rounded-t-3xl md:rounded-2xl md:border md:border-tower-gold/30 ' +
             'pt-3 px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:p-6 ' +
+            // Sized generously on desktop so the embedded YouTube
+            // iframe (16:9) reads as a real watch-this affordance
+            // rather than a postage-stamp preview. ~720 px anchored
+            // beside Leo, max-w-3xl when fallback-centered.
             (anchored
-              ? 'md:pointer-events-auto md:w-[min(520px,calc(100vw-32px))] md:max-w-xl'
-              : 'md:max-w-xl md:mx-auto')
+              ? 'md:pointer-events-auto md:w-[min(720px,calc(100vw-32px))] md:max-w-3xl'
+              : 'md:max-w-3xl md:mx-auto')
           }
-          style={anchored ? { transform: 'translate(28px, -50%)' } : undefined}
         >
-        {/* Mobile sheet grip — hidden on desktop. */}
+        {/* `flipEdge` mode on the anchor hook owns the full
+            placement (gap + vertical centre + edge flip); the inner
+            card MUST NOT add its own offset transform here.
+            Mobile sheet grip — hidden on desktop. */}
         <div className="md:hidden flex justify-center -mt-1 mb-3" aria-hidden>
           <div className="w-9 h-1 rounded-full bg-white/20" />
         </div>
@@ -130,11 +146,21 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
           <h2 className="text-2xl font-bold mt-1">Hi, I&apos;m Leo 👋</h2>
         </div>
 
-        <div className="mb-4 rounded-md overflow-hidden border border-white/10 aspect-video bg-black">
+        {/* Bleed past the card's px-6 side padding on mobile so the
+            video fills the bottom-sheet width. Desktop keeps the
+            inset — the modal is already wide enough that the video
+            reads as large without bleeding. */}
+        <div className="-mx-6 md:mx-0 mb-4 rounded-none md:rounded-md overflow-hidden border border-white/10 aspect-video bg-black">
+          {/* iframe attributes mirror `requirements/youtube_frame_rule.md`
+              — `autoplay` in `allow`, `referrerPolicy` to match
+              YouTube's canonical embed code. The clean-embed query
+              params (controls / rel / iv_load_policy / modestbranding /
+              disablekb) live on `video.embed` from lib/youtubeUrl. */}
           <iframe
             src={video.embed}
-            title="Diaflow Tower intro"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            title="YouTube video player"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
             className="w-full h-full"
           />

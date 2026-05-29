@@ -328,11 +328,6 @@ export function MySquadDrawer({
             ✓ You&apos;re in — we&apos;ll email you on launch day
           </div>
         )}
-        {emailVerified === true && (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-            ✓ Email verified
-          </div>
-        )}
 
         {/* Standalone "Visiting <name>" pill was here previously. It
             was removed so /floor/[code] MySquad mirrors /office +

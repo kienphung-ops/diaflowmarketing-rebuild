@@ -80,9 +80,15 @@ export function IrisHireModal({
   // Live character-anchor only on desktop. On mobile we render as a
   // bottom sheet, where the per-frame transform would just fight the
   // sheet's bottom-edge position.
+  // `flipEdge` is defensive here — Iris usually sits at the LEFT
+  // edge of the room so the default right-side placement is fine,
+  // but if she ever wanders close to the right wall the hook flips
+  // the card to her left instead of clipping off-screen. Vertical
+  // centring + clamping prevent overflow on short viewports.
   const isDesktop = useIsDesktop()
   const anchorRef = useAnchorPosition(
     open && isDesktop ? anchorSlug ?? null : null,
+    { flipEdge: true, vCenter: true, gap: 28 },
   )
   const anchored = !!anchorSlug && isDesktop
   // "Next floor" copy — defaults to currentFloor+1; at the penthouse
@@ -179,13 +185,9 @@ export function IrisHireModal({
             'pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-0 ' +
             (anchored ? 'md:pointer-events-auto' : 'md:mx-auto')
           }
-          style={
-            anchored
-              ? // Same translate-(28px, -50%) trick used by the other
-                // anchored pop-ups so the card sits beside the head.
-                { transform: 'translate(28px, -50%)' }
-              : undefined
-          }
+          // No static transform — `flipEdge` on useAnchorPosition
+          // owns the full placement (gap + vertical centre + edge
+          // flip on tight viewports).
         >
         {/* Mobile sheet grip — hidden on desktop. */}
         <div className="md:hidden flex justify-center pt-2.5 pb-1" aria-hidden>

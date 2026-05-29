@@ -173,6 +173,15 @@ model RecruitedTeammate {
 // `description` stores the API output verbatim (already trimmed). The
 // only consumer is /api/recruit + /api/recruit/[id], which read the
 // row to populate RecruitedTeammate.description.
+// RoleDescription — per-role cache for the "what this teammate will
+// do" sentence returned by the Diaflow process API. The Primary key
+// is the LOWERCASED role string so capitalisation variants ("CEO" vs
+// "ceo" vs "Ceo") all hit the same row — bulk adds with mixed casing
+// shouldn't billed for duplicate API calls.
+//
+// `description` stores the API output verbatim (already trimmed). The
+// only consumer is /api/recruit + /api/recruit/[id], which read the
+// row to populate RecruitedTeammate.description.
 model RoleDescription {
   role        String   @id
   displayRole String   @map("display_role")

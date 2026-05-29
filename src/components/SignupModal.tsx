@@ -76,6 +76,16 @@ export function SignupModal({ onClose }: Props) {
         typeof window !== 'undefined'
           ? window.localStorage.getItem('diaflow_pending_ref') ?? undefined
           : undefined
+      // Re-read trial state AT SUBMIT TIME, not at modal mount. The
+      // `trial` variable above is a useMemo snapshot from when the
+      // modal first opened — if the Mia onboarding's `/api/job-summary`
+      // call landed AFTER the modal opened, that snapshot still has
+      // `recommendedRole: null` even though localStorage has the
+      // fresh value. Reading here picks up whatever finished between
+      // mount and submit, so User.recommendedRole gets persisted on
+      // signup instead of relying on the post-signup backfill effect.
+      const latestTrial =
+        typeof window !== 'undefined' ? readTrialState() : trial
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -83,13 +93,13 @@ export function SignupModal({ onClose }: Props) {
           email: email.trim(),
           password,
           ref,
-          trialTeamName: trial?.teamName ?? undefined,
-          trialTeamPurpose: trial?.teamPurpose ?? undefined,
+          trialTeamName: latestTrial?.teamName ?? undefined,
+          trialTeamPurpose: latestTrial?.teamPurpose ?? undefined,
           // Carry the Diaflow role recommendation across signup so the
           // new account inherits the personalised copy and doesn't
           // need to re-call the upstream on first load.
-          trialRecommendedRole: trial?.recommendedRole ?? undefined,
-          trialReason: trial?.reason ?? undefined,
+          trialRecommendedRole: latestTrial?.recommendedRole ?? undefined,
+          trialReason: latestTrial?.reason ?? undefined,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -125,15 +135,23 @@ export function SignupModal({ onClose }: Props) {
       typeof window !== 'undefined'
         ? window.localStorage.getItem('diaflow_pending_ref') ?? ''
         : ''
+    // Re-read trial state at click time — the modal's `trial` useMemo
+    // snapshot is taken at mount, but the user may have clicked Google
+    // before the Mia onboarding's job-summary API call resolved.
+    // Reading here picks up the latest localStorage values so the
+    // recommendedRole + reason actually survive the round-trip.
+    const latestTrial =
+      typeof window !== 'undefined' ? readTrialState() : trial
     const params = new URLSearchParams()
     if (ref) params.set('ref', ref)
     // Pass the trial fields as query params — the start route then
     // bakes them into the OAuth `state` cookie so they survive the
     // round-trip to Google.
-    if (trial?.teamName) params.set('teamName', trial.teamName)
-    if (trial?.teamPurpose) params.set('teamPurpose', trial.teamPurpose)
-    if (trial?.recommendedRole) params.set('recommendedRole', trial.recommendedRole)
-    if (trial?.reason) params.set('reason', trial.reason)
+    if (latestTrial?.teamName) params.set('teamName', latestTrial.teamName)
+    if (latestTrial?.teamPurpose) params.set('teamPurpose', latestTrial.teamPurpose)
+    if (latestTrial?.recommendedRole)
+      params.set('recommendedRole', latestTrial.recommendedRole)
+    if (latestTrial?.reason) params.set('reason', latestTrial.reason)
     const qs = params.toString()
     window.location.href = `/api/auth/oauth/google${qs ? `?${qs}` : ''}`
   }
