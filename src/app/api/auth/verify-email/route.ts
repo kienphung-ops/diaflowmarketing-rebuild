@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashOtpForEmail, readSession } from '@/lib/auth'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 export const runtime = 'nodejs'
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   const token = await prisma.authToken.findFirst({
     where: {
       userId: session.userId,
-      type: 'EMAIL_VERIFY',
+      type: TOKEN_TYPES.EMAIL_VERIFY,
       tokenHash,
       usedAt: null,
     },

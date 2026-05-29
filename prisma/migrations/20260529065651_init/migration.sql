@@ -1,6 +1,3 @@
--- CreateEnum
-CREATE TYPE "TokenType" AS ENUM ('MAGIC_LINK', 'OTP', 'EMAIL_VERIFY', 'PASSWORD_RESET');
-
 -- CreateTable
 CREATE TABLE "email_captures" (
     "id" SERIAL NOT NULL,
@@ -47,7 +44,7 @@ CREATE TABLE "users" (
 CREATE TABLE "auth_tokens" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
-    "type" "TokenType" NOT NULL,
+    "type" TEXT NOT NULL,
     "token_hash" TEXT NOT NULL,
     "expires_at" TIMESTAMP(3) NOT NULL,
     "used_at" TIMESTAMP(3),

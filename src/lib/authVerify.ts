@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { computeFloorForInvites } from '@/lib/floors'
 import { hashOtpForEmail, hashToken } from '@/lib/auth'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
-import type { TokenType } from '@prisma/client'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 export interface VerifyResult {
   userId: string
@@ -58,9 +58,9 @@ async function processReferralIfAny(userId: string, email: string): Promise<void
   await invalidateLeaderboard(inviter.id, userId)
 }
 
-export async function consumeAuthToken(rawToken: string, type: TokenType, emailHint?: string): Promise<VerifyResult> {
+export async function consumeAuthToken(rawToken: string, type: TOKEN_TYPES, emailHint?: string): Promise<VerifyResult> {
   const tokenHash =
-    type === 'OTP' && emailHint
+    type === TOKEN_TYPES.OTP && emailHint
       ? hashOtpForEmail(emailHint, rawToken)
       : hashToken(rawToken)
 

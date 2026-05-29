@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateMagicLinkToken } from '@/lib/auth'
 import { trackKlaviyoEvent, KlaviyoEvent, KlaviyoEventType } from '@/lib/klaviyo'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 export const runtime = 'nodejs'
 
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     // Invalidate older PASSWORD_RESET tokens for this user — only one
     // active reset link at a time.
     await prisma.authToken.updateMany({
-      where: { userId: user.id, type: 'PASSWORD_RESET', usedAt: null },
+      where: { userId: user.id, type: TOKEN_TYPES.PASSWORD_RESET, usedAt: null },
       data: { usedAt: new Date() },
     })
 
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
     await prisma.authToken.create({
       data: {
         userId: user.id,
-        type: 'PASSWORD_RESET',
+        type: TOKEN_TYPES.PASSWORD_RESET,
         tokenHash: link.hash,
         expiresAt,
       },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { attachSessionCookie, createSessionJwt } from '@/lib/auth'
 import { AuthVerifyError, consumeAuthToken } from '@/lib/authVerify'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Code must be 6 digits' }, { status: 400 })
     }
 
-    const result = await consumeAuthToken(code, 'OTP', email)
+    const result = await consumeAuthToken(code, TOKEN_TYPES.OTP, email)
     const jwt = await createSessionJwt(result.userId)
     const res = NextResponse.json({ success: true })
     attachSessionCookie(res, jwt)

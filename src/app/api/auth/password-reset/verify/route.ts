@@ -17,6 +17,7 @@ import {
   createSessionJwt,
   hashToken,
 } from '@/lib/auth'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 export const runtime = 'nodejs'
 
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
       include: { user: true },
     })
 
-    if (!tokenRow || tokenRow.type !== 'PASSWORD_RESET') {
+    if (!tokenRow || tokenRow.type !== TOKEN_TYPES.PASSWORD_RESET) {
       return NextResponse.json({ error: 'Invalid reset link' }, { status: 400 })
     }
     if (tokenRow.usedAt) {

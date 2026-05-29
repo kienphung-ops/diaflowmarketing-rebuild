@@ -8,6 +8,7 @@ import {
   TOKEN_TTL_MINUTES,
 } from '@/lib/auth'
 import { sendAuthEmail } from '@/lib/email'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 function getClientIp(req: NextRequest): string | undefined {
   const xff = req.headers.get('x-forwarded-for')
@@ -119,8 +120,8 @@ export async function POST(req: NextRequest) {
 
     await prisma.authToken.createMany({
       data: [
-        { userId: user.id, type: 'MAGIC_LINK', tokenHash: magic.hash, expiresAt, ipAddress: ip },
-        { userId: user.id, type: 'OTP', tokenHash: otpHash, expiresAt, ipAddress: ip },
+        { userId: user.id, type: TOKEN_TYPES.MAGIC_LINK, tokenHash: magic.hash, expiresAt, ipAddress: ip },
+        { userId: user.id, type: TOKEN_TYPES.OTP, tokenHash: otpHash, expiresAt, ipAddress: ip },
       ],
     })
 

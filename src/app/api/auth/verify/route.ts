@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { attachSessionCookie, createSessionJwt } from '@/lib/auth'
 import { AuthVerifyError, consumeAuthToken } from '@/lib/authVerify'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url)
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await consumeAuthToken(token, 'MAGIC_LINK')
+    const result = await consumeAuthToken(token, TOKEN_TYPES.MAGIC_LINK)
     const jwt = await createSessionJwt(result.userId)
     const res = NextResponse.redirect(`${appUrl}/?auth=ok`)
     attachSessionCookie(res, jwt)

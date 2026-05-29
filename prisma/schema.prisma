@@ -70,7 +70,7 @@ model AuthToken {
   id        String    @id @default(cuid())
   userId    String    @map("user_id")
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      TokenType
+  type      String
   tokenHash String    @unique @map("token_hash")
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
@@ -79,13 +79,6 @@ model AuthToken {
 
   @@index([userId, type])
   @@map("auth_tokens")
-}
-
-enum TokenType {
-  MAGIC_LINK
-  OTP
-  EMAIL_VERIFY
-  PASSWORD_RESET
 }
 
 model InviteEvent {

@@ -19,6 +19,7 @@ import {
   TOKEN_TTL_MINUTES,
 } from '@/lib/auth'
 import { trackKlaviyoEvent, KlaviyoEvent, KlaviyoEventType } from '@/lib/klaviyo'
+import { TOKEN_TYPES } from '@/lib/authToken'
 
 export const runtime = 'nodejs'
 
@@ -51,14 +52,14 @@ export async function POST() {
   // Invalidate any previous unused EMAIL_VERIFY tokens for this user
   // (so an old code can't compete with the new one).
   await prisma.authToken.updateMany({
-    where: { userId: session.userId, type: 'EMAIL_VERIFY', usedAt: null },
+    where: { userId: session.userId, type: TOKEN_TYPES.EMAIL_VERIFY, usedAt: null },
     data: { usedAt: new Date() },
   })
 
   await prisma.authToken.create({
     data: {
       userId: session.userId,
-      type: 'EMAIL_VERIFY',
+      type: TOKEN_TYPES.EMAIL_VERIFY,
       tokenHash,
       expiresAt,
     },
