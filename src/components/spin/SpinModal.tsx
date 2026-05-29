@@ -8,6 +8,7 @@ import {
   formatCents,
   type Wedge,
 } from '@/lib/spin/constants'
+import { buildShareUrl } from '@/lib/spin/useFirstShareSpin'
 
 // ── Wedge def — DB row threaded through the spin API response ───────
 // Kept loose (string fields) on the client so admins can add new wedge
@@ -417,12 +418,16 @@ export function SpinModal({
   const runShareTask = useCallback(
     (task: TaskState) => {
       if (!inviteUrl || pendingTask) return
-      const text = `I'm building my AI dream team on Diaflow Tower. Join me 👉`
-      const shareUrl =
-        task.platform === 'linkedin'
-          ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`
-          : `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(inviteUrl)}`
-      window.open(shareUrl, '_blank', 'noopener,noreferrer,width=600,height=640')
+      // X copy mirrors `useFirstShareSpin`'s default — keeps every
+      // share surface on the same marketing line. The URL itself is
+      // built via the canonical `buildShareUrl` helper so SpinModal,
+      // MySquadDrawer, ShareModal and MobileShareSheet all hit
+      // `x.com/intent/tweet` (NOT `twitter.com/intent/tweet`, which
+      // redirects through x.com/i/flow/login and frequently lands
+      // the popup at a login wall instead of the compose screen).
+      const xText = "I'm building my AI dream team on Diaflow Tower. Join me 👉"
+      const shareUrl = buildShareUrl(task.platform, inviteUrl, xText)
+      window.open(shareUrl, '_blank', 'noopener,noreferrer,width=620,height=620')
       setPendingTask(task.key)
       // Honor-system dwell: after SHARE_DWELL_SECONDS, claim the spin.
       setTimeout(async () => {

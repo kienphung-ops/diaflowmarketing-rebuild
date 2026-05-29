@@ -54,15 +54,30 @@ interface Result {
   pending: SharePlatform | null
 }
 
-function buildShareUrl(platform: SharePlatform, inviteUrl: string, xText: string): string {
+/**
+ * Canonical share-intent URL builder — exported so EVERY share
+ * surface in the app (MySquadDrawer, ShareModal, MobileShareSheet,
+ * SpinModal) funnels through the same domain + parameter shape.
+ *
+ * Why this matters for X: `twitter.com/intent/tweet` still resolves
+ * but Twitter / X redirects it via `x.com/i/flow/login?...` which
+ * sometimes opens a login wall instead of the compose screen in
+ * popups. `x.com/intent/tweet` skips the redirect and lands the
+ * compose dialog directly — same outcome on every browser.
+ *
+ * LinkedIn's share-offsite intent only takes `url`; title +
+ * description come from the page's OG tags.
+ *
+ * Matches the marketing copy spec in `requirements/share-btn.md`.
+ */
+export function buildShareUrl(
+  platform: SharePlatform,
+  inviteUrl: string,
+  xText: string,
+): string {
   if (platform === 'x') {
-    // url is passed as a separate param so X auto-shortens and
-    // tracks the link cleanly. Hashtag stays inline per the
-    // marketing copy in requirements/share-btn.md.
     return `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encodeURIComponent(inviteUrl)}&hashtags=DiaflowTower`
   }
-  // LinkedIn's share-offsite intent only takes `url` — title +
-  // description come from the page's OG tags.
   return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`
 }
 
