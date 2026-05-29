@@ -15,6 +15,20 @@ body {
   background: #0a0e27;
   color: #f5f0e6;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* `touch-action: manipulation` disables the browser's double-tap-
+     to-zoom gesture while keeping pinch-zoom, scrolling, and normal
+     taps untouched. Belt-and-suspenders with the layout.tsx
+     `viewport.userScalable=false`: the meta tag blocks ALL zoom
+     reliably on modern browsers, this CSS line is the fallback for
+     edge cases where the meta tag is ignored. Without it, double-
+     tapping a button on mobile zoomed the page 200%, stranding the
+     bottom-nav / Tower / SPIN affordances off-screen. */
+  touch-action: manipulation;
+  /* Kill the 300ms tap-delay flash that some Android browsers paint
+     over the tapped element while they wait to disambiguate a
+     potential double-tap. With double-tap-zoom disabled there's
+     nothing to wait for. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 canvas {

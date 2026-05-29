@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { headers } from 'next/headers'
 import './globals.css'
 import { GoogleAnalytics } from '@/components/GoogleAnalytics'
@@ -40,6 +40,29 @@ async function resolveSiteUrl(): Promise<URL> {
 const SITE_NAME = 'Diaflow Tower'
 const SITE_DESCRIPTION = 'Build your AI office. Invite friends to climb the tower.'
 const OG_IMAGE = '/diaflow-logo.jpg'
+
+/**
+ * Viewport — disables user scaling so mobile browsers can't double-tap
+ * zoom or pinch the canvas-based scene. Default Next.js viewport
+ * (`width=device-width, initial-scale=1`) allowed BOTH zoom paths,
+ * and the double-tap-to-zoom behaviour caused buttons + bottom nav
+ * to scroll off-screen and stranded users on the zoomed view (no
+ * obvious way back). The Tower is a game-style fixed-layout UI
+ * (3D scene on desktop, 2D scene on mobile, both `fixed inset-0`
+ * with their own pan / drag affordances), so user zoom isn't a
+ * feature we're losing — we're just stopping a misfire.
+ *
+ * `maximumScale: 1` is the cross-browser belt; `userScalable: false`
+ * is the suspenders for older iOS Safari that ignored maximumScale
+ * unless userScalable was ALSO set. Both together cover every
+ * mobile browser we ship to.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
 
 // `generateMetadata` (instead of a static `metadata` export) so we
 // can `await resolveSiteUrl()` — reading the incoming request's host

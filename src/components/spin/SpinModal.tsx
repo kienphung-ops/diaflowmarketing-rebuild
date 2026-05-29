@@ -585,34 +585,32 @@ export function SpinModal({
                         : 'No spins left'}
               </button>
               {mode === 'auth' && (
-                // Two-line balance block — small uppercase label
-                // ("AI Teammate Credit") above the running total so
-                // the user sees what the number represents at a
-                // glance, not just a bare "Balance N / M" line. The
-                // value half mirrors the screenshot: gold credit
-                // earned, muted "of $cap" suffix. `relative` keeps
-                // the floating "+$X" reward indicator anchored to
-                // this block.
+                // Inline credit display: "AI Teammate Credit: $X"
+                // with the value highlighted in gold. The "OF $50"
+                // cap suffix is suppressed UNTIL the user has hit
+                // the cap — until then the running total is the
+                // headline, undistracted by the ceiling. Once they
+                // top out we render a second muted line so they
+                // see *why* the wheel stops accumulating. `relative`
+                // keeps the floating "+$X" reward indicator anchored
+                // to this block.
                 <div className="mt-3 text-center relative">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-tower-cream/55">
-                    AI Teammate Credit
-                  </div>
-                  <div className="mt-0.5 text-[15px] font-extrabold tabular-nums leading-tight">
+                  <div className="leading-tight">
+                    <span className="text-[11px] uppercase tracking-[0.12em] font-bold text-tower-cream/55">
+                      AI Teammate Credit:
+                    </span>{' '}
                     <span
                       className={
-                        'inline-block text-tower-gold origin-center ' +
+                        'inline-block text-tower-gold tabular-nums font-extrabold text-[14px] origin-center ' +
                         (creditFlash ? 'animate-credit-bump' : '')
                       }
                     >
                       {formatCents(state?.creditCents ?? 0)}
                     </span>
-                    <span className="text-tower-cream/55 font-semibold">
-                      {' '}of {formatCents(SPIN_CREDIT_CAP_CENTS)}
-                    </span>
                   </div>
                   {state?.capReached && (
-                    <div className="mt-0.5 text-[10px] text-emerald-300 font-semibold">
-                      cap reached
+                    <div className="mt-0.5 text-[11px] uppercase tracking-[0.12em] font-bold text-tower-cream/55 tabular-nums">
+                      OF {formatCents(SPIN_CREDIT_CAP_CENTS)}
                     </div>
                   )}
                   {/* Floating "+$X" reward indicator. Anchored above
@@ -663,70 +661,103 @@ export function SpinModal({
               '[scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]'
             }
           >
-            {/* ── Recurring ────────────────────────────────────────
-                Tasks that pay out repeatedly — daily reset + the
-                unlimited-uses referral. Split out from the one-time
-                section so users can see the "always-available" earn
-                paths at a glance. */}
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tower-cream/55 mb-2">
-              Recurring
-            </h3>
-
-            <EarnRow
-              icon="📅"
-              title="Daily spin"
-              subtitle={
-                state.daily.available
-                  ? 'Claim your free spin for today'
-                  : 'Come back tomorrow for another'
+            {/* ── Earn paths ───────────────────────────────────────
+                One flat list — daily spin, referral, one-time social
+                tasks. No category headings; rows are sorted so
+                uncompleted earn paths float to the top of the list
+                while completed ones stick to the bottom (visible so
+                progress reads, but not blocking the user's eye from
+                the next thing they CAN do). Stable sort: original
+                array order is preserved within each "done" bucket. */}
+            {(() => {
+              interface EarnRowDef {
+                key: string
+                icon: string
+                title: string
+                subtitle: string
+                actionLabel: string
+                done: boolean
+                disabled?: boolean
+                onAction?: () => void
               }
-              actionLabel={state.daily.available ? 'Claim +1' : 'Claimed'}
-              done={!state.daily.available}
-              onAction={state.daily.available ? claimDaily : undefined}
-            />
-
-            {/* "Refer a friend" opens the share-link modal (ShareModal /
-                MobileShareSheet), NOT the signup modal — auth-mode
-                users already have an account; we just need to surface
-                their invite URL + the social share buttons. */}
-            <EarnRow
-              icon="👥"
-              title="Refer a friend"
-              subtitle="+1 spin per successful signup · unlimited"
-              actionLabel="Invite"
-              done={false}
-              onAction={onOpenShare}
-            />
-
-            {/* ── One-time tasks ──────────────────────────────────
-                Tasks that pay out at most ONCE per user (server-
-                enforced via the TaskCompletion unique constraint).
-                The "(N of M available)" caption counts the ones the
-                user hasn't completed yet — clearer than just
-                listing the rows without a progress hint. */}
-            {state.tasks.length > 0 && (
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tower-cream/55 mt-4 mb-2">
-                One-time tasks{' '}
-                <span className="text-tower-cream/35 font-bold normal-case tracking-normal">
-                  ({state.tasks.filter(t => !t.completed).length} of {state.tasks.length} available)
-                </span>
-              </h3>
-            )}
-
-            {state.tasks.map(task => (
-              <EarnRow
-                key={task.key}
-                icon={task.platform === 'linkedin' ? 'in' : '𝕏'}
-                title={task.label}
-                subtitle={task.completed ? 'Completed' : '+1 spin · one-time only'}
-                actionLabel={
-                  task.completed ? 'Done' : pendingTask === task.key ? 'Waiting…' : 'Share'
-                }
-                done={task.completed}
-                disabled={!inviteUrl || !!pendingTask}
-                onAction={!task.completed ? () => runShareTask(task) : undefined}
-              />
-            ))}
+              const rows: EarnRowDef[] = [
+                {
+                  key: 'daily',
+                  icon: '📅',
+                  title: 'Daily spin',
+                  subtitle: state.daily.available
+                    ? 'Claim your free spin for today'
+                    : 'Come back tomorrow for another',
+                  actionLabel: state.daily.available ? 'Claim +1' : 'Claimed',
+                  done: !state.daily.available,
+                  onAction: state.daily.available ? claimDaily : undefined,
+                },
+                {
+                  // Referral opens the share-link modal (NOT the
+                  // signup modal — auth-mode users already have an
+                  // account). Always treated as `done: false` so it
+                  // stays in the actionable bucket above completed
+                  // one-time tasks.
+                  key: 'refer',
+                  icon: '👥',
+                  title: 'Refer a friend',
+                  subtitle: '+1 spin per successful signup · unlimited',
+                  actionLabel: 'Invite',
+                  done: false,
+                  onAction: onOpenShare,
+                },
+                ...state.tasks.map<EarnRowDef>(task => ({
+                  key: `task-${task.key}`,
+                  icon: task.platform === 'linkedin' ? 'in' : '𝕏',
+                  title: task.label,
+                  subtitle: task.completed
+                    ? 'Completed'
+                    : '+1 spin · one-time only',
+                  actionLabel: task.completed
+                    ? 'Done'
+                    : pendingTask === task.key
+                      ? 'Waiting…'
+                      : 'Share',
+                  done: task.completed,
+                  disabled: !inviteUrl || !!pendingTask,
+                  onAction: !task.completed
+                    ? () => runShareTask(task)
+                    : undefined,
+                })),
+              ]
+              // Sort priority — two-level stable sort:
+              //   1. Daily spin ALWAYS pinned at the top, regardless
+              //      of `done`. It's the recurring earn path the user
+              //      should see / claim first every session, so the
+              //      "Claim +1" button (or the muted "Claimed" pill
+              //      after they grab it) sits at row 0 every time.
+              //   2. Among the other rows (refer + one-time tasks),
+              //      uncompleted (done=false) above completed
+              //      (done=true). Same stable-bucket idea as before
+              //      so original array order is preserved inside
+              //      each "done" bucket.
+              // `Array.prototype.sort` is required to be stable in
+              // V8 ≥ 7.0 / Node 12+, so the priority-key collapse
+              // keeps within-bucket order deterministic.
+              rows.sort((a, b) => {
+                const dailyA = a.key === 'daily' ? 0 : 1
+                const dailyB = b.key === 'daily' ? 0 : 1
+                if (dailyA !== dailyB) return dailyA - dailyB
+                return Number(a.done) - Number(b.done)
+              })
+              return rows.map(row => (
+                <EarnRow
+                  key={row.key}
+                  icon={row.icon}
+                  title={row.title}
+                  subtitle={row.subtitle}
+                  actionLabel={row.actionLabel}
+                  done={row.done}
+                  disabled={row.disabled}
+                  onAction={row.onAction}
+                />
+              ))
+            })()}
           </div>
         )}
       </div>
@@ -758,24 +789,11 @@ function ResultPanel({
   tokens: number
 }) {
   const isJackpot = outcome.wedge === 'jackpot'
-  const won = outcome.cashCents > 0
-  // Face value = the wedge's full cents BEFORE the cap; falls back to
-  // the realised credit if the def is gone (no cap info lost — the
-  // outcome already encodes "added" + "capped").
   const faceValue = wedgeDef?.type === 'credit' ? wedgeDef.amount : outcome.cashCents
 
   return (
     <div className="w-full text-center">
-      <div className={'text-4xl mb-1 ' + (isJackpot ? 'animate-bounce' : '')}>
-        {isJackpot ? '🎉' : won ? '✨' : '🎁'}
-      </div>
-      {/* Anon teaser users get a fuller sentence ("You won $X Credit")
-          so the reward reads as a tangible thing they've earned, not
-          a bare delta. Auth mode skips the ResultPanel entirely now,
-          but if it ever re-enters this branch we keep the legacy
-          "+$X" delta form so the chained-spin / jackpot accumulator
-          still reads clearly. */}
-      <div className="text-2xl font-extrabold text-tower-gold">
+      <div className="text-xl font-extrabold text-tower-gold">
         {faceValue > 0
           ? mode === 'anon'
             ? `You won ${formatCents(faceValue)} Credit`
