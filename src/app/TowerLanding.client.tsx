@@ -1041,6 +1041,23 @@ export default function TowerLanding(props: Props) {
   const activeStep = isTrial ? trial.onboardingStep : 'done'
   const onboardingComplete = activeStep === 'done'
 
+  // Arcade click — gated on onboarding completion. The arcade stays
+  // visible during onboarding (it's part of the scene), but tapping it
+  // before the user finishes Iris → Mia → Leo nudges them back to the
+  // onboarding flow with a toast instead of silently doing nothing
+  // (the previous `undefined` handler made the click feel broken).
+  const handleArcadeClick = useCallback(() => {
+    if (onboardingComplete) {
+      setSpinOpen(true)
+      return
+    }
+    pushToast({
+      title: '🎰 Complete onboarding first',
+      body: 'Finish meeting Iris, Mia, and Leo — then the spin wheel unlocks.',
+      tone: 'info',
+    })
+  }, [onboardingComplete, pushToast])
+
   // Invites needed for the next floor — used to fill in the post-Leo
   // Mia welcome bubble ("N invite to Floor M ↓"). `useFloor` falls back
   // to the static snapshot before the API responds, so the bubble
@@ -1223,7 +1240,7 @@ export default function TowerLanding(props: Props) {
           recruitGreetSignals={recruitGreetSignals}
           resetSignal={resetSignal}
           // Spin arcade — in-room interactive object (front lounge).
-          onArcadeClick={onboardingComplete ? () => setSpinOpen(true) : undefined}
+          onArcadeClick={handleArcadeClick}
           spinTokens={spinTokens}
           spinTeaser={!props.signedIn && !anonSpun}
         />
@@ -1268,7 +1285,7 @@ export default function TowerLanding(props: Props) {
         arrangeMode={arrangeMode && !isDesktop}
         onItemMove={handleItemMove2D}
         // Spin arcade — always-on interactive item (front-left corner).
-        onArcadeClick={onboardingComplete ? () => setSpinOpen(true) : undefined}
+        onArcadeClick={handleArcadeClick}
         spinTokens={spinTokens}
         spinTeaser={!props.signedIn && !anonSpun}
       />
