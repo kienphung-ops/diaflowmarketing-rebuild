@@ -189,10 +189,18 @@ export async function playSpin(userId: string): Promise<SpinPlayResult> {
   const wedges = await getSpinWedges()
 
   return prisma.$transaction(async tx => {
-    const user = await tx.user.findUnique({
-      where: { id: userId },
-      select: { spinTokens: true, spinCreditCents: true },
-    })
+    // PARALLEL READS — `findUnique` (user state) and `count` (first-spin
+    // check) are independent, so we issue them concurrently inside the
+    // transaction. On a remote DB each query is one RTT; running them
+    // serially used to add ~100-200 ms of perceived "click → wheel
+    // starts" lag for every spin.
+    const [user, priorSpinCount] = await Promise.all([
+      tx.user.findUnique({
+        where: { id: userId },
+        select: { spinTokens: true, spinCreditCents: true },
+      }),
+      tx.spinResult.count({ where: { userId } }),
+    ])
     if (!user) return { ok: false, reason: 'not_found' } as const
     if (user.spinTokens < 1) return { ok: false, reason: 'no_tokens' } as const
 
@@ -202,7 +210,6 @@ export async function playSpin(userId: string): Promise<SpinPlayResult> {
     // authenticated spins go back to default weights — which matches
     // the product intent ("favourable odds for the user's very first
     // taste of the wheel, anon or auth").
-    const priorSpinCount = await tx.spinResult.count({ where: { userId } })
     const isFirstSpin = priorSpinCount === 0
 
     const results: SpinOutcome[] = []
@@ -231,30 +238,38 @@ export async function playSpin(userId: string): Promise<SpinPlayResult> {
       results.push({ wedge: k1, cashCents: added, isRespin: false, capped })
     }
 
-    // Persist: token spend + credit gain.
-    const updated = await tx.user.update({
-      where: { id: userId },
-      data: {
-        spinTokens: { decrement: 1 },
-        spinCreditCents: running > user.spinCreditCents ? running : undefined,
-      },
-      select: { spinTokens: true, spinCreditCents: true },
-    })
-
-    // Ledger: one SpinResult per outcome; a spin_again SpinGrant for the
-    // free re-spin attribution (does NOT touch the banked balance).
-    await tx.spinResult.createMany({
-      data: results.map(o => ({
-        userId,
-        wedge: o.wedge,
-        cashCents: o.cashCents,
-        isRespin: o.isRespin,
-        capped: o.capped,
-      })),
-    })
+    // PARALLEL WRITES — the user update + ledger inserts touch different
+    // tables and don't depend on each other's results, so we fan them
+    // out concurrently. Saves another 1-2 RTTs vs. the previous
+    // serial-await chain (felt especially when the DB is remote).
+    const writes: Promise<unknown>[] = [
+      tx.user.update({
+        where: { id: userId },
+        data: {
+          spinTokens: { decrement: 1 },
+          spinCreditCents: running > user.spinCreditCents ? running : undefined,
+        },
+        select: { spinTokens: true, spinCreditCents: true },
+      }),
+      tx.spinResult.createMany({
+        data: results.map(o => ({
+          userId,
+          wedge: o.wedge,
+          cashCents: o.cashCents,
+          isRespin: o.isRespin,
+          capped: o.capped,
+        })),
+      }),
+    ]
     if (landedRespin) {
-      await tx.spinGrant.create({ data: { userId, source: 'spin_again', amount: 1 } })
+      writes.push(
+        tx.spinGrant.create({ data: { userId, source: 'spin_again', amount: 1 } }),
+      )
     }
+    const [updated] = (await Promise.all(writes)) as [
+      { spinTokens: number; spinCreditCents: number },
+      ...unknown[],
+    ]
 
     return {
       ok: true,
@@ -381,12 +396,23 @@ export async function migrateAnonSpin(
     })
     if (!user) return
     const { added, capped } = applyCap(user.spinCreditCents, anon.cashCents)
-    if (added > 0) {
-      await tx.user.update({
-        where: { id: userId },
-        data: { spinCreditCents: { increment: added } },
-      })
-    }
+    // Start the daily-spin cooldown at the moment of migration. The
+    // anon teaser IS the user's first spin of the day — without this
+    // they could sign up, claim the daily on top, and effectively
+    // double-spin every brand-new account. The 20 h `DAILY_COOLDOWN_MS`
+    // window on `lastDailySpinAt` is the same gate `claimDailySpin`
+    // checks, so a fresh user gets their next daily 20 h after
+    // signup-with-teaser instead of immediately.
+    //
+    // Always run the user.update even when `added === 0` (cap hit OR
+    // anon won spin_again only) so the cooldown lands regardless.
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        ...(added > 0 ? { spinCreditCents: { increment: added } } : {}),
+        lastDailySpinAt: new Date(),
+      },
+    })
     await tx.spinResult.create({
       data: { userId, wedge: anon.wedge, cashCents: added, capped, isRespin: false },
     })

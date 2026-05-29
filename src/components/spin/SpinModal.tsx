@@ -230,18 +230,28 @@ export function SpinModal({
     if (loading || phase === 'spinning') return
     setError(null)
     setLoading(true)
+    // OPTIMISTIC: flip the UI to the spinning state IMMEDIATELY so the
+    // SPIN button label changes to "Spinning…" the moment the user
+    // clicks — no waiting on the API roundtrip. The actual wheel
+    // animation still waits for the server-returned target (we can't
+    // animate to a wedge without knowing which one), but the button
+    // change gives instant "I clicked, system is processing" feedback
+    // and hides most of the perceived latency.
+    setPhase('spinning')
     try {
       const r = await fetch('/api/spin', { method: 'POST' })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) {
         setError(j.error ?? 'Spin failed')
         setLoading(false)
+        setPhase('idle')
         return
       }
       const results = (j.results ?? []) as SpinOutcome[]
       if (results.length === 0) {
         setError('Spin failed')
         setLoading(false)
+        setPhase('idle')
         return
       }
       // Stash the server numbers for the result panel + bubble the
@@ -254,12 +264,14 @@ export function SpinModal({
       onStateChange?.({ tokens: j.tokens, creditCents: j.creditCents })
       seqRef.current = results
       seqIdxRef.current = 0
-      setPhase('spinning')
+      // Phase is already 'spinning' (set above) — now provide the
+      // target + bump spinToken so SpinWheel actually starts animating.
       setWheelTarget(results[0].wedge)
       setSpinToken(t => t + 1)
     } catch {
       setError('Network error — try again')
       setLoading(false)
+      setPhase('idle')
     }
   }, [loading, phase])
 
