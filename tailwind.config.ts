@@ -57,6 +57,25 @@ const config: Config = {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%':      { transform: 'translateY(6px)' },
         },
+        // Spin-wheel credit increment cue — the balance text briefly
+        // pops (scale + brighter glow) when the user's credit goes up.
+        // Pairs with `credit-rise` (floating amount) to give the user
+        // a clear "your balance went up by X" without a modal popup.
+        'credit-bump': {
+          '0%':   { transform: 'scale(1)',    textShadow: '0 0 0 rgba(168, 117, 255, 0)' },
+          '30%':  { transform: 'scale(1.35)', textShadow: '0 0 18px rgba(168, 117, 255, 0.75)' },
+          '100%': { transform: 'scale(1)',    textShadow: '0 0 0 rgba(168, 117, 255, 0)' },
+        },
+        // Floating "+$X" reward indicator — rises above the balance
+        // row and fades out over 3 s. Game-style credit pop instead
+        // of the old centred sparkle panel. Fade-in fast so the
+        // number is readable, then drift up + fade slowly.
+        'credit-rise': {
+          '0%':   { opacity: '0', transform: 'translate(-50%, 6px)   scale(0.85)' },
+          '15%':  { opacity: '1', transform: 'translate(-50%, -8px)  scale(1.08)' },
+          '30%':  { opacity: '1', transform: 'translate(-50%, -22px) scale(1)' },
+          '100%': { opacity: '0', transform: 'translate(-50%, -64px) scale(0.95)' },
+        },
       },
       animation: {
         'onboarding-pop':     'onboarding-pop 240ms cubic-bezier(0.16, 1, 0.3, 1)',
@@ -65,6 +84,8 @@ const config: Config = {
         'nav-pulse':          'nav-pulse 1.6s ease-in-out infinite',
         'nav-pulse-ring':     'nav-pulse-ring 1.6s ease-out infinite',
         'nav-arrow-bounce':   'nav-arrow-bounce 1s ease-in-out infinite',
+        'credit-bump':        'credit-bump 900ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'credit-rise':        'credit-rise 3000ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
       },
     },
   },

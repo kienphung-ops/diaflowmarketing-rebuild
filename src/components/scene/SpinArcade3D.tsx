@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { ArcadeMachine } from './environment/FloorItems'
+import { ArcadeMachine, ArcadeSpinFace } from './environment/FloorItems'
 
 /** Canonical default position of the spin arcade in the 3D office. The
  *  "Arrange your room" override (key `spin_arcade_0`) takes precedence
@@ -53,8 +53,11 @@ export function SpinArcade3D({ position, tokens, teaser, onClick }: Props) {
 
   return (
     <group ref={groupRef} position={position}>
-      {/* Visual cabinet (always rendered unlocked = full opacity). */}
+      {/* Visual cabinet (always rendered unlocked = full opacity). The
+          spin-wheel face is layered on top so this cabinet reads as the
+          PRIZE machine — the plain F14 decor arcade omits this overlay. */}
       <ArcadeMachine unlocked />
+      <ArcadeSpinFace />
 
       {/* Coloured glow around the machine. */}
       <pointLight

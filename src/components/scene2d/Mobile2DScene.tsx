@@ -526,8 +526,11 @@ function Arcade2D({
   onClick: () => void
   onMove?: (uid: string, world: [number, number, number]) => void
 }) {
-  const size = SPRITE_SIZES['arcade_machine'] ?? { w: 36, h: 60 }
-  const renderer = SPRITES['arcade_machine']
+  // Uses the SPIN-branded sprite (wheel face + SPIN marquee). The
+  // plain `arcade_machine` sprite is reserved for the F14 decor
+  // cabinet so the two cabinets read as distinct in the 2D scene.
+  const size = SPRITE_SIZES['spin_arcade'] ?? { w: 36, h: 60 }
+  const renderer = SPRITES['spin_arcade']
   const active = teaser || tokens > 0
   const { xPct, yPct } = projectToScreen(worldPos)
   const pointerIdRef = useRef<number | null>(null)

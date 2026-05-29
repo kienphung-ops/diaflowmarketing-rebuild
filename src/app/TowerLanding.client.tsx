@@ -235,7 +235,17 @@ export default function TowerLanding(props: Props) {
   const sawFirstSnapshotRef = useRef(false)
 
   const pushToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
-    setToasts(prev => [...prev, { ...msg, id: `t-${Date.now()}-${Math.random()}` }])
+    // Dedup by title within a 3 s window — referrals fire BOTH the
+    // SSE `invite-accepted` event and a near-immediate snapshot on
+    // reconnect, and dev-mode HMR can also accumulate leaked
+    // EventSource listeners. Without this guard the same +1 toast
+    // shows two-or-more times.
+    setToasts(prev => {
+      const now = Date.now()
+      const dup = prev.find(t => t.title === msg.title && now - parseInt(t.id.split('-')[1] || '0', 10) < 3000)
+      if (dup) return prev
+      return [...prev, { ...msg, id: `t-${now}-${Math.random()}` }]
+    })
   }, [])
 
   const dismissToast = useCallback((id: string) => {
@@ -510,6 +520,11 @@ export default function TowerLanding(props: Props) {
   useRealtimeFloor({
     enabled: !isTrial,
     onSnapshot: data => {
+      // Sync spin tokens on EVERY snapshot (initial + reconnects). This
+      // catches the referral grant case where a friend signed up while
+      // this user's SSE stream was disconnected — the next snapshot has
+      // the bumped spinTokens and we apply it silently.
+      if (typeof data.spinTokens === 'number') setSpinTokens(data.spinTokens)
       // First snapshot of this mount = authoritative baseline. Commit
       // it silently (no celebration / no invite toast) so a stale SSR
       // floor can't masquerade as a fresh climb on every mount.
@@ -577,11 +592,22 @@ export default function TowerLanding(props: Props) {
     },
     onInviteAccepted: data => {
       setServerState(prev => ({ ...prev, totalInvites: data.totalInvites }))
+      // Referral grants +1 spin in the same signup transaction —
+      // surface it on the arcade badge + top-bar pill immediately
+      // alongside the +1 invite toast. The server payload carries the
+      // post-grant total so the client doesn't have to math it out.
+      if (typeof data.spinTokens === 'number') setSpinTokens(data.spinTokens)
       pushToast({
         title: data.delta === 1 ? '+1 invite accepted' : `+${data.delta} invites accepted`,
         body: 'A new teammate slot is waiting — add them to your squad.',
         tone: 'success',
       })
+    },
+    // Standalone token-change event — covers daily-claim / task
+    // completion from another tab, anon-spin migration, and is also a
+    // fallback if `invite-accepted` is missed (the server fires both).
+    onSpinTokens: data => {
+      setSpinTokens(data.spinTokens)
     },
   })
 
@@ -1255,10 +1281,22 @@ export default function TowerLanding(props: Props) {
         mode={props.signedIn ? 'auth' : 'anon'}
         inviteUrl={spinInviteUrl}
         teammateCount={computeTeammateCount(recruits)}
+        // Live parent token count — keeps the modal in sync when SSE
+        // delivers a token change while the modal is already open.
+        currentSpinTokens={props.signedIn ? spinTokens : undefined}
         onSaveTeam={() => {
           setSpinOpen(false)
           setShowSignupModal(true)
         }}
+        // Auth-mode "Refer a friend" CTA — opens the share-link modal
+        // ON TOP of the spin modal (no close). Spin modal stays mounted
+        // behind so the user can resume their wheel state immediately
+        // after closing the share modal. Both backdrops use z-40 and
+        // ShareModal portals to body, so its backdrop sits on top and
+        // catches dismiss clicks before they reach SpinModal.
+        onOpenShare={
+          props.signedIn ? () => setShareModalOpen(true) : undefined
+        }
         onStateChange={s => {
           setSpinTokens(s.tokens)
           if (!props.signedIn) setAnonSpun(true)

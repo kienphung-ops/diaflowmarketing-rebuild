@@ -11,8 +11,8 @@
  * size things correctly (e.g. `basic_chair_desk × 3` → render 3 desks).
  */
 
-import { NextResponse } from 'next/server'
-import { getAllFloorsConfig } from '@/lib/floorsApi'
+import { NextRequest, NextResponse } from 'next/server'
+import { getAllFloorsConfig, invalidateFloorsConfig } from '@/lib/floorsApi'
 
 export const runtime = 'nodejs'
 // `force-dynamic` skips Next.js's static-route prerender + fetch cache.
@@ -23,8 +23,15 @@ export const runtime = 'nodejs'
 // so admin DB edits showed up only after the next deploy.
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // `?refresh=1` busts the Redis + in-process cache before reading,
+    // so a manual DB edit (Prisma Studio, SQL, etc.) propagates to the
+    // UI immediately on the next page load. Without this query param
+    // the natural 60 s cache TTL covers most cases automatically.
+    if (req.nextUrl.searchParams.get('refresh') === '1') {
+      await invalidateFloorsConfig()
+    }
     const floors = await getAllFloorsConfig()
     return NextResponse.json(
       { floors },

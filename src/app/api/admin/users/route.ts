@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true,
       email: true,
-      first_email: true,
+      firstEmail: true,
       emailVerified: true,
       country: true,
       ipAddress: true,

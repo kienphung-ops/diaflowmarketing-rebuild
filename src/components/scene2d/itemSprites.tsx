@@ -49,6 +49,10 @@ export const SPRITE_SIZES: Record<string, { w: number; h: number }> = {
   couch: { w: 64, h: 36 },
   neon_sign: { w: 56, h: 22 },
   arcade_machine: { w: 36, h: 60 },
+  // Same silhouette as the plain arcade — the difference is only the
+  // wheel face the sprite renders. Sharing dimensions keeps the
+  // Arrange-room hit-boxes consistent across the two cabinets.
+  spin_arcade: { w: 36, h: 60 },
   floor_ceiling_windows: { w: 50, h: 110 },
   tea_table: { w: 38, h: 28 },
   living_wall: { w: 60, h: 60 },
@@ -266,7 +270,31 @@ export const SPRITES: Record<string, (ctx: SpriteContext) => ReactNode> = {
     </div>
   ),
 
+  // Plain F14 decor arcade — CRT screen + joystick + buttons, no spin
+  // wheel. The spin-prize cabinet uses the separate `spin_arcade`
+  // sprite below so the two don't visually collide.
   arcade_machine: () => (
+    <div className="w-full h-full relative">
+      {/* Cabinet body */}
+      <div className="absolute inset-x-0 inset-y-2 bg-[#7c3aed] rounded-sm border border-[#5a2ac0]" />
+      {/* Marquee */}
+      <div className="absolute inset-x-0 top-0 h-2 bg-[#a855f7] rounded-t-sm shadow-[0_0_8px_rgba(168,85,247,0.7)]" />
+      {/* Screen */}
+      <div className="absolute inset-x-1.5 top-3 h-1/3 bg-[#1a0030] border border-[#2a1a3a] shadow-[inset_0_0_6px_rgba(168,85,247,0.8)]" />
+      {/* Control deck */}
+      <div className="absolute inset-x-1 bottom-3 h-1.5 bg-[#3a2a1a] flex items-center justify-evenly">
+        <span className="w-1 h-1 rounded-full bg-[#d33b3b]" />
+        <span className="w-1 h-1 rounded-full bg-[#fbbf24]" />
+        <span className="w-1 h-1 rounded-full bg-[#22d3ee]" />
+      </div>
+    </div>
+  ),
+
+  // Spin-prize variant — same cabinet silhouette as `arcade_machine`
+  // but with a SPIN-branded marquee + a 7-segment prize wheel where the
+  // CRT screen would be. Rendered by Mobile2DScene's <Arcade2D>; the
+  // F14 decor item uses `arcade_machine` above.
+  spin_arcade: () => (
     <div className="w-full h-full relative">
       {/* Cabinet body */}
       <div className="absolute inset-x-0 inset-y-2 bg-[#7c3aed] rounded-sm border border-[#5a2ac0]" />

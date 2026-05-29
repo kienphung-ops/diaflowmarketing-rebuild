@@ -132,44 +132,138 @@ export default function TowerFloorViewClient({
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-[#04040d]">
-      {/* Top chrome — back button + floor stats + prev/next nav. */}
-      <header className="fixed top-0 inset-x-0 z-10 flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-2">
-          <Link
-            href="/tower"
-            className="px-2.5 md:px-3 py-1.5 rounded-md bg-night-mid/70 border border-white/10 text-tower-cream text-xs md:text-sm hover:bg-night-mid transition flex items-center gap-1.5"
-            aria-label="Back to tower"
+      {/* Top chrome — re-designed so users stop confusing the preview
+          with their own floor. The "PREVIEWING FLOOR N" pill makes it
+          unmistakable, and "Go to your office" gives a one-click escape
+          back to where they actually live.
+            Mobile: 2 rows — back/office on top, floor nav below.
+            Desktop: 1 row — back/office on the left, pill centred,
+                              floor nav on the right. */}
+      <header className="fixed top-0 inset-x-0 z-10 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
+        {/* ── Row 1 (mobile + desktop): nav buttons ─────────────── */}
+        <div className="flex items-center justify-between md:relative">
+          {/* Mobile: Back to tower sticks to the LEFT edge — paired
+              with "Go to your office" pinned to the right edge via
+              its own wrapper below. This keeps the two primary nav
+              affordances at the far corners of the row so they're
+              easy to thumb on a phone and visually distinct from
+              the floor-nav row below. Desktop keeps both buttons
+              grouped on the left (the pill takes the centre and the
+              preview buttons take the right). */}
+          <div className="pointer-events-auto flex items-center md:gap-2">
+            <Link
+              href="/tower"
+              className="px-3 py-1.5 md:py-2 rounded-md bg-night-mid border border-white/15 text-tower-cream text-xs md:text-sm font-semibold hover:bg-night-mid/80 transition whitespace-nowrap shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+              aria-label="Back to tower"
+            >
+              Back to tower
+            </Link>
+            {/* Desktop-only second button — on mobile the same link
+                renders at the right edge of the row (see sibling
+                wrapper below) so the two CTAs flank the row. */}
+            <Link
+              href="/"
+              className="hidden md:inline-flex px-3 py-1.5 md:py-2 rounded-md bg-night-mid border border-purple-400/40 text-tower-cream text-xs md:text-sm font-semibold hover:bg-night-mid/80 transition whitespace-nowrap shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+              aria-label="Go to your office"
+            >
+              Go to your office
+            </Link>
+          </div>
+
+          {/* Centre pill — DESKTOP ONLY (mobile shows the floor number
+              between the prev/next buttons on row 2). Same night-mid
+              palette as the flanking nav buttons so the chrome reads
+              as one coherent bar; the floor number itself is the only
+              accent (tower-gold) — that's what the user actually needs
+              to notice, not the pill's chrome. */}
+          <div
+            className="hidden md:flex pointer-events-auto absolute left-1/2 -translate-x-1/2 items-center gap-1.5 px-4 py-2 rounded-full bg-night-mid border border-white/15 text-tower-cream text-[13px] font-extrabold uppercase tracking-[0.06em] shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
           >
-            <span aria-hidden>←</span>
-            <span className="hidden sm:inline">Back to tower</span>
-            <span className="sm:hidden">Back</span>
+            <span aria-hidden>🔭</span>
+            <span>
+              Previewing Floor <span className="text-tower-gold">{preview.floor}</span>
+            </span>
+          </div>
+
+          {/* MOBILE-ONLY — Go to your office anchored to the row's
+              right edge. Pairs with "Back to tower" on the left so
+              the two primary actions flank the row instead of
+              huddling together. Desktop version sits in the left
+              cluster above (alongside Back to tower) since the
+              middle/right slots are occupied by the pill + preview
+              nav. */}
+          <Link
+            href="/"
+            className="md:hidden pointer-events-auto px-3 py-1.5 rounded-md bg-night-mid border border-purple-400/40 text-tower-cream text-xs font-semibold hover:bg-night-mid/80 transition whitespace-nowrap shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+            aria-label="Go to your office"
+          >
+            Go to your office
           </Link>
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-night-mid/60 border border-white/5 text-xs text-tower-cream/80">
-            <span className="text-tower-gold font-semibold">Floor {preview.floor}</span>
-            <span className="opacity-40">/</span>
-            <span>{preview.totalFloors}</span>
+
+          {/* Right cluster — DESKTOP prev/next preview buttons. Mobile
+              version lives on row 2 below. */}
+          <div className="hidden md:flex pointer-events-auto items-center gap-1.5">
+            {prevFloor && (
+              <Link
+                href={`/tower-view/${prevFloor}`}
+                className="px-3 py-1.5 rounded-md bg-night-mid/70 border border-white/10 text-tower-cream/80 text-xs font-semibold hover:bg-night-mid transition flex flex-col items-center leading-tight"
+                aria-label={`Preview Floor ${prevFloor}`}
+              >
+                <span className="text-[9px] uppercase tracking-[0.1em] text-tower-cream/45 font-bold">
+                  ← Preview
+                </span>
+                <span className="text-[13px] font-bold text-tower-cream">Floor {prevFloor}</span>
+              </Link>
+            )}
+            {nextFloor && (
+              <Link
+                href={`/tower-view/${nextFloor}`}
+                className="px-3 py-1.5 rounded-md bg-night-mid/70 border border-white/10 text-tower-cream/80 text-xs font-semibold hover:bg-night-mid transition flex flex-col items-center leading-tight"
+                aria-label={`Preview Floor ${nextFloor}`}
+              >
+                <span className="text-[9px] uppercase tracking-[0.1em] text-tower-cream/45 font-bold">
+                  Preview →
+                </span>
+                <span className="text-[13px] font-bold text-tower-cream">Floor {nextFloor}</span>
+              </Link>
+            )}
           </div>
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-1.5">
-          {prevFloor && (
-            <Link
-              href={`/tower-view/${prevFloor}`}
-              className="px-3 py-1.5 rounded-md bg-night-mid/70 border border-white/10 text-tower-cream/80 text-xs font-semibold hover:bg-night-mid transition"
-              aria-label={`Floor ${prevFloor}`}
-            >
-              ← Floor {prevFloor}
-            </Link>
-          )}
-          {nextFloor && (
-            <Link
-              href={`/tower-view/${nextFloor}`}
-              className="px-3 py-1.5 rounded-md bg-tower-gold text-night-deep text-xs font-bold shadow-[0_4px_12px_rgba(168,117,255,0.4)] hover:bg-tower-gold/90 transition"
-              aria-label={`Floor ${nextFloor}`}
-            >
-              Floor {nextFloor} →
-            </Link>
-          )}
+        {/* ── Row 2 (MOBILE ONLY): prev / current / next floor nav.
+            Equal-width 3-column grid so the "Floor X of N" centre
+            doesn't drift even when there's no prev/next link. */}
+        <div className="md:hidden mt-2 grid grid-cols-3 items-center gap-1.5 pointer-events-auto">
+          <div className="justify-self-start">
+            {prevFloor ? (
+              <Link
+                href={`/tower-view/${prevFloor}`}
+                className="inline-flex items-center px-3 py-1.5 rounded-md bg-night-mid/70 border border-white/10 text-tower-cream text-xs font-semibold hover:bg-night-mid transition"
+                aria-label={`Preview Floor ${prevFloor}`}
+              >
+                ← Floor {prevFloor}
+              </Link>
+            ) : (
+              <span />
+            )}
+          </div>
+          <div className="justify-self-center text-center text-tower-cream text-xs font-bold leading-tight">
+             <span className="text-night-mid ">Floor {preview.floor}</span>{' '}
+            <span className="text-tower-cream/80 font-medium">of {preview.totalFloors}</span>
+          </div>
+          <div className="justify-self-end">
+            {nextFloor ? (
+              <Link
+                href={`/tower-view/${nextFloor}`}
+                className="inline-flex items-center px-3 py-1.5 rounded-md bg-night-mid/70 border border-white/10 text-tower-cream text-xs font-semibold hover:bg-night-mid transition"
+                aria-label={`Preview Floor ${nextFloor}`}
+              >
+                Floor {nextFloor} →
+              </Link>
+            ) : (
+              <span />
+            )}
+          </div>
         </div>
       </header>
 
@@ -177,7 +271,9 @@ export default function TowerFloorViewClient({
           + status line all shift with the viewer's state. */}
       <div
         className={
-          'absolute top-16 left-3 md:left-7 z-20 px-4 md:px-5 py-3 md:py-4 rounded-2xl bg-black/80 backdrop-blur-md border max-w-[92vw] md:w-[320px] ' +
+          // top-28 on mobile clears the new 2-row header (back/office +
+          // floor nav), top-16 on desktop matches the original 1-row chrome.
+          'absolute top-28 md:top-16 left-3 md:left-7 z-20 px-4 md:px-5 py-3 md:py-4 rounded-2xl bg-black/80 backdrop-blur-md border max-w-[92vw] md:w-[320px] ' +
           cardBorder
         }
         style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}

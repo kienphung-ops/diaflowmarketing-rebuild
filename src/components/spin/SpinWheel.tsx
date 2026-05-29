@@ -1,29 +1,45 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { WEDGE_DEFS, type Wedge } from '@/lib/spin/constants'
+import type { Wedge } from '@/lib/spin/constants'
 
 /**
- * The prize wheel — 7 EQUAL visual segments (the odds are NOT
+ * The prize wheel — N EQUAL visual segments (the odds are NOT
  * telegraphed by segment size; the server's weighted RNG decides the
  * landing). The wheel only ever animates to a result the server already
  * picked, so a tampered client can't fake a win.
  *
  * Controlled by `spinToken`: bump it (with `target` set) to trigger a
  * spin to that wedge. `onLanded` fires when the animation settles.
+ *
+ * Wedge data (label / color / order) is passed in from the parent — the
+ * authoritative source is the `spin_wedges` DB table, threaded through
+ * the spin API response.
  */
 
-const SEG = WEDGE_DEFS.length // 7
-const SEG_ANGLE = 360 / SEG
+/** Minimal wedge shape the wheel needs to render — wider DB row trimmed
+ *  to the fields the SVG cares about. */
+export interface WheelWedge {
+  key: string
+  label: string
+  color: string
+  /** Reward type — used for special label rendering only (e.g. the
+   *  "↻ AGAIN" label on a spin-type wedge). */
+  type: string
+}
+
 const SPIN_DURATION_MS = 4200
 const FULL_SPINS = 5 // whole rotations before settling, for drama
 
 interface Props {
   /** Bump this (monotonic) to start a spin. 0 = idle, never spun. */
   spinToken: number
-  /** The wedge the wheel must land on (server-decided). */
+  /** The wedge key the wheel must land on (server-decided). */
   target: Wedge | null
   onLanded?: () => void
+  /** Wedge catalogue, ordered for display. The wheel renders one
+   *  equal-angle segment per entry (in array order, clockwise). */
+  wedges: WheelWedge[]
   /** Diameter in px. */
   size?: number
 }
@@ -33,25 +49,41 @@ function polar(cx: number, cy: number, r: number, angleDeg: number) {
   return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) }
 }
 
-export function SpinWheel({ spinToken, target, onLanded, size = 280 }: Props) {
+export function SpinWheel({ spinToken, target, onLanded, wedges, size = 280 }: Props) {
+  const seg = Math.max(1, wedges.length)
+  const segAngle = 360 / seg
+
   const [rotation, setRotation] = useState(0)
   const [spinning, setSpinning] = useState(false)
-  const prevToken = useRef(0)
+  // `null` on first render so the very first effect run treats whatever
+  // `spinToken` the parent passed in as the baseline (no animation). Past
+  // that, every bump triggers an animation as normal. This is what
+  // prevents the modal from auto-replaying the last spin when the user
+  // closes + reopens the wheel — the parent's `spinToken` may still hold
+  // the previous session's value, and a naive `useRef(0)` would diff
+  // against 0 and fire the animation before the parent's reset effect
+  // got a chance to run.
+  const prevToken = useRef<number | null>(null)
 
   useEffect(() => {
+    if (prevToken.current === null) {
+      // First render — record the baseline and bail without animating.
+      prevToken.current = spinToken
+      return
+    }
     if (spinToken === prevToken.current) return
     prevToken.current = spinToken
     if (!target) return
 
-    const idx = WEDGE_DEFS.findIndex(d => d.key === target)
+    const idx = wedges.findIndex(d => d.key === target)
     if (idx < 0) return
 
-    // Segment i spans [i*SEG_ANGLE, (i+1)*SEG_ANGLE] clockwise from top.
+    // Segment i spans [i*segAngle, (i+1)*segAngle] clockwise from top.
     // Its center sits at center_i; we rotate the wheel by -center_i so
     // that center lands under the fixed top pointer. A tiny in-segment
     // jitter makes repeated wins feel less mechanical.
-    const center = idx * SEG_ANGLE + SEG_ANGLE / 2
-    const jitter = (Math.random() - 0.5) * (SEG_ANGLE * 0.5)
+    const center = idx * segAngle + segAngle / 2
+    const jitter = (Math.random() - 0.5) * (segAngle * 0.5)
     // Always rotate forward past the current rotation by a whole number
     // of turns so the wheel never visually rewinds.
     const base = rotation - (rotation % 360)
@@ -100,14 +132,15 @@ export function SpinWheel({ spinToken, target, onLanded, size = 280 }: Props) {
       >
         {/* Outer rim */}
         <circle cx={cx} cy={cy} r={108} fill="#10122e" />
-        {WEDGE_DEFS.map((d, i) => {
-          const start = i * SEG_ANGLE
-          const end = (i + 1) * SEG_ANGLE
+        {wedges.map((d, i) => {
+          const start = i * segAngle
+          const end = (i + 1) * segAngle
           const p1 = polar(cx, cy, r, start)
           const p2 = polar(cx, cy, r, end)
-          const mid = polar(cx, cy, r * 0.62, start + SEG_ANGLE / 2)
-          const labelRot = start + SEG_ANGLE / 2
+          const mid = polar(cx, cy, r * 0.62, start + segAngle / 2)
+          const labelRot = start + segAngle / 2
           const isJackpot = d.key === 'jackpot'
+          const isRespin = d.type === 'spin'
           return (
             <g key={d.key}>
               <path
@@ -116,19 +149,47 @@ export function SpinWheel({ spinToken, target, onLanded, size = 280 }: Props) {
                 stroke="#0b0d24"
                 strokeWidth={1.5}
               />
-              <text
-                x={mid.x}
-                y={mid.y}
-                fill={isJackpot ? '#1f2147' : '#fdf6e3'}
-                fontSize={d.key === 'spin_again' ? 8.5 : isJackpot ? 9 : 11}
-                fontWeight={isJackpot ? 900 : 700}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                transform={`rotate(${labelRot}, ${mid.x}, ${mid.y})`}
-                style={{ pointerEvents: 'none' }}
-              >
-                {d.key === 'spin_again' ? '↻ AGAIN' : d.label}
-              </text>
+              {/* Auto-wrap long labels (anything with a space, e.g.
+                  "JACKPOT $25") onto two tspans so the text stays
+                  inside the wedge instead of bleeding into the rim.
+                  Single-token labels render inline as before. */}
+              {(() => {
+                const raw = isRespin ? '↻ AGAIN' : d.label
+                const parts = raw.includes(' ') ? raw.split(/\s+/) : [raw]
+                const multiline = parts.length > 1
+                // Slightly smaller font when wrapped so 2 lines still
+                // fit comfortably within the pie slice.
+                const fontSize = multiline
+                  ? isJackpot
+                    ? 9
+                    : 9.5
+                  : isRespin
+                    ? 8.5
+                    : isJackpot
+                      ? 9
+                      : 11
+                const lineHeight = fontSize * 1.05
+                // Centre the multi-line block on `mid.y` by shifting
+                // the first tspan up by half the total height.
+                const y0 = multiline ? mid.y - (lineHeight * (parts.length - 1)) / 2 : mid.y
+                return (
+                  <text
+                    fill={isJackpot ? '#1f2147' : '#fdf6e3'}
+                    fontSize={fontSize}
+                    fontWeight={isJackpot ? 900 : 700}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    transform={`rotate(${labelRot}, ${mid.x}, ${mid.y})`}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {parts.map((part, idx) => (
+                      <tspan key={idx} x={mid.x} y={y0 + idx * lineHeight}>
+                        {part}
+                      </tspan>
+                    ))}
+                  </text>
+                )
+              })()}
             </g>
           )
         })}

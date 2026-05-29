@@ -114,7 +114,6 @@ export function Header({
               {spinTokens === 1 ? 'spin' : 'spins'}
             </>
           )}
-          {!signedIn && <span className="ml-2 opacity-60 hidden md:inline">(trial)</span>}
         </div>
 
         {/* Tower toggle — desktop only. The header right slot on mobile
@@ -141,7 +140,7 @@ export function Header({
                   className="absolute inset-0 rounded-md border-2 border-tower-gold/70 animate-nav-pulse-ring pointer-events-none"
                 />
               )}
-              {showTower ? 'Office view' : 'Tower view'}
+              {showTower ? 'Go to your office' : 'Go to tower'}
             </button>
 
             {/* Bouncing "Click here" arrow beneath the button, pointing

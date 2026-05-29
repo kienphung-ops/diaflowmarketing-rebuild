@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       user = await prisma.user.create({
         data: {
           email,
-          first_email: email,
+          firstEmail: email,
           referralCode,
           // Inviter lock — referredByCode + referredAt are sealed exactly
           // once, here at user-creation time. Below, we deliberately skip

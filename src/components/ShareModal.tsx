@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
 
 interface Props {
   open: boolean
@@ -22,6 +23,12 @@ interface Props {
   inviteUrl: string | null
   currentFloor: number
   totalInvites: number
+  /** Optional — fires after the first-share dwell completes and the
+   *  spin task claim returns. Parent uses it to bubble the new banked
+   *  token count into the Header pill / spin badge so the user sees
+   *  their +1 spin immediately. `granted=false` means the claim was
+   *  a no-op (already done or network error). */
+  onShareSpinClaimed?: (granted: boolean, tokens?: number) => void
 }
 
 export function ShareModal({
@@ -30,6 +37,7 @@ export function ShareModal({
   inviteUrl,
   currentFloor,
   totalInvites,
+  onShareSpinClaimed,
 }: Props) {
   const [copied, setCopied] = useState(false)
   useEffect(() => {
@@ -55,20 +63,24 @@ export function ShareModal({
     ? nextFloor.unlockItems?.find(s => s && s.trim().length > 0) ?? nextFloor.label
     : 'Penthouse — keep sharing'
 
-  if (!open) return null
-  if (typeof document === 'undefined') return null
-
-  // ── Share-intent URLs — mirrors MobileShareSheet ────────────────
+  // ── Share-intent payload — mirrors MobileShareSheet ──────────────
+  // MUST be defined before the early returns below so the
+  // useFirstShareSpin hook is called in the same order on every render.
   const xText = nextFloor
     ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
     : 'just topped out my AI office at diaflow 🏆'
-  const encoded = inviteUrl ? encodeURIComponent(inviteUrl) : ''
-  const xHref = inviteUrl
-    ? `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encoded}&hashtags=DiaflowTower`
-    : undefined
-  const liHref = inviteUrl
-    ? `https://www.linkedin.com/sharing/share-offsite/?url=${encoded}`
-    : undefined
+
+  // Shared share + first-share-spin claim flow. The URL-building and
+  // dwell-then-POST-/api/spin/task plumbing lives in the hook so the
+  // mobile sheet + MySquadDrawer behave identically.
+  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+    inviteUrl,
+    xText,
+    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+  })
+
+  if (!open) return null
+  if (typeof document === 'undefined') return null
 
   const copyPayload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
   const displayUrl = inviteUrl
@@ -83,11 +95,6 @@ export function ShareModal({
     } catch {
       /* ignore — older browsers without async clipboard */
     }
-  }
-
-  function openIntent(href: string | undefined) {
-    if (!href) return
-    window.open(href, '_blank', 'noopener,noreferrer')
   }
 
   return createPortal(
@@ -150,16 +157,16 @@ export function ShareModal({
               badge={<span className="font-bold">𝕏</span>}
               badgeBg="#000"
               badgeColor="#fff"
-              disabled={!inviteUrl}
-              onClick={() => openIntent(xHref)}
+              disabled={!inviteUrl || sharePending !== null}
+              onClick={() => triggerShare('x')}
             />
             <ShareBtn
               label="LinkedIn"
               badge={<span className="font-extrabold italic">in</span>}
               badgeBg="#0a66c2"
               badgeColor="#fff"
-              disabled={!inviteUrl}
-              onClick={() => openIntent(liHref)}
+              disabled={!inviteUrl || sharePending !== null}
+              onClick={() => triggerShare('linkedin')}
             />
             <ShareBtn
               label={copied ? 'Copied' : 'Copy'}

@@ -51,9 +51,17 @@ export const ITEMS_2D: Item2DConfig[] = [
     offsetStep: [2.5, 0, 0],
   },
   { key: 'neon_sign', position: [-2.0, 3.20, -5.29] },
-  // `arcade_machine` is no longer floor-gated decor — it's the spin
-  // entry point, rendered ALWAYS as an interactive sprite in
-  // Mobile2DScene (see <Arcade2D>). Removed here to avoid duplication.
+  // `arcade_machine` = F14 decor cabinet (plain CRT, no spin wheel).
+  // The spin-prize cabinet uses the separate `spin_arcade` sprite
+  // rendered by Mobile2DScene's <Arcade2D> on the floor band.
+  //
+  // X position deliberately shifted from the pre-spin x=1.40 to x=-1.5
+  // (~38% screen) so it doesn't collide on-screen with the spin cabinet
+  // (which lives at world x=-4 → ~59% screen via the floor projection).
+  // The 2D projection collapses depth, so two cabinets at very
+  // different worlds can still stack visually unless their x values
+  // are far enough apart.
+  { key: 'arcade_machine', position: [-1.5, -0.35, -5.34] },
   { key: 'floor_ceiling_windows', position: [4.87, 2.27, -5.34] },
   { key: 'tea_table', position: [4.23, -0.55, 4.05] },
   { key: 'living_wall', position: [1.08, 1.49, -5.34] },

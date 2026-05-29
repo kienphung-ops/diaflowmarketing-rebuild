@@ -631,11 +631,12 @@ function NeonSign({ unlocked }: { unlocked: boolean }) {
 export function ArcadeMachine({ unlocked }: { unlocked: boolean }) {
   // Minifigure-sized arcade cabinet — ~1.7 tall (matches the
   // minifigure silhouette from feet to top-of-hair) and ~0.85 wide,
-  // so it reads as a "stand up and play it" object, not a wall
-  // accent. The position in ITEMS has been moved from the back wall
-  // to the front-of-room lounge area so it sits alongside the couch
-  // + tea table cluster — the new arcade is closer to the camera
-  // and well clear of the workstation strip.
+  // so it reads as a "stand up and play it" object, not a wall accent.
+  //
+  // This is the GENERIC cabinet (CRT screen, joystick, two buttons).
+  // The spin-wheel overlay lives in <ArcadeSpinFace> below and is
+  // only added by <SpinArcade3D> so the F14 decor cabinet stays a
+  // plain arcade and the spin entry reads as a distinct prize machine.
   return (
     <group>
       {/* Cabinet body */}
@@ -648,42 +649,14 @@ export function ArcadeMachine({ unlocked }: { unlocked: boolean }) {
         <boxGeometry args={[0.87, 0.22, 0.66]} />
         <M color="#a855f7" unlocked={unlocked} emissive="#c084fc" emissiveIntensity={0.55} />
       </mesh>
-      {/* Front face — recessed dark housing behind the wheel. */}
+      {/* Screen — recessed CRT panel near the top of the front face */}
       <mesh position={[0, 1.15, 0.33]}>
         <boxGeometry args={[0.72, 0.58, 0.02]} />
         <M color="#2a1a3a" unlocked={unlocked} />
       </mesh>
-      {/* ── SPIN WHEEL on the front — the differentiator from a plain
-          arcade screen. A gold-rimmed disc split into 7 coloured pie
-          slices (circleGeometry thetaStart/thetaLength), a hub, and a
-          downward pointer at the top. */}
-      {/* Gold rim backing */}
-      <mesh position={[0, 1.15, 0.342]}>
-        <circleGeometry args={[0.265, 28]} />
-        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.4} />
-      </mesh>
-      {/* 7 pie slices */}
-      {(['#9F8BFF', '#4c3a8c', '#6d4bd8', '#8b5cf6', '#a78bfa', '#1f2147', '#fbbf24'] as const).map(
-        (col, i) => {
-          const slice = (Math.PI * 2) / 7
-          return (
-            <mesh key={i} position={[0, 1.15, 0.346]}>
-              <circleGeometry args={[0.24, 24, i * slice, slice]} />
-              <M color={col} unlocked={unlocked} emissive={col} emissiveIntensity={0.35} />
-            </mesh>
-          )
-        },
-      )}
-      {/* Hub */}
-      <mesh position={[0, 1.15, 0.35]}>
-        <circleGeometry args={[0.045, 16]} />
-        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.5} />
-      </mesh>
-      {/* Pointer — small triangle at the top of the wheel, tip pointing
-          down into it. */}
-      <mesh position={[0, 1.42, 0.36]} rotation={[Math.PI, 0, 0]}>
-        <coneGeometry args={[0.04, 0.08, 3]} />
-        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.6} />
+      <mesh position={[0, 1.15, 0.345]}>
+        <planeGeometry args={[0.6, 0.5]} />
+        <M color="#1a0030" unlocked={unlocked} emissive="#a855f7" emissiveIntensity={0.85} />
       </mesh>
       {/* Control deck — flat slab protruding from the front face at
           waist height (where the player stands). */}
@@ -713,6 +686,54 @@ export function ArcadeMachine({ unlocked }: { unlocked: boolean }) {
       <mesh position={[0, 0.48, 0.33]}>
         <boxGeometry args={[0.1, 0.04, 0.015]} />
         <M color="#1a1a2e" unlocked={unlocked} />
+      </mesh>
+    </group>
+  )
+}
+
+/**
+ * Spin-wheel overlay drawn ON TOP of an ArcadeMachine to brand it as
+ * the spin prize machine (vs the plain F14 decor arcade). Only used by
+ * <SpinArcade3D> — the regular ArcadeMachine never includes it.
+ * Geometry is sized + positioned to sit flush with the cabinet's CRT
+ * screen recess so the wheel reads as the screen itself.
+ */
+export function ArcadeSpinFace({ unlocked = true }: { unlocked?: boolean }) {
+  return (
+    <group>
+      {/* Cover the CRT glow so the slot reads as a wheel housing,
+          not a screen with a wheel pasted over it. */}
+      <mesh position={[0, 1.15, 0.342]}>
+        <planeGeometry args={[0.62, 0.52]} />
+        <M color="#2a1a3a" unlocked={unlocked} />
+      </mesh>
+      {/* Gold rim backing */}
+      <mesh position={[0, 1.15, 0.344]}>
+        <circleGeometry args={[0.265, 28]} />
+        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.4} />
+      </mesh>
+      {/* 7 pie slices */}
+      {(['#9F8BFF', '#4c3a8c', '#6d4bd8', '#8b5cf6', '#a78bfa', '#1f2147', '#fbbf24'] as const).map(
+        (col, i) => {
+          const slice = (Math.PI * 2) / 7
+          return (
+            <mesh key={i} position={[0, 1.15, 0.347]}>
+              <circleGeometry args={[0.24, 24, i * slice, slice]} />
+              <M color={col} unlocked={unlocked} emissive={col} emissiveIntensity={0.35} />
+            </mesh>
+          )
+        },
+      )}
+      {/* Hub */}
+      <mesh position={[0, 1.15, 0.35]}>
+        <circleGeometry args={[0.045, 16]} />
+        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.5} />
+      </mesh>
+      {/* Pointer — small triangle at the top of the wheel, tip pointing
+          down into it. */}
+      <mesh position={[0, 1.42, 0.36]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[0.04, 0.08, 3]} />
+        <M color="#fbbf24" unlocked={unlocked} emissive="#fbbf24" emissiveIntensity={0.6} />
       </mesh>
     </group>
   )
@@ -1208,12 +1229,15 @@ export const ITEMS: ItemSpec[] = [
     render: u => <UpgradedDesk unlocked={u} />,
   },
   { key: 'neon_sign',       position: [ 0.69,  4.20, -5.29], render: u => <NeonSign unlocked={u} /> },
-  // NOTE: `arcade_machine` is no longer a floor-gated decor item here.
-  // It's the SPIN-WHEEL entry point, so it's rendered ALWAYS (from day
-  // one, not unlocked at F14) as an interactive object — see
-  // <SpinArcade3D> in OfficeScene.tsx (3D) and the always-on arcade in
-  // Mobile2DScene.tsx (2D). Kept out of this gated list to avoid a
-  // duplicate cabinet at F14+.
+  // `arcade_machine` is the F14 DECOR cabinet — a static visual unlock,
+  // not interactive. The SpinArcade3D (rendered separately by
+  // OfficeScene) is the spin-wheel entry point and uses the SAME
+  // <ArcadeMachine> mesh; we deliberately place the decor cabinet at a
+  // DIFFERENT spot from `SPIN_ARCADE_3D_DEFAULT` ([1.70, -0.55, 4.50])
+  // so the two cabinets read as separate objects in the room. Front-
+  // left corner is empty (dj_stand sits further back at z=5.57, and
+  // potted_plant is elevated at y=1.0), making this a natural slot.
+  { key: 'arcade_machine',  position: [-5.00, -0.55,  4.50], render: u => <ArcadeMachine unlocked={u} /> },
   { key: 'floor_ceiling_windows', position: [6.20, 1.90, -5.40], render: u => <FloorCeilingWindows unlocked={u} /> },
   { key: 'tea_table',       position: [ 3.01, -0.55, 3.75],  render: u => <TeaTable unlocked={u} /> },
   { key: 'living_wall',     position: [ 0.60,  0.50, -5.34], render: u => <LivingWall unlocked={u} /> },

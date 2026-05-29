@@ -23,12 +23,13 @@ import type { FloorConfigEntry } from '@/lib/floorsConfigTypes'
 export type { FloorConfigEntry, FloorItemConfig } from '@/lib/floorsConfigTypes'
 
 const CACHE_KEY = 'floors:v1:all'
-// Redis still holds for an hour — admins call `invalidateFloorsConfig()`
-// to force a refresh after edits, so most reads are bursts inside that
-// window. The in-process memo is intentionally MUCH shorter (60 s) so
-// a manual DB tweak via `npx prisma db seed` propagates within a
-// minute even if `invalidateFloorsConfig()` wasn't called.
-const REDIS_TTL_SECONDS = 60 * 60
+// Both cache tiers are short (60 s) so manual DB edits (Prisma Studio,
+// SQL, `npx prisma db seed`, etc.) propagate to the UI within a minute
+// without anyone having to call `invalidateFloorsConfig()`. The floor
+// catalogue is small (20 rows × ~10 items each), so the extra DB reads
+// every minute are negligible — well worth the freshness guarantee.
+// Bumps this back up only if floor reads become a measurable hotspot.
+const REDIS_TTL_SECONDS = 60
 const PROCESS_TTL_MS = 60 * 1000
 
 let processCache: { data: FloorConfigEntry[]; expiresAt: number } | null = null
@@ -62,8 +63,8 @@ export async function getAllFloorsConfig(): Promise<FloorConfigEntry[]> {
       invitesRequired: true,
       label: true,
       maxTeammates: true,
-      product_reward: true,
-      unlock_items: true,
+      productReward: true,
+      unlockItems: true,
       items: {
         select: {
           quantity: true,
@@ -79,8 +80,8 @@ export async function getAllFloorsConfig(): Promise<FloorConfigEntry[]> {
     invitesRequired: f.invitesRequired,
     label: f.label,
     maxTeammates: f.maxTeammates,
-    productReward: f.product_reward,
-    unlockItems: f.unlock_items,
+    productReward: f.productReward,
+    unlockItems: f.unlockItems,
     items: f.items.map(it => ({
       key: it.item.key,
       label: it.item.label,

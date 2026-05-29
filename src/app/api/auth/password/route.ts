@@ -7,6 +7,8 @@ import {
   generateReferralCode,
 } from '@/lib/auth'
 import { computeFloorForInvites } from '@/lib/floors'
+import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
+import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
 
 const BCRYPT_ROUNDS = 10
 const MIN_PASSWORD_LEN = 6
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.create({
       data: {
         email,
-        first_email: email,
+        firstEmail: email,
         passwordHash,
         ipAddress: ip,
         country: country ?? null,
@@ -146,13 +148,32 @@ export async function POST(req: NextRequest) {
               role: 'Operations Assistant',
             },
           })
+          // +1 spin for the inviter, same transaction as the floor / invite
+          // bump so the credit can't drift out of step with the invite.
+          await grantReferralSpinTx(tx, inviter.id)
         })
+      }
+    }
+
+    // Migrate this browser's anonymous teaser spin onto the freshly-
+    // created account (best-effort; never blocks signup).
+    const anonId = req.cookies.get(ANON_COOKIE)?.value
+    let anonCookieFound = false
+    if (anonId) {
+      try {
+        const r = await migrateAnonSpin(user.id, anonId)
+        anonCookieFound = r.cookieFound
+      } catch (e) {
+        console.warn('[auth/password] anon spin migrate failed:', (e as Error).message)
       }
     }
 
     const jwt = await createSessionJwt(user.id)
     const res = NextResponse.json({ success: true, mode: 'signup' })
     attachSessionCookie(res, jwt)
+    // Evict diaflow_anon_id post-migration so a later signup on the
+    // same browser doesn't see a stale (already-claimed) cookie.
+    if (anonCookieFound) clearAnonCookie(res)
     return res
   } catch (err) {
     console.error('[auth/password]', err)

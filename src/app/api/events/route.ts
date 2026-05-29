@@ -34,6 +34,12 @@ export async function GET(req: NextRequest) {
 
   let lastFloor = -1
   let lastInvites = -1
+  // -1 sentinel = "no baseline yet" — same convention as floor / invites.
+  // We track spinTokens so the inviter's UI (arcade badge + top-bar
+  // pill) reflects the +1 spin the referral signup grants WITHOUT a
+  // page reload. Referral grants happen inside the signup transaction
+  // server-side, so the next SSE tick sees the new value.
+  let lastSpinTokens = -1
 
   const encoder = new TextEncoder()
 
@@ -50,15 +56,18 @@ export async function GET(req: NextRequest) {
           select: {
             currentFloor: true,
             totalInvites: true,
+            spinTokens: true,
           },
         })
         if (u) {
           lastFloor = u.currentFloor
           lastInvites = u.totalInvites
+          lastSpinTokens = u.spinTokens
           const unlocked = await getUnlockedItemsForFloor(u.currentFloor)
           send('snapshot', {
             currentFloor: u.currentFloor,
             totalInvites: u.totalInvites,
+            spinTokens: u.spinTokens,
             unlockedItemKeys: unlocked.map(i => i.itemKey),
           })
         }
@@ -73,11 +82,16 @@ export async function GET(req: NextRequest) {
             select: {
               currentFloor: true,
               totalInvites: true,
+              spinTokens: true,
             },
           })
           if (!u) return
           const floorUp = u.currentFloor > lastFloor && lastFloor !== -1
           const invitesUp = u.totalInvites > lastInvites && lastInvites !== -1
+          // Emit on ANY change (not just an increase) so daily-claim /
+          // task / spin consumes that happen in another tab still sync.
+          // The hot path is a no-op when the value matches.
+          const tokensChanged = u.spinTokens !== lastSpinTokens && lastSpinTokens !== -1
 
           if (floorUp) {
             // Only resolve the item list on actual floor-ups — keeps the
@@ -86,6 +100,7 @@ export async function GET(req: NextRequest) {
             send('floor-up', {
               currentFloor: u.currentFloor,
               totalInvites: u.totalInvites,
+              spinTokens: u.spinTokens,
               unlockedItemKeys: unlocked.map(i => i.itemKey),
             })
           }
@@ -93,10 +108,23 @@ export async function GET(req: NextRequest) {
             send('invite-accepted', {
               delta: u.totalInvites - lastInvites,
               totalInvites: u.totalInvites,
+              spinTokens: u.spinTokens,
+            })
+          }
+          if (tokensChanged) {
+            // Standalone event for non-referral token changes (daily
+            // claim from another tab, task completion, etc.). When the
+            // change comes WITH an invite-accepted, both events fire —
+            // the client de-dupes by always assigning the same final
+            // tokens value.
+            send('spin-tokens', {
+              spinTokens: u.spinTokens,
+              delta: u.spinTokens - lastSpinTokens,
             })
           }
           lastFloor = u.currentFloor
           lastInvites = u.totalInvites
+          lastSpinTokens = u.spinTokens
 
           // Heartbeat to keep proxies from closing the connection.
           controller.enqueue(encoder.encode(`: ping\n\n`))

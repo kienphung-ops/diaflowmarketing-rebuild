@@ -28,6 +28,7 @@ import {
   generateReferralCode,
 } from '@/lib/auth'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
+import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
 import { computeFloorForInvites } from '@/lib/floors'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
         const u = await tx.user.create({
           data: {
             email,
-            first_email: email,
+            firstEmail: email,
             passwordHash,
             ipAddress: ip,
             country: country ?? null,
@@ -235,10 +236,12 @@ export async function POST(req: NextRequest) {
     // free spin pre-signup): adds the capped cash to the new account
     // and marks the AnonymousSpin row migrated. Best-effort — never
     // blocks signup if it fails.
-    const anonId = req.cookies.get('diaflow_anon_id')?.value
+    const anonId = req.cookies.get(ANON_COOKIE)?.value
+    let anonCookieFound = false
     if (anonId) {
       try {
-        await migrateAnonSpin(createdUser.id, anonId)
+        const r = await migrateAnonSpin(createdUser.id, anonId)
+        anonCookieFound = r.cookieFound
       } catch (e) {
         console.warn('[auth/signup] anon spin migrate failed:', (e as Error).message)
       }
@@ -247,6 +250,13 @@ export async function POST(req: NextRequest) {
     const jwt = await createSessionJwt(createdUser.id)
     const res = NextResponse.json({ success: true })
     attachSessionCookie(res, jwt)
+    // Evict diaflow_anon_id once the row has been resolved (claimed
+    // OR already-migrated). Without this the browser keeps presenting
+    // the same cookie to every future signup, which is how "user can
+    // migrate one more time" surfaced — the row's idempotent guard
+    // saved us from double-credit, but the cookie itself was leaking
+    // identity information across accounts.
+    if (anonCookieFound) clearAnonCookie(res)
     return res
   } catch (err) {
     console.error('[auth/signup]', err)

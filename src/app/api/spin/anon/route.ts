@@ -19,10 +19,16 @@ import { prisma } from '@/lib/prisma'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { resolveAnonSpin } from '@/lib/spin/service'
 import { ANON_SPINS_PER_IP_PER_DAY, type Wedge } from '@/lib/spin/constants'
+import { getSpinWedges } from '@/lib/spin/wedgesApi'
 
 export const dynamic = 'force-dynamic'
 
-const ANON_COOKIE = 'diaflow_anon_id'
+// Single source of truth for the cookie name lives in lib/spin/anonCookie.
+// Importing here (writer) AND in the signup / OAuth routes (clearer)
+// guarantees they all agree on the same name — drift was the root of
+// "user can migrate one more time" since the auth routes never cleared
+// the writer's cookie after migration.
+import { ANON_COOKIE } from '@/lib/spin/anonCookie'
 // Cookie outlives the teaser so a returning visitor keeps their "already
 // spun" state (and the row stays migrate-able) — 90 days.
 const ANON_COOKIE_MAX_AGE = 60 * 60 * 24 * 90
@@ -35,17 +41,22 @@ function getClientIp(req: NextRequest): string | undefined {
 
 export async function GET(req: NextRequest) {
   const cookieId = req.cookies.get(ANON_COOKIE)?.value
-  if (!cookieId) return NextResponse.json({ spun: false, result: null })
+  // Wedges are returned on every response so the client can render the
+  // wheel from real DB data on the very first request — no second
+  // round-trip, no flicker between hardcoded fallback + live values.
+  const wedges = await getSpinWedges()
+  if (!cookieId) return NextResponse.json({ spun: false, result: null, wedges })
 
   const row = await prisma.anonymousSpin.findUnique({
     where: { cookieId },
     select: { wedge: true, cashCents: true, teammateCount: true },
   })
-  if (!row) return NextResponse.json({ spun: false, result: null })
+  if (!row) return NextResponse.json({ spun: false, result: null, wedges })
   return NextResponse.json({
     spun: true,
     result: { wedge: row.wedge as Wedge, cashCents: row.cashCents },
     teammateCount: row.teammateCount,
+    wedges,
   })
 }
 
@@ -100,7 +111,7 @@ export async function POST(req: NextRequest) {
         ? Math.min(99, Math.floor(body.teammateCount))
         : 0
 
-    const { headline } = resolveAnonSpin()
+    const { headline } = await resolveAnonSpin()
     await prisma.anonymousSpin.create({
       data: {
         cookieId,

@@ -33,6 +33,7 @@ import {
 import { computeFloorForInvites } from '@/lib/floors'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
+import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
 import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
 import {
   buildRedirectUri,
@@ -118,11 +119,13 @@ export async function GET(req: NextRequest) {
     // Carry the anonymous teaser spin onto BRAND-NEW accounts only — a
     // returning user logging in via Google shouldn't absorb a fresh
     // anon spin from this browser. Best-effort; never blocks login.
+    let anonCookieFound = false
     if (isNew) {
-      const anonId = req.cookies.get('diaflow_anon_id')?.value
+      const anonId = req.cookies.get(ANON_COOKIE)?.value
       if (anonId) {
         try {
-          await migrateAnonSpin(userId, anonId)
+          const r = await migrateAnonSpin(userId, anonId)
+          anonCookieFound = r.cookieFound
         } catch (e) {
           console.warn('[oauth/google/callback] anon spin migrate failed:', (e as Error).message)
         }
@@ -138,6 +141,9 @@ export async function GET(req: NextRequest) {
     attachSessionCookie(res, jwt)
     // Burn the state cookie now that we've consumed it.
     res.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', { path: '/', maxAge: 0 })
+    // Evict diaflow_anon_id post-migration so a subsequent signup on
+    // the same browser doesn't see a stale (already-claimed) cookie.
+    if (anonCookieFound) clearAnonCookie(res)
     return res
   } catch (err) {
     console.error('[oauth/google/callback] user upsert failed', err)
@@ -224,7 +230,7 @@ async function findOrCreateUserFromGoogle({
       const created = await tx.user.create({
         data: {
           email: normalisedEmail,
-          first_email: normalisedEmail,
+          firstEmail: normalisedEmail,
           // No passwordHash — Google account, password sign-in is
           // disabled until the user goes through the password-reset
           // flow to set one explicitly.

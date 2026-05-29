@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
 import { TeammatePortrait } from './TeammatePortrait'
 
 /**
@@ -53,6 +54,11 @@ interface Props {
   nextFloor: { id: number; invitesRequired: number } | null
   /** The user's personal invite URL (`origin/floor/<code>`). */
   inviteUrl: string | null
+  /** Optional — fires after the celebration-modal share completes the
+   *  3 s dwell and the task claim returns. Same hook (and same task
+   *  keys) as the drawer / desktop share modal — the very first share
+   *  from any of these surfaces pays out the +1 spin. */
+  onShareSpinClaimed?: (granted: boolean, tokens?: number) => void
 }
 
 // Per-slug accent colours for the avatar tile so Iris / Mia / Leo read
@@ -77,6 +83,7 @@ export function SaveSuccessModal({
   totalInvites,
   nextFloor,
   inviteUrl,
+  onShareSpinClaimed,
 }: Props) {
   const [copied, setCopied] = useState(false)
   const invitesToNext = nextFloor
@@ -91,6 +98,22 @@ export function SaveSuccessModal({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  // Same first-share-spin flow as the drawer + desktop ShareModal +
+  // mobile share sheet. MUST live above the early returns below so the
+  // hook is called in the same order on every render — moving it down
+  // tripped React's "rendered more hooks than during the previous
+  // render" guard the first time `open` flipped from false → true.
+  const xText = nextFloor
+    ? `just built my AI office at diaflow. ${invitesToNext} ${
+        invitesToNext === 1 ? 'invite' : 'invites'
+      } from unlocking the next floor 👀`
+    : 'just topped out my AI office at diaflow 🏆'
+  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+    inviteUrl,
+    xText,
+    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+  })
 
   if (!open) return null
   if (typeof document === 'undefined') return null
@@ -109,25 +132,10 @@ export function SaveSuccessModal({
 
   function handleShare(network: 'x' | 'linkedin') {
     if (!inviteUrl) return
-    const xText = nextFloor
-      ? `just built my AI office at diaflow. ${invitesToNext} ${
-          invitesToNext === 1 ? 'invite' : 'invites'
-        } from unlocking the next floor 👀`
-      : 'just topped out my AI office at diaflow 🏆'
     if (network === 'x') {
-      window.open(
-        `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encodeURIComponent(
-          inviteUrl,
-        )}&hashtags=DiaflowTower`,
-        '_blank',
-        'noopener,noreferrer,width=620,height=620',
-      )
+      triggerShare('x')
     } else {
-      window.open(
-        `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`,
-        '_blank',
-        'noopener,noreferrer,width=620,height=620',
-      )
+      triggerShare('linkedin')
     }
   }
 
@@ -202,7 +210,7 @@ export function SaveSuccessModal({
       <div className="grid grid-cols-3 gap-1.5 md:gap-2 mt-auto">
         <button
           onClick={() => handleShare('x')}
-          disabled={!inviteUrl}
+          disabled={!inviteUrl || sharePending !== null}
           className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-[9px] bg-[#15182E] border border-[#2A2A4D] text-[12.5px] text-tower-cream/90 hover:bg-[#1B1A38] transition disabled:opacity-50"
           aria-label="Share on X"
         >
@@ -213,7 +221,7 @@ export function SaveSuccessModal({
         </button>
         <button
           onClick={() => handleShare('linkedin')}
-          disabled={!inviteUrl}
+          disabled={!inviteUrl || sharePending !== null}
           className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-[9px] bg-[#15182E] border border-[#2A2A4D] text-[12.5px] text-tower-cream/90 hover:bg-[#1B1A38] transition disabled:opacity-50"
           aria-label="Share on LinkedIn"
         >

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
 
 /**
  * Bottom-sheet share surface for mobile, opened from the
@@ -35,6 +36,9 @@ interface Props {
    *  real invite link so we can route them through signup instead of
    *  silently disabling everything. */
   onSignupNudge?: () => void
+  /** Optional — fires after the first-share spin claim completes so
+   *  the parent can refresh the header token pill / spin badge. */
+  onShareSpinClaimed?: (granted: boolean, tokens?: number) => void
 }
 
 export function MobileShareSheet({
@@ -44,6 +48,7 @@ export function MobileShareSheet({
   currentFloor,
   totalInvites,
   onSignupNudge,
+  onShareSpinClaimed,
 }: Props) {
   const [copied, setCopied] = useState(false)
   useEffect(() => {
@@ -69,20 +74,27 @@ export function MobileShareSheet({
     ? nextFloor.unlockItems?.find(s => s && s.trim().length > 0) ?? nextFloor.label
     : 'Penthouse — keep sharing'
 
-  if (!open) return null
-  if (typeof document === 'undefined') return null
-
-  // ── Share-intent URLs — mirrors MySquadDrawer.handleShare ───────
+  // ── Share-intent payload — mirrors MySquadDrawer.handleShare ────
+  // Defined ABOVE the early returns below so `useFirstShareSpin`
+  // is called in the same order on every render (React's rules of
+  // hooks). If you push the hook past `if (!open) return null` the
+  // first time the sheet opens you'll get "rendered more hooks than
+  // during the previous render".
   const xText = nextFloor
     ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
     : 'just topped out my AI office at diaflow 🏆'
-  const encoded = inviteUrl ? encodeURIComponent(inviteUrl) : ''
-  const xHref = inviteUrl
-    ? `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encoded}&hashtags=DiaflowTower`
-    : undefined
-  const liHref = inviteUrl
-    ? `https://www.linkedin.com/sharing/share-offsite/?url=${encoded}`
-    : undefined
+
+  // Shared share + first-share-spin claim flow. Same hook the desktop
+  // ShareModal + MySquadDrawer use, so the very first share — from any
+  // surface — pays out the matching spin task.
+  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+    inviteUrl,
+    xText,
+    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+  })
+
+  if (!open) return null
+  if (typeof document === 'undefined') return null
 
   const copyPayload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
 
@@ -105,12 +117,15 @@ export function MobileShareSheet({
     }
   }
 
-  function openIntent(href: string | undefined) {
-    if (!href) {
+  // Trial-user nudge funnel — when there's no inviteUrl yet, the
+  // X / LinkedIn buttons fall through to the signup CTA rather than
+  // calling the spin hook (which would silently no-op).
+  function handleShareClick(platform: 'x' | 'linkedin') {
+    if (!inviteUrl) {
       onSignupNudge?.()
       return
     }
-    window.open(href, '_blank', 'noopener,noreferrer')
+    triggerShare(platform)
   }
 
   return createPortal(
@@ -185,16 +200,16 @@ export function MobileShareSheet({
             badge={<span className="font-bold">𝕏</span>}
             badgeBg="#000"
             badgeColor="#fff"
-            disabled={!inviteUrl}
-            onClick={() => openIntent(xHref)}
+            disabled={!inviteUrl || sharePending !== null}
+            onClick={() => handleShareClick('x')}
           />
           <ShareBtn
             label="LinkedIn"
             badge={<span className="font-extrabold italic">in</span>}
             badgeBg="#0a66c2"
             badgeColor="#fff"
-            disabled={!inviteUrl}
-            onClick={() => openIntent(liHref)}
+            disabled={!inviteUrl || sharePending !== null}
+            onClick={() => handleShareClick('linkedin')}
           />
           <ShareBtn
             label={copied ? 'Copied' : 'Copy'}

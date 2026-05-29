@@ -6,11 +6,20 @@ datasource db {
   provider = "postgresql"
 }
 
+// Naming convention:
+//   Prisma fields → camelCase (the names the TypeScript layer sees).
+//   DB columns   → snake_case via @map (so SQL / DBeaver / dashboards
+//                  stay in their native idiom and ad-hoc SQL doesn't
+//                  need quoted "camelCase" identifiers).
+// Every renamable column carries an @map, even when the Prisma name
+// already matches — it keeps the file scannable and future field
+// renames don't accidentally re-introduce mixed casing.
+
 model EmailCapture {
   id        Int      @id @default(autoincrement())
   email     String
   source    String
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@map("email_captures")
 }
@@ -18,40 +27,40 @@ model EmailCapture {
 model User {
   id              String              @id @default(cuid())
   email           String              @unique
-  first_email     String?
-  passwordHash    String?
-  emailVerified   DateTime?
-  googleId        String?             @unique
-  googleEmail     String?
-  recommendedRole String?
+  firstEmail      String?             @map("first_email")
+  passwordHash    String?             @map("password_hash")
+  emailVerified   DateTime?           @map("email_verified")
+  googleId        String?             @unique @map("google_id")
+  googleEmail     String?             @map("google_email")
+  recommendedRole String?             @map("recommended_role")
   reason          String?
-  ipAddress       String?
+  ipAddress       String?             @map("ip_address")
   country         String?
-  referralCode    String              @unique
-  referredByCode  String?
-  referredAt      DateTime?
+  referralCode    String              @unique @map("referral_code")
+  referredByCode  String?             @map("referred_by_code")
+  referredAt      DateTime?           @map("referred_at")
   referredBy      User?               @relation("UserReferrals", fields: [referredByCode], references: [referralCode])
   referrals       User[]              @relation("UserReferrals")
-  totalInvites    Int                 @default(0)
-  currentFloor    Int                 @default(1)
+  totalInvites    Int                 @default(0) @map("total_invites")
+  currentFloor    Int                 @default(1) @map("current_floor")
   floor           Floor               @relation(fields: [currentFloor], references: [id])
-  teamName        String?
-  teamPurpose     String?
-  publicVisible   Boolean             @default(false)
+  teamName        String?             @map("team_name")
+  teamPurpose     String?             @map("team_purpose")
+  publicVisible   Boolean             @default(false) @map("public_visible")
   authTokens      AuthToken[]
   inviteEvents    InviteEvent[]       @relation("InviterEvents")
   recruitedTeams  RecruitedTeammate[]
-  itemPositions   Json?
-  itemPositions2D Json?
-  spinTokens      Int                 @default(0)
-  spinCreditCents Int                 @default(0)
-  lastDailySpinAt DateTime?
+  itemPositions   Json?               @map("item_positions")
+  itemPositions2D Json?               @map("item_positions_2d")
+  spinTokens      Int                 @default(0) @map("spin_tokens")
+  spinCreditCents Int                 @default(0) @map("spin_credit_cents")
+  lastDailySpinAt DateTime?           @map("last_daily_spin_at")
   spinResults     SpinResult[]
   spinGrants      SpinGrant[]
   taskCompletions TaskCompletion[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
 
   @@index([referralCode])
   @@map("users")
@@ -59,14 +68,14 @@ model User {
 
 model AuthToken {
   id        String    @id @default(cuid())
-  userId    String
+  userId    String    @map("user_id")
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      TokenType
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  ipAddress String?
-  createdAt DateTime  @default(now())
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  ipAddress String?   @map("ip_address")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@index([userId, type])
   @@map("auth_tokens")
@@ -81,14 +90,14 @@ enum TokenType {
 
 model InviteEvent {
   id            String   @id @default(cuid())
-  inviterUserId String
+  inviterUserId String   @map("inviter_user_id")
   inviter       User     @relation("InviterEvents", fields: [inviterUserId], references: [id], onDelete: Cascade)
-  invitedEmail  String
-  invitedUserId String?
-  ipAddress     String?
-  userAgent     String?
+  invitedEmail  String   @map("invited_email")
+  invitedUserId String?  @map("invited_user_id")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
   verified      Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([inviterUserId])
   @@index([invitedEmail])
@@ -105,11 +114,11 @@ model InviteEvent {
 // query side, not stored per-user).
 model Floor {
   id              Int         @id
-  invitesRequired Int
+  invitesRequired Int         @map("invites_required")
   label           String
-  maxTeammates    Int
-  product_reward  String?
-  unlock_items    String[]    @default([])
+  maxTeammates    Int         @map("max_teammates")
+  productReward   String?     @map("product_reward")
+  unlockItems     String[]    @default([]) @map("unlock_items")
   items           FloorItem[]
   users           User[]
 
@@ -134,8 +143,8 @@ model Item {
 // floor N, the unlocked-item set is `FloorItem WHERE floorId <= N`.
 model FloorItem {
   id       Int   @id @default(autoincrement())
-  floorId  Int
-  itemId   Int
+  floorId  Int   @map("floor_id")
+  itemId   Int   @map("item_id")
   quantity Int   @default(1)
   floor    Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
   item     Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -147,15 +156,15 @@ model FloorItem {
 
 model RecruitedTeammate {
   id          String   @id @default(cuid())
-  userId      String
+  userId      String   @map("user_id")
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   slug        String?
   name        String
   role        String
   pokes       Int      @default(0)
-  isDefault   Boolean  @default(false)
+  isDefault   Boolean  @default(false) @map("is_default")
   description String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@unique([userId, slug])
   @@index([userId])
@@ -173,10 +182,10 @@ model RecruitedTeammate {
 // row to populate RecruitedTeammate.description.
 model RoleDescription {
   role        String   @id
-  displayRole String
+  displayRole String   @map("display_role")
   description String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
 
   @@map("role_descriptions")
 }
@@ -198,15 +207,15 @@ model RoleDescription {
 // User.spinTokens; this table is the audit trail / analytics source.
 model SpinGrant {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // "daily" | "referral" | "task" | "spin_again" (validated in BE).
   source    String
   amount    Int      @default(1)
   // Set only when source = "task" — the one-time task key that earned
   // this grant ("share_linkedin" or "share_x" in V1). Null otherwise.
-  taskKey   String?
-  createdAt DateTime @default(now())
+  taskKey   String?  @map("task_key")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([source])
@@ -220,23 +229,23 @@ model SpinResult {
   id        String   @id @default(cuid())
   // Null for anonymous pre-signup spins; backfilled to the new user id
   // when the anonymous session migrates on signup.
-  userId    String?
+  userId    String?  @map("user_id")
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Cookie id of the anonymous spinner (null for authenticated spins).
-  anonId    String?
+  anonId    String?  @map("anon_id")
   // "cash_50c" | ... | "spin_again" | "jackpot" (validated in BE).
   wedge     String
   // Cash actually credited for this spin, in cents AFTER cap logic
   // (0 for spin_again, and 0 when a cash/jackpot wedge is nulled by the
   // $50 cap). The face value of the wedge is implied by `wedge`.
-  cashCents Int      @default(0)
+  cashCents Int      @default(0) @map("cash_cents")
   // True when this spin was the free re-spin granted by a spin_again
   // wedge (did not consume a banked token).
-  isRespin  Boolean  @default(false)
+  isRespin  Boolean  @default(false) @map("is_respin")
   // True when a cash/jackpot wedge was downgraded because the user had
   // already hit the $50 cap — recorded for history, nothing added.
   capped    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([anonId])
@@ -248,14 +257,73 @@ model SpinResult {
 // most once per user, for life.
 model TaskCompletion {
   id          String   @id @default(cuid())
-  userId      String
+  userId      String   @map("user_id")
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  taskKey     String
-  completedAt DateTime @default(now())
+  taskKey     String   @map("task_key")
+  completedAt DateTime @default(now()) @map("completed_at")
 
   @@unique([userId, taskKey])
   @@index([userId])
   @@map("task_completions")
+}
+
+// SpinWedge — admin-editable catalogue of wheel segments. ONE row per
+// segment on the visible wheel. The backend reads this table (behind a
+// cached loader, see lib/spin/wedgesApi.ts) so the rewards + odds + UI
+// colours can be tuned without code changes / redeploys.
+//
+// Field guide:
+//   key       — stable identifier, referenced by SpinResult.wedge /
+//               AnonymousSpin.wedge. Treat as immutable once seeded —
+//               renaming would orphan historical ledger rows.
+//   label     — short text drawn onto the wheel segment.
+//   type      — reward category. V1 has "credit" (cash credit, amount =
+//               cents) and "spin" (an extra spin; used for the
+//               "spin again" outcome). Future-proofs the schema for
+//               "item", "product", "tokens", etc. with no migration.
+//   amount    — generic numeric reward, interpreted per `type`:
+//                   credit → cents added to spinCreditCents
+//                   spin   → spin tokens granted (1 in V1)
+//   weight    — relative pick probability (any positive int; normalised
+//               by pickWedge). Set to 0 + enabled=false to retire.
+//   color     — hex fill for the wedge segment on the client SVG.
+//   enabled   — soft toggle. Disabled wedges are excluded from picks +
+//               not rendered, but the row stays so historical
+//               SpinResult.wedge values remain joinable for analytics.
+//   sortOrder — visual ordering on the wheel (0-based, clockwise from
+//               12 o'clock). Lower number = earlier segment.
+//
+// Admins edit rows in Prisma Studio or via SQL; the next request hits
+// the cache loader and the new config propagates in <60 s (or call
+// invalidateSpinWedges() to bust immediately).
+model SpinWedge {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  label     String
+  type      String   @default("credit")
+  amount    Int      @default(0)
+  // Default probability weight (used for every spin AFTER the user's
+  // first one). By convention all enabled-wedge weights sum to 100 so
+  // each value reads as a percentage, but `pickWedge` renormalises so
+  // any positive integer is valid.
+  weight    Int
+  // First-spin override — applied to:
+  //   • every anonymous teaser spin (each browser only gets one), and
+  //   • the FIRST spin an authenticated user takes (zero prior
+  //     SpinResult rows).
+  // When null the picker falls back to `weight`. Same percentage
+  // convention as `weight` — set values that sum to 100 for a clean
+  // readout. Useful for tuning the "first impression" outcome (e.g.
+  // higher jackpot odds on the very first spin, fewer spin_again
+  // re-rolls so new users see cash quickly).
+  firstWeight Int?  @map("first_weight")
+  color     String
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("spin_wedges")
 }
 
 // AnonymousSpin — server-side record for the pre-login teaser spin.
@@ -266,14 +334,14 @@ model TaskCompletion {
 // $50 cap from minute one.
 model AnonymousSpin {
   id               String    @id @default(cuid())
-  cookieId         String    @unique
-  ipAddress        String?
+  cookieId         String    @unique @map("cookie_id")
+  ipAddress        String?   @map("ip_address")
   wedge            String
-  cashCents        Int       @default(0)
-  teammateCount    Int       @default(0)
-  migratedToUserId String?
-  migratedAt       DateTime?
-  createdAt        DateTime  @default(now())
+  cashCents        Int       @default(0) @map("cash_cents")
+  teammateCount    Int       @default(0) @map("teammate_count")
+  migratedToUserId String?   @map("migrated_to_user_id")
+  migratedAt       DateTime? @map("migrated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   @@index([ipAddress])
   @@map("anonymous_spins")

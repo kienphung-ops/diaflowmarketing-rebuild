@@ -8,6 +8,7 @@ import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
 import { useOrigin } from '@/hooks/useOrigin'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
 import type { InviterInfo } from '@/lib/inviter'
 
 /** Ordinal suffix for the "Nth teammate" label (1st, 2nd, 3rd, 4th…). */
@@ -98,6 +99,11 @@ interface Props {
     /** Sum of pokes across all teammates on the floor. */
     totalPokes: number
   }
+  /** Optional — fires after the drawer's X / LinkedIn buttons complete
+   *  their first-share dwell + spin claim. Parent uses it to bubble
+   *  the new banked-token count into the Header pill. `granted=false`
+   *  means the claim was rejected (already done or network error). */
+  onShareSpinClaimed?: (granted: boolean, tokens?: number) => void
 }
 
 // Invite link + share-floor link are now the SAME URL — visitors land
@@ -126,6 +132,7 @@ export function MySquadDrawer({
   onArrangeRoom,
   visiting,
   teammates,
+  onShareSpinClaimed,
   // Below are still part of Props for callers but the drawer no longer
   // renders share-floor list / add-teammate UI. The /floor/<code>
   // route is the canonical share + invite URL, and per-teammate
@@ -211,40 +218,27 @@ export function MySquadDrawer({
   }
 
   /**
-   * Build the share copy + open the network's intent URL. URL format
-   * comes from requirements/share-btn.md:
+   * Marketing copy + share-intent URLs come from
+   * requirements/share-btn.md and are built inside `useFirstShareSpin`:
    *
    *   X        → https://x.com/intent/tweet?text=<text>&url=<inviteUrl>&hashtags=DiaflowTower
    *   LinkedIn → https://www.linkedin.com/sharing/share-offsite/?url=<inviteUrl>
    *
-   * Text is the marketing copy from the same spec, with dynamic
-   * `invitesToNext` injected. The invite URL is passed in `&url=`
-   * (NOT appended to text) so X auto-appends + auto-shortens the
-   * link cleanly. LinkedIn's share-offsite intent only accepts a
-   * `url` param — it pulls the title/description from the OG tags
-   * already configured on /floor/[code] (see app/floor/[code]/page.tsx
-   * generateMetadata), so no separate `text` plumbing is needed.
+   * The same hook ALSO posts to /api/spin/task after a 3 s dwell so the
+   * user's first share — from this drawer or any other surface
+   * (desktop ShareModal, MobileShareSheet) — pays out the matching
+   * +1 spin task. The server's unique constraint keeps subsequent
+   * shares idempotent. `triggerShare(...)` is wired straight into
+   * the X / LinkedIn buttons below.
    */
-  function handleShare(network: 'x' | 'linkedin') {
-    if (!inviteUrl) return
-    const xText = nextFloor
-      ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
-      : 'just topped out my AI office at diaflow 🏆'
-
-    if (network === 'x') {
-      window.open(
-        `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encodeURIComponent(inviteUrl)}&hashtags=DiaflowTower`,
-        '_blank',
-        'noopener,noreferrer,width=620,height=620',
-      )
-      return
-    }
-    window.open(
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`,
-      '_blank',
-      'noopener,noreferrer,width=620,height=620',
-    )
-  }
+  const xText = nextFloor
+    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
+    : 'just topped out my AI office at diaflow 🏆'
+  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+    inviteUrl,
+    xText,
+    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+  })
 
 
   return (
@@ -680,8 +674,8 @@ export function MySquadDrawer({
           )}
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => handleShare('x')}
-              disabled={!inviteUrl}
+              onClick={() => triggerShare('x')}
+              disabled={!inviteUrl || sharePending !== null}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on X"
             >
@@ -689,8 +683,8 @@ export function MySquadDrawer({
               <span>X</span>
             </button>
             <button
-              onClick={() => handleShare('linkedin')}
-              disabled={!inviteUrl}
+              onClick={() => triggerShare('linkedin')}
+              disabled={!inviteUrl || sharePending !== null}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on LinkedIn"
             >
