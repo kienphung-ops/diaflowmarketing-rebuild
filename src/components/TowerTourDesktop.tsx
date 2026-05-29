@@ -110,19 +110,19 @@ export function TowerTourDesktop({
         <h2 className="text-[27px] font-extrabold leading-[1.15] tracking-tight mb-4">
           The penthouse:{' '}
           <span className="bg-gradient-to-r from-purple-300 to-purple-400 bg-clip-text text-transparent">
-            3 months of Pro free + featured at launch.
+            4 months of Pro free + featured at launch.
           </span>
         </h2>
         <p className="text-[14.5px] text-tower-cream/75 leading-relaxed mb-5">
           Reach Floor 20 and you unlock the{' '}
-          <strong className="text-tower-cream font-semibold">full penthouse, 3 months of Diaflow Pro free</strong>,
+          <strong className="text-tower-cream font-semibold">full penthouse, 4 months of Diaflow Pro free</strong>,
           plus your team is <strong className="text-tower-cream font-semibold">featured on launch day.</strong>
         </p>
         <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-purple-500/12 border border-purple-400/40 text-purple-200 text-[13px] font-bold mb-5">
           <span aria-hidden>👑</span>
           <span>Full penthouse</span>
           <span className="text-purple-300/40" aria-hidden>·</span>
-          <span>🎁 3-mo Pro free</span>
+          <span>🎁 4 months Pro free</span>
           <span className="text-purple-300/40" aria-hidden>·</span>
           <span className="text-amber-300" aria-hidden>⭐</span>
           <span>Featured</span>

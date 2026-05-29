@@ -585,22 +585,36 @@ export function SpinModal({
                         : 'No spins left'}
               </button>
               {mode === 'auth' && (
-                <p className="mt-2 text-[11px] text-tower-cream/55 relative">
-                  Balance{' '}
-                  <strong
-                    className={
-                      'inline-block text-tower-gold tabular-nums origin-center ' +
-                      (creditFlash ? 'animate-credit-bump' : '')
-                    }
-                  >
-                    {formatCents(state?.creditCents ?? 0)}
-                  </strong>{' '}
-                  / {formatCents(SPIN_CREDIT_CAP_CENTS)}
-                  {state?.capReached && <span className="ml-1 text-emerald-300">· cap reached</span>}
-                  {/* Floating "+$X" reward indicator. Anchored above the
-                      balance number; `animate-credit-rise` floats it up
-                      + fades over 3 s. `pointer-events-none` so it
-                      never blocks clicks on the SPIN button beneath. */}
+                // Two-line balance block — small uppercase label
+                // ("AI Teammate Credit") above the running total so
+                // the user sees what the number represents at a
+                // glance, not just a bare "Balance N / M" line. The
+                // value half mirrors the screenshot: gold credit
+                // earned, muted "of $cap" suffix. `relative` keeps
+                // the floating "+$X" reward indicator anchored to
+                // this block.
+                <div className="mt-3 text-center relative">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-tower-cream/55">
+                    AI Teammate Credit
+                  </div>
+                  <div className="mt-0.5 text-[15px] font-extrabold tabular-nums leading-tight">
+                    <span
+                      className={
+                        'inline-block text-tower-gold origin-center ' +
+                        (creditFlash ? 'animate-credit-bump' : '')
+                      }
+                    >
+                      {formatCents(state?.creditCents ?? 0)}
+                    </span>
+                    <span className="text-tower-cream/55 font-semibold">
+                      {' '}of {formatCents(SPIN_CREDIT_CAP_CENTS)}
+                    </span>
+                  </div>
+                  {state?.capReached && (
+                    <div className="mt-0.5 text-[10px] text-emerald-300 font-semibold">
+                      cap reached
+                    </div>
+                  )}
                   {/* Floating "+$X" reward indicator. Anchored above
                       the balance number; `animate-credit-rise` floats
                       it up + fades over 3 s. `pointer-events-none` so
@@ -609,12 +623,12 @@ export function SpinModal({
                     <span
                       key={floatingCredit.id}
                       aria-hidden
-                      className="absolute left-1/2 -top-2 -translate-x-1/2 text-[18px] font-extrabold text-tower-gold drop-shadow-[0_0_8px_rgba(168,117,255,0.6)] pointer-events-none whitespace-nowrap animate-credit-rise"
+                      className="absolute left-1/2 -top-3 -translate-x-1/2 text-[18px] font-extrabold text-tower-gold drop-shadow-[0_0_8px_rgba(168,117,255,0.6)] pointer-events-none whitespace-nowrap animate-credit-rise"
                     >
                       +{formatCents(floatingCredit.delta)}
                     </span>
                   )}
-                </p>
+                </div>
               )}
               {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
             </>
@@ -706,7 +720,7 @@ export function SpinModal({
                 title={task.label}
                 subtitle={task.completed ? 'Completed' : '+1 spin · one-time only'}
                 actionLabel={
-                  task.completed ? 'Done' : pendingTask === task.key ? 'Waiting…' : 'Do it'
+                  task.completed ? 'Done' : pendingTask === task.key ? 'Waiting…' : 'Share'
                 }
                 done={task.completed}
                 disabled={!inviteUrl || !!pendingTask}
@@ -755,8 +769,18 @@ function ResultPanel({
       <div className={'text-4xl mb-1 ' + (isJackpot ? 'animate-bounce' : '')}>
         {isJackpot ? '🎉' : won ? '✨' : '🎁'}
       </div>
+      {/* Anon teaser users get a fuller sentence ("You won $X Credit")
+          so the reward reads as a tangible thing they've earned, not
+          a bare delta. Auth mode skips the ResultPanel entirely now,
+          but if it ever re-enters this branch we keep the legacy
+          "+$X" delta form so the chained-spin / jackpot accumulator
+          still reads clearly. */}
       <div className="text-2xl font-extrabold text-tower-gold">
-        {faceValue > 0 ? `+${formatCents(faceValue)}` : 'Nice try!'}
+        {faceValue > 0
+          ? mode === 'anon'
+            ? `You won ${formatCents(faceValue)} Credit`
+            : `+${formatCents(faceValue)}`
+          : 'Nice try!'}
         {isJackpot && ' JACKPOT'}
       </div>
       {outcome.capped && (
