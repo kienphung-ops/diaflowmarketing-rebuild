@@ -13,7 +13,7 @@
  */
 
 import { useEffect } from 'react'
-import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
+import { resolveLeoVideo } from '@/lib/youtubeUrl'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
@@ -46,10 +46,10 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
   )
   const anchored = !!anchorSlug && isDesktop
   // Same env-driven helper LeoBubble uses — keeps the two Leo modals
-  // in sync. Reads the BARE VIDEO ID from NEXT_PUBLIC_YOUTUBE_ID and
-  // falls back to the canonical Diaflow intro when the env is blank
-  // (see lib/youtubeUrl).
-  const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_ID)
+  // in sync. Reads the BARE VIDEO ID from NEXT_PUBLIC_YOUTUBE_ID;
+  // when the env is blank we fall back to the bundled MP4 in /public
+  // so the modal still plays without any env config (see lib/youtubeUrl).
+  const video = resolveLeoVideo(process.env.NEXT_PUBLIC_YOUTUBE_ID)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -151,19 +151,34 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
             inset — the modal is already wide enough that the video
             reads as large without bleeding. */}
         <div className="-mx-6 md:mx-0 mb-4 rounded-none md:rounded-md overflow-hidden border border-white/10 aspect-video bg-black">
-          {/* iframe attributes mirror `requirements/youtube_frame_rule.md`
-              — `autoplay` in `allow`, `referrerPolicy` to match
-              YouTube's canonical embed code. The clean-embed query
-              params (controls / rel / iv_load_policy / modestbranding /
-              disablekb) live on `video.embed` from lib/youtubeUrl. */}
-          <iframe
-            src={video.embed}
-            title="YouTube video player"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-            className="w-full h-full"
-          />
+          {video.kind === 'youtube' ? (
+            // iframe attributes mirror `requirements/youtube_frame_rule.md`
+            // — `autoplay` in `allow`, `referrerPolicy` to match
+            // YouTube's canonical embed code. The clean-embed query
+            // params (controls / rel / iv_load_policy / modestbranding /
+            // disablekb) live on `video.embed` from lib/youtubeUrl.
+            <iframe
+              src={video.embed}
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+              className="w-full h-full"
+            />
+          ) : (
+            // Local MP4 fallback. `playsInline` keeps playback inline
+            // on iOS instead of forcing fullscreen; `preload="metadata"`
+            // pulls just the header bytes so the full ~80 MB doesn't
+            // download until the user actually hits play.
+            <video
+              src={video.src}
+              title="Diaflow Tower intro"
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full h-full"
+            />
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-3 mb-4">

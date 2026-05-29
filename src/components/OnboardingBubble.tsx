@@ -18,7 +18,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { youtubeEmbedUrl } from '@/lib/youtubeUrl'
+import { resolveLeoVideo } from '@/lib/youtubeUrl'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 
@@ -538,18 +538,16 @@ interface LeoProps {
 }
 
 export function LeoBubble({ onContinue }: LeoProps) {
-  // Resolve YouTube embed URL from the BARE VIDEO ID in env. The
-  // "Watch on YouTube" link was removed per the Section 1 / step 4
-  // mockup, so only the embed flavour is consumed here. Parameter
-  // set comes from `requirements/youtube_frame_rule.md` — see
-  // `lib/youtubeUrl.ts`.
-  const video = youtubeEmbedUrl(process.env.NEXT_PUBLIC_YOUTUBE_ID)
+  // Resolve Leo's intro video. With NEXT_PUBLIC_YOUTUBE_ID set we
+  // embed YouTube (clean-params per requirements/youtube_frame_rule.md);
+  // without it we fall back to the bundled MP4 in /public so the
+  // marketing surface still has a working video. See lib/youtubeUrl.ts.
+  const video = resolveLeoVideo(process.env.NEXT_PUBLIC_YOUTUBE_ID)
 
   return (
     <ModalShell onClose={onContinue} wide step={4} anchorSlug="leo">
       <div>
-        {/* Embedded YouTube iframe driven by NEXT_PUBLIC_YOUTUBE_URL.
-            16:9 aspect ratio + purple glow underneath so the video
+        {/* 16:9 video well + purple glow underneath so the video
             doesn't look pasted onto the dark surface.
             On mobile we bleed past the ModalShell's px-6 side padding
             (`-mx-6`) so the video stretches edge-to-edge of the
@@ -567,24 +565,42 @@ export function LeoBubble({ onContinue }: LeoProps) {
             }}
           />
           <div className="relative rounded-none md:rounded-xl overflow-hidden border border-white/10 aspect-video bg-black">
-            {/* iframe attributes mirror the canonical embed template
-                in `requirements/youtube_frame_rule.md`:
-                  - `allow` includes `autoplay` so the embed can honour
-                    a user-initiated play gesture without re-prompting
-                  - `referrerPolicy="strict-origin-when-cross-origin"`
-                    matches what YouTube's official embed code ships
-                The embed URL itself already carries the
-                clean-embed parameter set (controls=0, rel=0,
-                iv_load_policy=3, modestbranding=1, disablekb=1) — see
-                `lib/youtubeUrl.ts`. */}
-            <iframe
-              src={video.embed}
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-              className="w-full h-full"
-            />
+            {video.kind === 'youtube' ? (
+              // iframe attributes mirror the canonical embed template
+              // in `requirements/youtube_frame_rule.md`:
+              //   - `allow` includes `autoplay` so the embed can honour
+              //     a user-initiated play gesture without re-prompting
+              //   - `referrerPolicy="strict-origin-when-cross-origin"`
+              //     matches what YouTube's official embed code ships
+              // The embed URL itself already carries the clean-embed
+              // parameter set (controls=0, rel=0, iv_load_policy=3,
+              // modestbranding=1, disablekb=1) — see `lib/youtubeUrl.ts`.
+              <iframe
+                src={video.embed}
+                title="YouTube video player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            ) : (
+              // Local MP4 fallback when NEXT_PUBLIC_YOUTUBE_ID isn't set.
+              //   - `controls`: native play / scrub / volume UI
+              //   - `playsInline`: keep playback inline on iOS Safari
+              //     instead of forcing fullscreen takeover the moment
+              //     the user hits play
+              //   - `preload="metadata"`: pull just enough header bytes
+              //     to know duration + size without auto-downloading
+              //     the full ~80 MB file before the user opts in
+              <video
+                src={video.src}
+                title="Diaflow intro"
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full h-full"
+              />
+            )}
           </div>
         </div>
 
