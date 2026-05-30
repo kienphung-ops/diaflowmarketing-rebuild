@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import './globals.css'
 import { GoogleAnalytics } from '@/components/GoogleAnalytics'
 import { GoogleTagManager, GoogleTagManagerNoScript } from '@/components/GoogleTagManager'
+import { MicrosoftClarity } from '@/components/MicrosoftClarity'
 
 /**
  * Default site URL — used by Next.js's metadata API to resolve every
@@ -150,6 +151,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* GTM head/body script — loaded after-interactive so it
             doesn't block first paint. Configured container = GTM-KDPNP5XB. */}
         <GoogleTagManager />
+        <MicrosoftClarity />
         {/* Direct GA4 (gtag) kept as well for the existing
             NEXT_PUBLIC_GA_ID measurement — GTM and GA4 can coexist;
             GTM lets us add more vendor tags later without code changes. */}
