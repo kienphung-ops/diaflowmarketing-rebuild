@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
+import { trackEvent } from '@/lib/tracking'
 import { computeTeammateCount } from '@/lib/floors'
 import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
@@ -499,7 +500,7 @@ export function MySquadDrawer({
 
               <button
                 type="button"
-                onClick={() => setHowItWorksOpen(true)}
+                onClick={() => { trackEvent('nav_click_how_it_works'); setHowItWorksOpen(true) }}
                 className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
               >
                 <span className="text-lg leading-none shrink-0" aria-hidden>
@@ -788,7 +789,7 @@ export function MySquadDrawer({
           <div className={`grid gap-2 ${onArrangeRoom ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <button
               type="button"
-              onClick={() => setHowItWorksOpen(true)}
+              onClick={() => { trackEvent('nav_click_how_it_works'); setHowItWorksOpen(true) }}
               className="flex items-center justify-center gap-1 px-3 py-3 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
             >
               <span className="text-base leading-none" aria-hidden>ⓘ</span>
