@@ -1613,7 +1613,7 @@ export default function TowerLanding(props: Props) {
         teammates={recruits}
         onTeammateUpdate={handleTeammateUpdate}
         onAddTeammate={handleAddTeammate}
-        onOpenSignup={() => setShowSignupModal(true)}
+        onOpenSignup={() => { trackEvent('signup_click', { source: 'onboarding' }); setShowSignupModal(true) }}
         inviter={props.inviter}
         onResetAllPositions={handleResetAllPositions}
         // Owner-side floor stats — only meaningful once they have a
