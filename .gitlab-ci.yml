@@ -1,0 +1,3 @@
+include:
+  - project: "diaflow.io/ci-template"
+    file: "diaflow-tower/.gitlab-ci.yml"
