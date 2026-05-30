@@ -286,12 +286,27 @@ export default function TowerLanding(props: Props) {
   // the SignupModal redirect + the Google OAuth callback (new account
   // branch only). Strips the query after firing so refresh doesn't
   // replay it.
+  //
+  // Tracking: email signups already fired `signup_complete` in the
+  // modal/page and set `sessionStorage.signup_tracked` to prevent
+  // double-counting. Google OAuth signups redirect here WITHOUT having
+  // fired the event, so we fire it here for those cases only.
   useEffect(() => {
     if (saveSuccessTriggeredRef.current) return
     if (!props.signedIn) return
     if (searchParams.get('just_signed_up') !== '1') return
     saveSuccessTriggeredRef.current = true
     setSaveSuccessOpen(true)
+    try {
+      const alreadyTracked = window.sessionStorage.getItem('signup_tracked')
+      if (!alreadyTracked) {
+        trackEvent('signup_complete', { method: 'google' })
+      } else {
+        window.sessionStorage.removeItem('signup_tracked')
+      }
+    } catch {
+      /* ignore — sessionStorage may be blocked */
+    }
     try {
       window.history.replaceState({}, '', '/')
     } catch {

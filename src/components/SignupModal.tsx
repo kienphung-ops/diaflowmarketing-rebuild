@@ -110,6 +110,14 @@ export function SignupModal({ onClose }: Props) {
       clearTrialState()
       trackEvent('signup_complete', { method: 'email' })
       try {
+        // Flag that we already tracked this signup so TowerLanding
+        // doesn't double-fire a google signup_complete when it sees
+        // `?just_signed_up=1` on the incoming redirect.
+        window.sessionStorage.setItem('signup_tracked', '1')
+      } catch {
+        /* ignore */
+      }
+      try {
         window.localStorage.removeItem('diaflow_pending_ref')
       } catch {
         /* ignore */
@@ -155,7 +163,6 @@ export function SignupModal({ onClose }: Props) {
       params.set('recommendedRole', latestTrial.recommendedRole)
     if (latestTrial?.reason) params.set('reason', latestTrial.reason)
     const qs = params.toString()
-    trackEvent('signup_click', { source: 'header' })
     window.location.href = `/api/auth/oauth/google${qs ? `?${qs}` : ''}`
   }
 

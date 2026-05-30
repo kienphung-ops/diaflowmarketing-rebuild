@@ -38,6 +38,7 @@ export function trackEvent<K extends keyof TrackingEvents>(
     ? []
     : [params: TrackingEvents[K]]
 ): void {
+  if (typeof window === 'undefined') return
   const params = args[0] ?? {}
 
   // GTM dataLayer
