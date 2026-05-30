@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import { SceneSkeleton } from '@/components/fallback/SceneSkeleton'
 import { DISCORD_URL } from '@/lib/links'
+import { trackEvent } from '@/lib/tracking'
 
 const SceneCanvas = dynamic(
   () => import('@/components/scene/SceneCanvas').then(m => ({ default: m.SceneCanvas })),
@@ -90,6 +91,7 @@ export default function HowItWorksClient() {
             href={DISCORD_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackEvent('discord_click', { source: 'how_it_works' })}
             className="px-3 py-2 rounded-md bg-night-mid border border-white/10 text-tower-cream text-sm hover:border-purple-400/40"
           >
             Discord

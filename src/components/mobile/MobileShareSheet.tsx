@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
 import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
+import { trackEvent } from '@/lib/tracking'
 
 /**
  * Bottom-sheet share surface for mobile, opened from the
@@ -183,7 +184,7 @@ export function MobileShareSheet({
               {displayUrl}
             </div>
             <button
-              onClick={handleCopy}
+              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'mobile_share' }); handleCopy() }}
               disabled={!inviteUrl && !onSignupNudge}
               className="shrink-0 rounded-xl bg-tower-gold/15 border border-tower-gold/30 px-3.5 text-[12px] font-bold text-tower-gold hover:bg-tower-gold/25 disabled:opacity-50 disabled:cursor-not-allowed transition"
               aria-label="Copy invite link"
@@ -201,7 +202,7 @@ export function MobileShareSheet({
             badgeBg="#000"
             badgeColor="#fff"
             disabled={!inviteUrl || sharePending !== null}
-            onClick={() => handleShareClick('x')}
+            onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'mobile_share' }); handleShareClick('x') }}
           />
           <ShareBtn
             label="LinkedIn"
@@ -209,7 +210,7 @@ export function MobileShareSheet({
             badgeBg="#0a66c2"
             badgeColor="#fff"
             disabled={!inviteUrl || sharePending !== null}
-            onClick={() => handleShareClick('linkedin')}
+            onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'mobile_share' }); handleShareClick('linkedin') }}
           />
           <ShareBtn
             label={copied ? 'Copied' : 'Copy'}
@@ -217,7 +218,7 @@ export function MobileShareSheet({
             badgeBg="rgba(255,255,255,0.08)"
             badgeColor="#f5f1e8"
             disabled={!inviteUrl && !onSignupNudge}
-            onClick={handleCopy}
+            onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'mobile_share' }); handleCopy() }}
           />
         </div>
 
