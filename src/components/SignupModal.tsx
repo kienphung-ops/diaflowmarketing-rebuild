@@ -163,6 +163,7 @@ export function SignupModal({ onClose }: Props) {
       params.set('recommendedRole', latestTrial.recommendedRole)
     if (latestTrial?.reason) params.set('reason', latestTrial.reason)
     const qs = params.toString()
+    trackEvent('signup_click', { source: 'onboarding' })
     window.location.href = `/api/auth/oauth/google${qs ? `?${qs}` : ''}`
   }
 

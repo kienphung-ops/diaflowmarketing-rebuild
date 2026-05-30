@@ -16,7 +16,7 @@ interface TrackingEvents {
   signup_click: { source: 'header' | 'iris' | 'mobile_share' | 'onboarding' | 'mobile_nav' }
   signup_complete: { method: 'email' | 'google' }
   discord_click: { source: 'squad_drawer' | 'how_it_works' }
-  share_click: { platform: 'twitter' | 'linkedin' | 'copy'; source: string }
+  share_click: { platform: 'twitter' | 'linkedin' | 'copy'; source: 'share_modal' | 'mobile_share' | 'iris_modal' | 'squad_drawer' }
   nav_click_tower_view: Record<string, never>
   nav_click_how_it_works: Record<string, never>
 }
