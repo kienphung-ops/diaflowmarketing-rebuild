@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1
 #
-# diaflow-tower (Next.js 14 + Prisma) — production image, standalone build.
+# diaflow-tower (Next.js 14 + Prisma) — production image, `next start` runtime.
 #
-# Stages : base -> deps -> builder -> runner (slim, standalone-only).
-# Final  : ships `.next/standalone` + `.next/static` + `public` + `prisma/`.
+# Stages : base -> deps -> builder -> runner.
+# Final  : ships full `.next/` + production node_modules + source + prisma/,
+#          started with `yarn start` (next start) on PORT 3000.
 #
 # CI writes `.env` before the build (base64 of DEV_ENV_B64 / UAT_ENV_B64 /
 # PROD_ENV_B64) so NEXT_PUBLIC_* values are baked into the client bundle.
 #
-# Requires: `output: "standalone"` in next.config.mjs, AND a committed
-# lockfile (yarn.lock OR package-lock.json). The install step exits 1 if
-# none is found.
+# Requires: committed lockfile (yarn.lock OR package-lock.json). The install
+# step exits 1 if none is found.
 
 ARG NODE_IMAGE=public.ecr.aws/docker/library/node:22-bookworm-slim
 
@@ -42,7 +42,7 @@ RUN \
   elif [ -f pnpm-lock.yaml ];    then corepack enable && pnpm run build; \
   fi
 
-# ── runner: slim runtime — standalone output only ────────────────────────────
+# ── runner: full runtime — `next start` via yarn ─────────────────────────────
 FROM base AS runner
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -53,18 +53,19 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid nodejs nextjs
+    && useradd --system --uid 1001 --gid nodejs nextjs \
+    && corepack enable
 
-# Standalone tree: `server.js` + pruned node_modules (includes @prisma/client)
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-# `.next/static` and `public` are NOT included in standalone — copy them.
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Full production runtime (no standalone): ship .next, deps, manifests,
+# prisma schema, and assets. `next start` reads `.next/` and resolves
+# server modules from node_modules at request time.
+COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/yarn.lock* /app/package-lock.json* /app/pnpm-lock.yaml* ./
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-# Prisma schema — needed only if you later run `prisma migrate deploy` from
-# the running container. The Prisma engines + generated client are already
-# in node_modules via the standalone trace.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.mjs ./next.config.mjs
 
 USER nextjs
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["yarn", "start"]
