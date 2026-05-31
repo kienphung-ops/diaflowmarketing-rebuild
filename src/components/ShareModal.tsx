@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
 import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
+import { trackEvent } from '@/lib/tracking'
 
 interface Props {
   open: boolean
@@ -141,7 +142,7 @@ export function ShareModal({
               {displayUrl}
             </span>
             <button
-              onClick={handleCopy}
+              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'share_modal' }); handleCopy() }}
               disabled={!inviteUrl}
               className="shrink-0 rounded-md bg-tower-gold text-night-deep px-3 py-1.5 text-[11.5px] font-extrabold hover:bg-tower-gold/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
               aria-label="Copy invite link"
@@ -158,7 +159,7 @@ export function ShareModal({
               badgeBg="#000"
               badgeColor="#fff"
               disabled={!inviteUrl || sharePending !== null}
-              onClick={() => triggerShare('x')}
+              onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'share_modal' }); triggerShare('x') }}
             />
             <ShareBtn
               label="LinkedIn"
@@ -166,7 +167,7 @@ export function ShareModal({
               badgeBg="#0a66c2"
               badgeColor="#fff"
               disabled={!inviteUrl || sharePending !== null}
-              onClick={() => triggerShare('linkedin')}
+              onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'share_modal' }); triggerShare('linkedin') }}
             />
             <ShareBtn
               label={copied ? 'Copied' : 'Copy'}
@@ -174,7 +175,7 @@ export function ShareModal({
               badgeBg="rgba(168,117,255,0.2)"
               badgeColor="#c4a3ff"
               disabled={!inviteUrl}
-              onClick={handleCopy}
+              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'share_modal' }); handleCopy() }}
             />
           </div>
         </div>

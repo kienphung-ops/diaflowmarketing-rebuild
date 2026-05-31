@@ -18,6 +18,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { clearTrialState, readTrialState } from '@/lib/trial'
+import { trackEvent } from '@/lib/tracking'
 import { PasswordInput } from '@/components/PasswordInput'
 import { InlineSpinner } from '@/components/ViewTransitionOverlay'
 
@@ -70,6 +71,15 @@ export default function SignupPage() {
       // local trial state + pending ref so a fresh account starts
       // cleanly, then redirect to the office view.
       clearTrialState()
+      trackEvent('signup_complete', { method: 'email' })
+      try {
+        // Flag that we already tracked this signup so TowerLanding
+        // doesn't double-fire a google signup_complete if it ever
+        // sees `?just_signed_up=1` on the incoming redirect.
+        window.sessionStorage.setItem('signup_tracked', '1')
+      } catch {
+        /* ignore */
+      }
       try {
         window.localStorage.removeItem('diaflow_pending_ref')
       } catch {

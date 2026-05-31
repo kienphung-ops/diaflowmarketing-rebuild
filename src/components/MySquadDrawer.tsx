@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
+import { trackEvent } from '@/lib/tracking'
 import { computeTeammateCount } from '@/lib/floors'
 import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
@@ -499,7 +500,7 @@ export function MySquadDrawer({
 
               <button
                 type="button"
-                onClick={() => setHowItWorksOpen(true)}
+                onClick={() => { trackEvent('nav_click_how_it_works'); setHowItWorksOpen(true) }}
                 className="w-full rounded-xl bg-night-mid/60 border border-white/10 px-3.5 py-3 flex items-center gap-3 hover:border-white/20 transition"
               >
                 <span className="text-lg leading-none shrink-0" aria-hidden>
@@ -658,7 +659,7 @@ export function MySquadDrawer({
                 {inviteUrl.replace(/^https?:\/\//, '')}
               </div>
               <button
-                onClick={handleCopy}
+                onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'squad_drawer' }); handleCopy() }}
                 aria-label="Copy invite link"
                 title={copied ? 'Copied' : 'Copy link'}
                 className="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-md bg-night-deep/80 border border-white/10 text-tower-cream/80 hover:text-tower-cream hover:border-white/20 transition"
@@ -669,7 +670,7 @@ export function MySquadDrawer({
           )}
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => triggerShare('x')}
+              onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'squad_drawer' }); triggerShare('x') }}
               disabled={!inviteUrl || sharePending !== null}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on X"
@@ -678,7 +679,7 @@ export function MySquadDrawer({
               <span>X</span>
             </button>
             <button
-              onClick={() => triggerShare('linkedin')}
+              onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'squad_drawer' }); triggerShare('linkedin') }}
               disabled={!inviteUrl || sharePending !== null}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on LinkedIn"
@@ -687,7 +688,7 @@ export function MySquadDrawer({
               <span>LinkedIn</span>
             </button>
             <button
-              onClick={handleCopy}
+              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'squad_drawer' }); handleCopy() }}
               disabled={!inviteUrl}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Copy invite link"
@@ -725,6 +726,7 @@ export function MySquadDrawer({
               href={DISCORD_URL}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackEvent('discord_click', { source: 'squad_drawer' })}
               className="inline-flex items-center gap-1.5 text-[#a5b4fc] hover:text-[#c7d2fe] underline-offset-2 hover:underline text-sm font-medium transition"
             >
               <svg
@@ -788,7 +790,7 @@ export function MySquadDrawer({
           <div className={`grid gap-2 ${onArrangeRoom ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <button
               type="button"
-              onClick={() => setHowItWorksOpen(true)}
+              onClick={() => { trackEvent('nav_click_how_it_works'); setHowItWorksOpen(true) }}
               className="flex items-center justify-center gap-1 px-3 py-3 rounded-xl bg-night-deep/60 border border-white/10 text-tower-cream hover:border-white/20 transition"
             >
               <span className="text-base leading-none" aria-hidden>ⓘ</span>
@@ -809,6 +811,7 @@ export function MySquadDrawer({
             href={DISCORD_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackEvent('discord_click', { source: 'squad_drawer' })}
             className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold transition"
           >
             <svg width="18" height="14" viewBox="0 0 71 55" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden>

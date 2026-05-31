@@ -12,8 +12,9 @@
  * minimal so any existing callers don't break.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { resolveLeoVideo } from '@/lib/youtubeUrl'
+import { trackEvent } from '@/lib/tracking'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
@@ -50,6 +51,55 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
   // when the env is blank we fall back to the bundled MP4 in /public
   // so the modal still plays without any env config (see lib/youtubeUrl).
   const video = resolveLeoVideo(process.env.NEXT_PUBLIC_YOUTUBE_ID)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const hasTrackedVideo = useRef(false)
+
+  // Poll YouTube iframe for playback progress via postMessage API.
+  // Fires leo_video_complete once the user passes ~80% of the video.
+  useEffect(() => {
+    if (!open || video.kind !== 'youtube' || hasTrackedVideo.current) return
+
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    function onMessage(e: MessageEvent) {
+      if (typeof e.data !== 'string') return
+      try {
+        const msg = JSON.parse(e.data)
+        if (msg.event === 'infoDelivery' && msg.info) {
+          const { currentTime, duration } = msg.info
+          if (
+            typeof currentTime === 'number' &&
+            typeof duration === 'number' &&
+            duration > 0 &&
+            currentTime / duration >= 0.8 &&
+            !hasTrackedVideo.current
+          ) {
+            hasTrackedVideo.current = true
+            trackEvent('leo_video_complete', { percent: Math.round((currentTime / duration) * 100) })
+            if (intervalId) clearInterval(intervalId)
+          }
+        }
+      } catch {
+        // ignore non-JSON messages
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+
+    intervalId = setInterval(() => {
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'listening' }),
+          'https://www.youtube.com'
+        )
+      }
+    }, 1000)
+
+    return () => {
+      window.removeEventListener('message', onMessage)
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [open, video.kind])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -158,7 +208,8 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
             // params (controls / rel / iv_load_policy / modestbranding /
             // disablekb) live on `video.embed` from lib/youtubeUrl.
             <iframe
-              src={video.embed}
+              ref={iframeRef}
+              src={`${video.embed}&enablejsapi=1`}
               title="YouTube video player"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
