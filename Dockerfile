@@ -12,7 +12,7 @@
 # lockfile (yarn.lock OR package-lock.json). The install step exits 1 if
 # none is found.
 
-ARG NODE_IMAGE=public.ecr.aws/docker/library/node:20-bookworm-slim
+ARG NODE_IMAGE=public.ecr.aws/docker/library/node:22-bookworm-slim
 
 # ── base ─────────────────────────────────────────────────────────────────────
 FROM ${NODE_IMAGE} AS base
