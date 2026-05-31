@@ -42,7 +42,10 @@ RUN \
   elif [ -f pnpm-lock.yaml ];    then corepack enable && pnpm run build; \
   fi
 
-# ── runner: full runtime — `next start` via yarn ─────────────────────────────
+# ── runner: full runtime — `next start` invoked directly via node ────────────
+# (We bypass yarn/corepack at runtime to avoid corepack trying to write to
+# ~/.cache/node/corepack on first invocation — the `next` binary in
+# node_modules is sufficient.)
 FROM base AS runner
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -53,8 +56,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid nodejs nextjs \
-    && corepack enable
+    && useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nextjs nextjs
 
 # Full production runtime (no standalone): ship .next, deps, manifests,
 # prisma schema, and assets. `next start` reads `.next/` and resolves
@@ -68,4 +70,4 @@ COPY --from=builder --chown=nextjs:nodejs /app/next.config.mjs ./next.config.mjs
 
 USER nextjs
 EXPOSE 3000
-CMD ["yarn", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]
