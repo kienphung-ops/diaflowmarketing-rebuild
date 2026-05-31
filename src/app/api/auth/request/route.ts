@@ -27,6 +27,12 @@ function getClientIp(req: NextRequest): string | undefined {
  * proxies) and finally to the request URL itself.
  */
 function getBrowserOrigin(req: NextRequest): string {
+  // `NEXT_PUBLIC_SITE_URL` is the authoritative override — magic
+  // link URLs get baked into outbound emails, so a localhost
+  // fallback here lands an unclickable link in the user's inbox.
+  // Same rationale + chain as the password-reset request route.
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (fromEnv) return fromEnv
   const origin = req.headers.get('origin')
   if (origin) return origin
   const host = req.headers.get('host')

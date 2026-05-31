@@ -50,8 +50,12 @@ export async function GET(req: NextRequest) {
   if (!clientId) {
     // Friendly error — surface to the user with a redirect to /login
     // carrying an `oauth_error` query param the page can pick up.
+    // Use `originOf(req)` (not `req.nextUrl.origin`) so this error
+    // redirect lands on the canonical site URL even when behind a
+    // reverse proxy that doesn't forward X-Forwarded-Host. Same fix
+    // as the callback route — see its writeup on the issue.
     return NextResponse.redirect(
-      new URL('/login?oauth_error=not_configured', req.nextUrl.origin),
+      new URL('/login?oauth_error=not_configured', originOf(req)),
     )
   }
 
