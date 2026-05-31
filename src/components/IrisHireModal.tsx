@@ -8,6 +8,7 @@ import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
 import { TeammatePortrait } from './TeammatePortrait'
+import { trackEvent } from '@/lib/tracking'
 
 interface Props {
   open: boolean
@@ -232,6 +233,7 @@ export function IrisHireModal({
               </p>
               <button
                 onClick={() => {
+                  trackEvent('iris_interaction', { action: 'save_team' })
                   onClose()
                   onOpenSignup?.()
                 }}
@@ -249,6 +251,7 @@ export function IrisHireModal({
               </p>
               <button
                 onClick={() => {
+                  trackEvent('iris_interaction', { action: 'add_teammate' })
                   onClose()
                   onAddTeammate?.()
                 }}
@@ -285,6 +288,7 @@ export function IrisHireModal({
                   aria-disabled={!inviteUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => trackEvent('share_click', { platform: 'twitter', source: 'iris_modal' })}
                   className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
                   }`}
@@ -298,6 +302,7 @@ export function IrisHireModal({
                   aria-disabled={!inviteUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => trackEvent('share_click', { platform: 'linkedin', source: 'iris_modal' })}
                   className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
                   }`}
@@ -307,7 +312,7 @@ export function IrisHireModal({
                   <span>LinkedIn</span>
                 </a>
                 <button
-                  onClick={handleCopy}
+                  onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'iris_modal' }); handleCopy() }}
                   disabled={!inviteUrl}
                   className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Copy invite link"

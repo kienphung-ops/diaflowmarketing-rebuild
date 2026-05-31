@@ -57,6 +57,7 @@ import {
 } from '@/lib/trial'
 
 import { SceneSkeleton } from '@/components/fallback/SceneSkeleton'
+import { trackEvent } from '@/lib/tracking'
 
 const SceneCanvas = dynamic(
   () => import('@/components/scene/SceneCanvas').then(m => ({ default: m.SceneCanvas })),
@@ -285,12 +286,27 @@ export default function TowerLanding(props: Props) {
   // the SignupModal redirect + the Google OAuth callback (new account
   // branch only). Strips the query after firing so refresh doesn't
   // replay it.
+  //
+  // Tracking: email signups already fired `signup_complete` in the
+  // modal/page and set `sessionStorage.signup_tracked` to prevent
+  // double-counting. Google OAuth signups redirect here WITHOUT having
+  // fired the event, so we fire it here for those cases only.
   useEffect(() => {
     if (saveSuccessTriggeredRef.current) return
     if (!props.signedIn) return
     if (searchParams.get('just_signed_up') !== '1') return
     saveSuccessTriggeredRef.current = true
     setSaveSuccessOpen(true)
+    try {
+      const alreadyTracked = window.sessionStorage.getItem('signup_tracked')
+      if (!alreadyTracked) {
+        trackEvent('signup_complete', { method: 'google' })
+      } else {
+        window.sessionStorage.removeItem('signup_tracked')
+      }
+    } catch {
+      /* ignore — sessionStorage may be blocked */
+    }
     try {
       window.history.replaceState({}, '', '/')
     } catch {
@@ -1202,7 +1218,7 @@ export default function TowerLanding(props: Props) {
         currentFloor={effective.currentFloor}
         totalInvites={effective.totalInvites}
         referralCode={props.referralCode}
-        onOpenSignup={isTrial ? () => setShowSignupModal(true) : undefined}
+        onOpenSignup={isTrial ? () => { trackEvent('signup_click', { source: 'header' }); setShowSignupModal(true) } : undefined}
         // Tower view is now a dedicated route — see /tower. Button navigates
         // there instead of toggling an overlay.
         showTower={false}
@@ -1215,6 +1231,7 @@ export default function TowerLanding(props: Props) {
             ? () => {
                 setAttentionTower(false)
                 setIsNavigating(true)
+                trackEvent('nav_click_tower_view')
                 router.push('/tower')
               }
             : undefined
@@ -1277,8 +1294,13 @@ export default function TowerLanding(props: Props) {
               if (slug === stepCharacter) setOnboardingModalVisible(true)
               return
             }
-            if (slug === 'iris') setIrisModalOpen(true)
-            else setActiveNpcModal(slug)
+            if (slug === 'iris') {
+              trackEvent('iris_interaction', { action: 'open_modal' })
+              setIrisModalOpen(true)
+            } else {
+              if (slug === 'mia') trackEvent('mia_interaction', { action: 'open_modal' })
+              setActiveNpcModal(slug)
+            }
           }}
           onTeammateClick={idx => {
             // Click → open the speech bubble (Step 2 of the design)
@@ -1338,8 +1360,13 @@ export default function TowerLanding(props: Props) {
             if (slug === stepCharacter) setOnboardingModalVisible(true)
             return
           }
-          if (slug === 'iris') setIrisModalOpen(true)
-          else setActiveNpcModal(slug)
+          if (slug === 'iris') {
+            trackEvent('iris_interaction', { action: 'open_modal' })
+            setIrisModalOpen(true)
+          } else {
+            if (slug === 'mia') trackEvent('mia_interaction', { action: 'open_modal' })
+            setActiveNpcModal(slug)
+          }
         }}
         onTeammateClick={idx => {
           const t = customRecruits[idx]
@@ -1375,6 +1402,7 @@ export default function TowerLanding(props: Props) {
         currentSpinTokens={props.signedIn ? spinTokens : undefined}
         onSaveTeam={() => {
           setSpinOpen(false)
+          trackEvent('signup_click', { source: 'onboarding' })
           setShowSignupModal(true)
         }}
         // Auth-mode "Refer a friend" CTA — opens the share-link modal
@@ -1441,6 +1469,7 @@ export default function TowerLanding(props: Props) {
               // timer is unaffected — it can finish naturally.
               setAttentionTower(false)
               setIsNavigating(true)
+              trackEvent('nav_click_tower_view')
               router.push('/tower')
             }}
             onOpenSquad={() => setSquadOpen(true)}
@@ -1450,7 +1479,10 @@ export default function TowerLanding(props: Props) {
             heroMode={props.signedIn ? 'invite' : 'save'}
             onHero={() => {
               if (props.signedIn) setMobileShareOpen(true)
-              else setShowSignupModal(true)
+              else {
+                trackEvent('signup_click', { source: 'mobile_nav' })
+                setShowSignupModal(true)
+              }
             }}
             attentionTower={attentionTower}
           />
@@ -1464,7 +1496,7 @@ export default function TowerLanding(props: Props) {
             }
             currentFloor={effective.currentFloor}
             totalInvites={effective.totalInvites}
-            onSignupNudge={isTrial ? () => setShowSignupModal(true) : undefined}
+            onSignupNudge={isTrial ? () => { trackEvent('signup_click', { source: 'mobile_share' }); setShowSignupModal(true) } : undefined}
           />
         </>
       )}
@@ -1581,7 +1613,7 @@ export default function TowerLanding(props: Props) {
         teammates={recruits}
         onTeammateUpdate={handleTeammateUpdate}
         onAddTeammate={handleAddTeammate}
-        onOpenSignup={() => setShowSignupModal(true)}
+        onOpenSignup={() => { trackEvent('signup_click', { source: 'onboarding' }); setShowSignupModal(true) }}
         inviter={props.inviter}
         onResetAllPositions={handleResetAllPositions}
         // Owner-side floor stats — only meaningful once they have a
@@ -1714,7 +1746,7 @@ export default function TowerLanding(props: Props) {
               if (nextSlots > 0) setBulkAddOpen(true)
             }
           }}
-          onOpenSignup={isTrial ? () => setShowSignupModal(true) : undefined}
+          onOpenSignup={isTrial ? () => { trackEvent('signup_click', { source: 'onboarding' }); setShowSignupModal(true) } : undefined}
         />
       )}
 
@@ -1744,7 +1776,7 @@ export default function TowerLanding(props: Props) {
         }
         signedIn={props.signedIn}
         onAddTeammate={() => setBulkAddOpen(true)}
-        onOpenSignup={() => setShowSignupModal(true)}
+        onOpenSignup={() => { trackEvent('signup_click', { source: 'iris' }); setShowSignupModal(true) }}
       />
 
       {showSignupModal && <SignupModal onClose={() => setShowSignupModal(false)} />}
