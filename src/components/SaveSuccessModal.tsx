@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
+import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 import { TeammatePortrait } from './TeammatePortrait'
 
 /**
@@ -107,7 +107,7 @@ export function SaveSuccessModal({
   const xText = nextFloor
     ? `just built my AI office at diaflow. ${invitesToNext} ${
         invitesToNext === 1 ? 'invite' : 'invites'
-      } from unlocking the next floor 👀`
+      } from unlocking the next level 👀`
     : 'just topped out my AI office at diaflow 🏆'
   const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
     inviteUrl,
@@ -125,6 +125,7 @@ export function SaveSuccessModal({
       await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
+      void creditShareUnlock('copy')
     } catch {
       /* ignore */
     }
@@ -184,12 +185,12 @@ export function SaveSuccessModal({
     <div className="rounded-xl bg-[#1B1A38] border border-[#2A2A4D] p-3.5 md:p-4 flex flex-col">
       <div className="flex justify-between items-baseline mb-2.5">
         <div className="text-[11px] uppercase tracking-[0.08em] text-tower-cream/55 font-semibold">
-          {nextFloor ? `Climb to Floor ${nextFloor.id}` : 'Penthouse reached'}
+          {nextFloor ? `Climb to level ${nextFloor.id}` : 'Penthouse reached'}
         </div>
         <div className="text-[12px] text-purple-300 font-semibold">
           {nextFloor
             ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} away`
-            : '👑 Top floor'}
+            : '👑 Max level'}
         </div>
       </div>
       {/* URL bar */}

@@ -38,6 +38,12 @@ interface Props {
   onHero: () => void
   /** Drives the hero label. `save` = trial user, `invite` = signed-in. */
   heroMode: 'save' | 'invite'
+  /** Opens the leaderboard / rank modal — rendered as the right slot,
+   *  to the right of the hero CTA. */
+  onOpenRank: () => void
+  /** Current leaderboard rank, shown in the Rank slot label (e.g. "#7").
+   *  null/undefined while unknown — falls back to the "Rank" label. */
+  rank?: number | null
   /** When true, paints a pulsing purple ring + glow around the Tower
    *  button to draw the user's eye there. Used right after onboarding
    *  finishes — the user has just met their team, and the next beat is
@@ -49,10 +55,11 @@ interface Props {
 export function MobileBottomNav({
   active,
   onGoOffice,
-  onGoTower,
+  //onGoTower,
   onOpenSquad,
   onHero,
   heroMode,
+  onOpenRank,
   attentionTower,
 }: Props) {
   const onTowerPage = active === 'tower'
@@ -66,7 +73,7 @@ export function MobileBottomNav({
           the post-onboarding attention pulse is active. Positioned
           relative to the nav's right edge so it lands directly on top
           of the Tower slot regardless of the hero CTA's width. */}
-      {showAttentionArrow && (
+      {false && showAttentionArrow && (
         <div
           aria-hidden
           className="absolute right-3 bottom-[calc(100%-4px)] flex flex-col items-center text-purple-300 animate-nav-arrow-bounce"
@@ -105,14 +112,12 @@ export function MobileBottomNav({
         {/* Hero — purple-filled wide CTA. Label swaps with login. */}
         <HeroBtn mode={heroMode} onClick={onHero} />
 
-        {/* Right slot — Tower navigation. Highlights when active or
-            attention-pulsing post-onboarding. */}
+        {/* Right slot — Rank opener (leaderboard modal). Shows the
+            user's current rank in the label when known (e.g. "#7"). */}
         <IconBtn
           icon="🏆"
-          label="Tower"
-          onClick={onGoTower}
-          active={onTowerPage}
-          pulse={!!attentionTower && !onTowerPage}
+          label='Rank'
+          onClick={onOpenRank}
         />
       </div>
     </nav>

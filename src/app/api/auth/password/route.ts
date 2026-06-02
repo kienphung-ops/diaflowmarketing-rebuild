@@ -6,7 +6,7 @@ import {
   createSessionJwt,
   generateReferralCode,
 } from '@/lib/auth'
-import { computeFloorForInvites } from '@/lib/floors'
+import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
 
@@ -122,7 +122,6 @@ export async function POST(req: NextRequest) {
       })
       if (inviter) {
         const newTotal = inviter.totalInvites + 1
-        const newFloor = computeFloorForInvites(newTotal)
         await prisma.$transaction(async tx => {
           await tx.inviteEvent.create({
             data: {
@@ -136,8 +135,10 @@ export async function POST(req: NextRequest) {
           })
           await tx.user.update({
             where: { id: inviter.id },
-            data: { totalInvites: newTotal, currentFloor: newFloor },
+            data: { totalInvites: newTotal },
           })
+          // Floor 2 is share-gated — recompute from fresh progress.
+          await recomputeAndPersistFloor(tx, inviter.id)
           // Items cascade automatically via FloorItem when currentFloor
           // changes; nothing else to write here.
           const teammateCount = await tx.recruitedTeammate.count({ where: { userId: inviter.id } })

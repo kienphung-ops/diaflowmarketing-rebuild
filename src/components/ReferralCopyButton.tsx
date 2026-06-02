@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 
 interface Props {
   code: string
@@ -25,7 +26,7 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
     : 0
 
   const handleCopy = async () => {
-    const url = `${window.location.origin}/?ref=${code}`
+    const url = `${window.location.origin}/floor/${code}`
     // Route through buildShareCopyText so the header Copy button
     // pastes the same marketing-formatted string as the MySquad +
     // HowItWorks + Iris drawers ("built my AI office, N invites
@@ -36,6 +37,9 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
       await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
+      // Copy counts as a share toward a share-gated next floor (server
+      // no-ops when it isn't share-gated).
+      void creditShareUnlock('copy')
     } catch {
       // fall through silently
     }

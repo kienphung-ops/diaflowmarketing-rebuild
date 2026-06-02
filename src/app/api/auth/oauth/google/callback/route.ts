@@ -30,7 +30,7 @@ import {
   createSessionJwt,
   generateReferralCode,
 } from '@/lib/auth'
-import { computeFloorForInvites } from '@/lib/floors'
+import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
@@ -299,7 +299,6 @@ async function findOrCreateUserFromGoogle({
       // Inviter credit — same chain as email signup.
       if (inviter && inviter.id !== created.id) {
         const newTotal = inviter.totalInvites + 1
-        const newFloor = computeFloorForInvites(newTotal)
         await tx.inviteEvent.create({
           data: {
             inviterUserId: inviter.id,
@@ -312,8 +311,10 @@ async function findOrCreateUserFromGoogle({
         })
         await tx.user.update({
           where: { id: inviter.id },
-          data: { totalInvites: newTotal, currentFloor: newFloor },
+          data: { totalInvites: newTotal },
         })
+        // Floor 2 is share-gated — recompute from fresh progress.
+        await recomputeAndPersistFloor(tx, inviter.id)
         // Spin economy: +1 spin to the inviter for the referral signup.
         await grantReferralSpinTx(tx, inviter.id)
       }

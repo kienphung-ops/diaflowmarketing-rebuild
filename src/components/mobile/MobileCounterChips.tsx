@@ -67,7 +67,7 @@ export function MobileCounterChips({
       style={{ scrollbarWidth: 'none' }}
     >
       <Chip>
-        Floor <strong className="text-tower-gold">{currentFloor}</strong>
+        Level <strong className="text-tower-gold">{currentFloor}</strong>
       </Chip>
       <Chip>
         <strong className="text-tower-gold">{totalInvites}</strong>{' '}
@@ -96,7 +96,7 @@ export function MobileCounterChips({
         // dropping the chip and leaving an awkward gap at the end of
         // the strip, surface a "you've topped out" status so the row
         // stays balanced and the milestone is acknowledged.
-        <Chip tone="gold">👑 Top floor reached</Chip>
+        <Chip tone="gold">👑 You&apos;ve reached the top!</Chip>
       )}
     </div>
   )

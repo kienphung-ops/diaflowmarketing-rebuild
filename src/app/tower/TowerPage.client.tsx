@@ -442,6 +442,8 @@ export default function TowerPageClient(props: Props) {
         onOpenSquad={() => setSquadOpen(true)}
         // Hero CTA in the middle slot — label swaps with login state.
         heroMode={props.signedIn ? 'invite' : 'save'}
+        onOpenRank={() => setLeaderboardOpen(true)}
+        rank={rank}
         onHero={() => {
           if (props.signedIn) setMobileShareOpen(true)
           else setSignupOpen(true)

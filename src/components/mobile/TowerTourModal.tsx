@@ -73,13 +73,13 @@ export function TowerTourModal({
     1: (
       <>
         <h2 className="text-[18px] font-extrabold leading-tight tracking-tight mb-2">
-          20 floors.{' '}
+          20 Levels.{' '}
           <span className="bg-gradient-to-r from-purple-300 to-purple-400 bg-clip-text text-transparent">
-            You&apos;re on Floor {currentFloor}.
+            You&apos;re on Level {currentFloor}.
           </span>
         </h2>
         <p className="text-[13px] text-tower-cream/70 leading-relaxed">
-          Your office sits at Floor {currentFloor}, with{' '}
+          Your office sits at Level {currentFloor}, with{' '}
           <strong className="text-tower-cream font-semibold">Iris, Mia, Leo</strong> hired.
         </p>
       </>
@@ -87,11 +87,11 @@ export function TowerTourModal({
     2: (
       <>
         <h2 className="text-[18px] font-extrabold leading-tight tracking-tight mb-2">
-          Floor 3 unlocks{' '}
+          Level 3 unlocks{' '}
           <span className="text-amber-300">free early beta access.</span>
         </h2>
         <p className="text-[13px] text-tower-cream/70 leading-relaxed mb-3">
-          Climb to Floor 3 and{' '}
+          Climb to Level 3 and{' '}
           <strong className="text-tower-cream font-semibold">use Diaflow before the public launch</strong>{' '}
           — free.
         </p>
@@ -109,7 +109,7 @@ export function TowerTourModal({
           </span>
         </h2>
         <p className="text-[13px] text-tower-cream/70 leading-relaxed mb-3">
-          Reach Floor 20, get the{' '}
+          Reach Level 20, get the{' '}
           <strong className="text-tower-cream font-semibold">
             full penthouse + 3 months of Pro free + featured at launch.
           </strong>
@@ -141,7 +141,7 @@ export function TowerTourModal({
           </span>
         </h2>
         <p className="text-[13px] text-tower-cream/70 leading-relaxed mb-2">
-          Every invite gets you closer to the next floor. Each floor unlocks new teammates and rewards.
+          Every invite gets you closer to the next Level. Each Level unlocks new teammates and rewards.
         </p>
         <p className="text-[13px] text-tower-cream font-semibold leading-relaxed">
           But only if you save your team first.
@@ -251,7 +251,7 @@ export function TowerTourModal({
                 onClick={() => setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : 4))}
                 className="px-4 py-3 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[12px] shadow-[0_6px_16px_rgba(168,117,255,0.35)] hover:shadow-[0_10px_22px_rgba(168,117,255,0.45)] transition"
               >
-                {step === 1 && 'Next: Floor 3 →'}
+                {step === 1 && 'Next: Level 3 →'}
                 {step === 2 && 'Next: penthouse →'}
                 {step === 3 && 'Next: how to climb →'}
               </button>

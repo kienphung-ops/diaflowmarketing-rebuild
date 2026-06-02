@@ -108,6 +108,10 @@ model InviteEvent {
 model Floor {
   id              Int         @id
   invitesRequired Int         @map("invites_required")
+  // How this floor is unlocked: "invite" (default — needs invitesRequired
+  // referrals) or "share" (needs the user to have shared at least once).
+  // Drives the requirement-aware gate in lib/floors → computeFloorForProgress.
+  unlockType      String      @default("invite") @map("unlock_type")
   label           String
   maxTeammates    Int         @map("max_teammates")
   productReward   String?     @map("product_reward")
