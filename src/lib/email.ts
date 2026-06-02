@@ -17,7 +17,7 @@ function buildAuthEmailHtml({ magicLinkUrl, otp }: { magicLinkUrl: string; otp: 
 <html>
   <body style="margin:0;padding:32px 16px;background:#0a0e27;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e8e8f0;">
     <div style="max-width:480px;margin:0 auto;background:#1a1a2e;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:32px;">
-      <h1 style="margin:0 0 12px;font-size:22px;color:#ffffff;">Sign in to Diaflow Tower</h1>
+      <h1 style="margin:0 0 12px;font-size:22px;color:#ffffff;">Sign in to Diaflow teammate</h1>
       <p style="margin:0 0 24px;color:rgba(255,255,255,0.7);font-size:14px;line-height:1.6;">
         Click the button below to sign in instantly, or enter the 6-digit code on the page.
       </p>
@@ -36,7 +36,7 @@ function buildAuthEmailHtml({ magicLinkUrl, otp }: { magicLinkUrl: string; otp: 
 }
 
 function buildAuthEmailText({ magicLinkUrl, otp }: { magicLinkUrl: string; otp: string }): string {
-  return `Sign in to Diaflow Tower
+  return `Sign in to Diaflow teammate
 
 Click the link to sign in instantly:
 ${magicLinkUrl}

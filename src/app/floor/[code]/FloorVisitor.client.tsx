@@ -136,7 +136,7 @@ export default function FloorVisitorClient(props: Props) {
   const [squadOpen, setSquadOpen] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
-  // "What is Diaflow Tower?" → opens the rewards/how-it-works modal.
+  // "What is Diaflow teammate?" → opens the rewards/how-it-works modal.
   const [howItWorksOpen, setHowItWorksOpen] = useState(false)
   const origin = useOrigin()
   // Covers the visited floor with a spinner while /tower loads. See the
@@ -570,7 +570,7 @@ export default function FloorVisitorClient(props: Props) {
         }}
       />
 
-      {/* "What is Diaflow Tower?" helper — bottom-left. Collapsed to a
+      {/* "What is Diaflow teammate?" helper — bottom-left. Collapsed to a
           "?" circle; expands to the full label on hover (desktop). Tap
           opens the How-it-works / rewards modal. Lifted above the
           anonymous "Build your own office" bottom card on mobile so they
@@ -578,7 +578,7 @@ export default function FloorVisitorClient(props: Props) {
       <button
         type="button"
         onClick={() => setHowItWorksOpen(true)}
-        aria-label="What is Diaflow Tower?"
+        aria-label="What is Diaflow teammate?"
         className={
           'group fixed left-4 z-30 flex items-center rounded-full bg-night-mid/90 border border-white/15 backdrop-blur-md text-tower-cream/80 hover:text-tower-cream shadow-lg transition-all ' +
           (props.visitorSignedIn ? 'bottom-4' : 'bottom-[6.5rem] md:bottom-4')
@@ -589,7 +589,7 @@ export default function FloorVisitorClient(props: Props) {
           ?
         </span>
         <span className="max-w-0 group-hover:max-w-[220px] overflow-hidden whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 text-[13px] font-semibold">
-          <span className="pr-4">What is Diaflow Tower?</span>
+          <span className="pr-4">What is Diaflow teammate?</span>
         </span>
       </button>
 
@@ -624,6 +624,7 @@ export default function FloorVisitorClient(props: Props) {
           totalInvites={liveVisitorInvites}
           trialMode={false}
           floorsClimbed={celebrationFloorsClimbed}
+          rank={rank}
           onClose={() => setCelebrationFloor(null)}
         />
       )}

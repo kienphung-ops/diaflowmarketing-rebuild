@@ -170,7 +170,7 @@ export default function LoginPage() {
         <div className="mt-4 pt-4 border-t border-white/5 text-center text-[12.5px] text-tower-cream/60">
           New here?{' '}
           <Link href="/" className="text-purple-300 font-semibold hover:underline">
-            Start your tower →
+            Meet your Diaflow teammate →
           </Link>
         </div>
       </div>
