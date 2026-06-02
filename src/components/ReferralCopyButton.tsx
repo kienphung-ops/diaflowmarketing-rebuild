@@ -48,7 +48,7 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
   return (
     <button
       onClick={handleCopy}
-      aria-label={copied ? 'Copied' : 'Share to climb'}
+      aria-label={copied ? 'Copied' : 'Share to level up'}
       className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[10px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
     >
       {copied ? (
@@ -62,7 +62,7 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
               "Share to climb" label — the header is the only share
               entry point there. (Clicking still copies the link.) */}
           <span className="md:hidden">Invite</span>
-          <span className="hidden md:inline">Share to climb</span>
+          <span className="hidden md:inline">Share to level up</span>
         </>
       )}
     </button>

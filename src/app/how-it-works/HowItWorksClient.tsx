@@ -56,7 +56,7 @@ export default function HowItWorksClient() {
         <div className="text-lg font-extrabold leading-tight">{DEMO_SQUAD_NAME}</div>
         <div className="text-xs text-tower-cream/50 mb-2">🏢 {DEMO_COMPANY}</div>
         <div className="inline-flex items-center gap-1 bg-purple-500/15 border border-purple-500/30 text-purple-300 px-3 py-1 rounded-full text-[11px] font-bold">
-          ▲ Floor {DEMO_CURRENT_FLOOR} · Diaflow Tower
+          ▲ Floor {DEMO_CURRENT_FLOOR} · Diaflow teammate
         </div>
       </div>
 
@@ -77,7 +77,7 @@ export default function HowItWorksClient() {
           </li>
           <li className="flex gap-2">
             <span className="text-tower-gold font-bold">3.</span>
-            <span>Climb 20 floors to earn free beta access + featured launch spot.</span>
+            <span>Reach Level 20 to earn free beta access + featured launch spot.</span>
           </li>
         </ol>
         <div className="mt-4 flex gap-2">

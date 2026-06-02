@@ -85,10 +85,9 @@ export function LeaderboardModal({
   // Bottom-anchored compact card matching the mockup .anchor-mini
   // style: translucent purple gradient, purple-tint border, parked
   // just above the MobileBottomNav (~82px tall + safe-area inset).
-  // Only the top entries fit comfortably in the small footprint;
-  // we cap the visible list to 5 and let the overflow scroll
-  // within the card.
-  const mobileTopRows = data?.top50.slice(0, 5) ?? []
+  // The card scrolls (max-h-[60vh] + overflow-y-auto), so show the full
+  // top 50 on mobile too — same list as desktop, just in a compact card.
+  const mobileTopRows = data?.top50 ?? []
   return (
     <>
       {/* MOBILE: bottom-anchored card (sub-md only). */}

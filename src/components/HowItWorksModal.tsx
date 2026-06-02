@@ -81,7 +81,7 @@ export function HowItWorksModal({
 
   // ── Share payload (post-login footer) ──────────────────────────
   const xText = encodeURIComponent(
-    'just built my AI office at diaflow 🚀 climb the levels with me'
+    'just built my AI office at diaflow 🚀 level up with me'
   )
   const encodedUrl = inviteUrl ? encodeURIComponent(inviteUrl) : ''
   const xShareHref = inviteUrl
@@ -144,7 +144,7 @@ export function HowItWorksModal({
               Every Level, every unlock
             </h2>
             <p className="text-[11.5px] md:text-xs text-tower-cream/55 mt-1.5 leading-relaxed">
-              Climb by inviting friends. Every Level unlocks an AI Teammate and
+              Level up by inviting friends. Every level unlocks an AI Teammate and
               new office gear. Real perks at{' '}
               <span className="text-amber-300 font-semibold">Level 3 (free beta)</span>{' '}
               and{' '}
@@ -281,7 +281,7 @@ export function HowItWorksModal({
                   ⚠ Not saved yet
                 </div>
                 <div className="text-[13px] font-bold leading-tight">
-                  Save your team to start climbing.
+                  Save your team to start leveling up.
                 </div>
               </div>
               <button

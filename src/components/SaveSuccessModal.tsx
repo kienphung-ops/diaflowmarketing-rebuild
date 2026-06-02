@@ -104,9 +104,12 @@ export function SaveSuccessModal({
   // hook is called in the same order on every render — moving it down
   // tripped React's "rendered more hooks than during the previous
   // render" guard the first time `open` flipped from false → true.
+  // Floor 2 is share-gated (invitesRequired 0) → invitesToNext is 0 there,
+  // and "0 invites from unlocking" reads oddly. Show at least 1.
+  const teaserInvites = Math.max(1, invitesToNext)
   const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${
-        invitesToNext === 1 ? 'invite' : 'invites'
+    ? `just built my AI office at diaflow. ${teaserInvites} ${
+        teaserInvites === 1 ? 'invite' : 'invites'
       } from unlocking the next level 👀`
     : 'just topped out my AI office at diaflow 🏆'
   const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
@@ -185,7 +188,7 @@ export function SaveSuccessModal({
     <div className="rounded-xl bg-[#1B1A38] border border-[#2A2A4D] p-3.5 md:p-4 flex flex-col">
       <div className="flex justify-between items-baseline mb-2.5">
         <div className="text-[11px] uppercase tracking-[0.08em] text-tower-cream/55 font-semibold">
-          {nextFloor ? `Climb to level ${nextFloor.id}` : 'Penthouse reached'}
+          {nextFloor ? `Reach Level ${nextFloor.id}` : 'Penthouse reached'}
         </div>
         <div className="text-[12px] text-purple-300 font-semibold">
           {nextFloor

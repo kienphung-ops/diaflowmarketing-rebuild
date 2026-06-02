@@ -241,8 +241,11 @@ export function MySquadDrawer({
    * shares idempotent. `triggerShare(...)` is wired straight into
    * the X / LinkedIn buttons below.
    */
+  // Floor 2 is share-gated (invitesRequired 0) → invitesToNext is 0 there,
+  // and "0 invites from unlocking" reads oddly. Show at least 1.
+  const teaserInvites = Math.max(1, invitesToNext)
   const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
+    ? `just built my AI office at diaflow. ${teaserInvites} ${teaserInvites === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
     : 'just topped out my AI office at diaflow 🏆'
   const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
     inviteUrl,
@@ -651,7 +654,7 @@ export function MySquadDrawer({
           <div className="flex items-baseline justify-between gap-2 mb-2.5">
             <h3 className="text-sm font-bold text-tower-cream">
               {nextFloor
-                ? `Share to reach Floor ${nextFloor.id}`
+                ? `Share to reach Level ${nextFloor.id}`
                 : 'Share your penthouse'}
             </h3>
             <span className="text-[11px] font-semibold text-purple-300 whitespace-nowrap">

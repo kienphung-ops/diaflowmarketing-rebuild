@@ -122,7 +122,7 @@ export default function SignupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <p className="text-sm text-tower-cream/70">
-            Create an account to save your team and start climbing.
+            Create an account to save your team and start leveling up.
           </p>
           <label className="block space-y-1">
             <span className="text-xs uppercase tracking-wider text-tower-cream/50">Email</span>

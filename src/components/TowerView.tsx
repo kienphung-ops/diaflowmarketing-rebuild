@@ -297,7 +297,7 @@ export function TowerView({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/tower.png"
-            alt="Diaflow Tower"
+            alt="Diaflow teammate"
             className="block select-none drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
             draggable={false}
             style={{
@@ -765,7 +765,7 @@ function FloorDrawer() {
   useEffect(() => {
     function move(e: PointerEvent) {
       if (!dragRef.current) return
-      const img = document.querySelector('img[alt="Diaflow Tower"]')
+      const img = document.querySelector('img[alt="Diaflow teammate"]')
       if (!img) return
       const r = img.getBoundingClientRect()
       const y = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100))

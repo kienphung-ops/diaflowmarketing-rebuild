@@ -67,8 +67,11 @@ export function ShareModal({
   // ── Share-intent payload — mirrors MobileShareSheet ──────────────
   // MUST be defined before the early returns below so the
   // useFirstShareSpin hook is called in the same order on every render.
+  // Floor 2 is share-gated (invitesRequired 0) → invitesToNext is 0 there,
+  // and "0 invites from unlocking" reads oddly. Show at least 1.
+  const teaserInvites = Math.max(1, invitesToNext)
   const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
+    ? `just built my AI office at diaflow. ${teaserInvites} ${teaserInvites === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
     : 'just topped out my AI office at diaflow 🏆'
 
   // Shared share + first-share-spin claim flow. The URL-building and

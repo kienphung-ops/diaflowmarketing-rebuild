@@ -136,7 +136,7 @@ export default function FloorVisitorClient(props: Props) {
   const [squadOpen, setSquadOpen] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
-  // "What is Diaflow Tower?" → opens the rewards/how-it-works modal.
+  // "What is Diaflow teammate?" → opens the rewards/how-it-works modal.
   const [howItWorksOpen, setHowItWorksOpen] = useState(false)
   const origin = useOrigin()
   // Covers the visited floor with a spinner while /tower loads. See the
@@ -423,7 +423,7 @@ export default function FloorVisitorClient(props: Props) {
         {/* Floor + total-pokes chips — mirrors the mobile visiting pill. */}
         <div className="flex gap-1.5 flex-wrap">
           <span className="rounded-full px-2.5 py-1 text-[11px] font-bold bg-tower-gold/15 text-tower-gold border border-tower-gold/30">
-            {props.currentFloor >= 20 ? '👑' : '🏢'} Floor {props.currentFloor}
+            {props.currentFloor >= 20 ? '👑' : '🏢'} Level {props.currentFloor}
           </span>
           <span className="rounded-full px-2.5 py-1 text-[11px] font-bold bg-purple-500/15 text-purple-200 border border-purple-400/30">
             ⭐ {totalPokes} {totalPokes === 1 ? 'poke' : 'pokes'}
@@ -432,18 +432,21 @@ export default function FloorVisitorClient(props: Props) {
         <div className="text-[11px] text-tower-cream/55 mt-2">
           Drag a teammate to poke them
         </div>
-        {/* Explicit back-to-office button — not every visitor realises
-            the header logo links home, so give them an obvious way out. */}
-        <button
-          type="button"
-          onClick={() => {
-            setIsNavigating(true)
-            router.push('/')
-          }}
-          className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-100 hover:bg-purple-500/30 text-[12px] font-bold py-2 transition"
-        >
-          <span aria-hidden>←</span> {props.visitorSignedIn ? 'Back to my office' : 'Back to home'}
-        </button>
+        {/* Explicit back-to-office button — only for signed-in visitors
+            (anonymous visitors have no office to return to). Not every
+            visitor realises the header logo links home. */}
+        {props.visitorSignedIn && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsNavigating(true)
+              router.push('/')
+            }}
+            className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-100 hover:bg-purple-500/30 text-[12px] font-bold py-2 transition"
+          >
+            <span aria-hidden>←</span> Back to my office
+          </button>
+        )}
       </div>
 
       {/* The right-side "Squad / Poke a teammate" panel was removed on
@@ -520,19 +523,21 @@ export default function FloorVisitorClient(props: Props) {
             ⭐ {totalPokes} {totalPokes === 1 ? 'poke' : 'pokes'}
           </span>
         </div>
-        {/* Explicit back-to-office button — the header logo isn't an
-            obvious back-affordance for everyone. pointer-events-auto so
+        {/* Explicit back-to-office button — signed-in visitors only
+            (anonymous visitors have no office). pointer-events-auto so
             it's tappable even though the pill wrapper ignores pointers. */}
-        <button
-          type="button"
-          onClick={() => {
-            setIsNavigating(true)
-            router.push('/')
-          }}
-          className="pointer-events-auto mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-500/25 border border-purple-400/45 text-purple-50 text-[11px] font-bold py-1.5 active:scale-[0.98] transition"
-        >
-          <span aria-hidden>←</span> {props.visitorSignedIn ? 'Back to my office' : 'Back to home'}
-        </button>
+        {props.visitorSignedIn && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsNavigating(true)
+              router.push('/')
+            }}
+            className="pointer-events-auto mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-500/25 border border-purple-400/45 text-purple-50 text-[11px] font-bold py-1.5 active:scale-[0.98] transition"
+          >
+            <span aria-hidden>←</span> Back to my office
+          </button>
+        )}
       </div>
 
       {/* MySquad — visitor's OWN squad, not the owner's. Right-edge
@@ -570,7 +575,7 @@ export default function FloorVisitorClient(props: Props) {
         }}
       />
 
-      {/* "What is Diaflow Tower?" helper — bottom-left. Collapsed to a
+      {/* "What is Diaflow teammate?" helper — bottom-left. Collapsed to a
           "?" circle; expands to the full label on hover (desktop). Tap
           opens the How-it-works / rewards modal. Lifted above the
           anonymous "Build your own office" bottom card on mobile so they
@@ -578,7 +583,7 @@ export default function FloorVisitorClient(props: Props) {
       <button
         type="button"
         onClick={() => setHowItWorksOpen(true)}
-        aria-label="What is Diaflow Tower?"
+        aria-label="What is Diaflow teammate?"
         className={
           'group fixed left-4 z-30 flex items-center rounded-full bg-night-mid/90 border border-white/15 backdrop-blur-md text-tower-cream/80 hover:text-tower-cream shadow-lg transition-all ' +
           (props.visitorSignedIn ? 'bottom-4' : 'bottom-[6.5rem] md:bottom-4')
@@ -589,7 +594,7 @@ export default function FloorVisitorClient(props: Props) {
           ?
         </span>
         <span className="max-w-0 group-hover:max-w-[220px] overflow-hidden whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 text-[13px] font-semibold">
-          <span className="pr-4">What is Diaflow Tower?</span>
+          <span className="pr-4">What is Diaflow teammate?</span>
         </span>
       </button>
 
@@ -624,6 +629,7 @@ export default function FloorVisitorClient(props: Props) {
           totalInvites={liveVisitorInvites}
           trialMode={false}
           floorsClimbed={celebrationFloorsClimbed}
+          rank={rank}
           onClose={() => setCelebrationFloor(null)}
         />
       )}

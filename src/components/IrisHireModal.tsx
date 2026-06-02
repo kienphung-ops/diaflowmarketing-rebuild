@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
+import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
@@ -116,6 +116,18 @@ export function IrisHireModal({
   // here. See useBackdropDismissGuard for the full writeup.
   const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
 
+  // Canonical X / LinkedIn share text. Defined before the early return
+  // because useFirstShareSpin is a hook and must run on every render.
+  const xText = nextFloor
+    ? `just built my AI office at diaflow. unlocking Level ${nextFloor.id} next 👀`
+    : 'just topped out my AI office at diaflow 🏆'
+  // Share through the SAME hook every other surface uses (ShareModal,
+  // MobileShareSheet, MySquadDrawer) so X / LinkedIn here also claim the
+  // first-share spin task → which credits a share-gated floor. Previously
+  // Iris used plain <a> links that skipped the claim, so sharing from Iris
+  // never leveled the user up.
+  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({ inviteUrl, xText })
+
   if (!open) return null
   if (typeof document === 'undefined') return null
 
@@ -135,21 +147,6 @@ export function IrisHireModal({
       /* ignore — older browsers without async clipboard */
     }
   }
-
-  // Same X / LinkedIn intent URLs used by MySquadDrawer +
-  // HowItWorksModal so the share affordance behaves identically
-  // everywhere it appears. See requirements/share-btn.md for the
-  // canonical format.
-  const xText = nextFloor
-    ? `just built my AI office at diaflow. unlocking Level ${nextFloor.id} next 👀`
-    : 'just topped out my AI office at diaflow 🏆'
-  const encodedUrl = inviteUrl ? encodeURIComponent(inviteUrl) : ''
-  const xShareHref = inviteUrl
-    ? `https://x.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encodedUrl}&hashtags=DiaflowTower`
-    : undefined
-  const linkedinShareHref = inviteUrl
-    ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
-    : undefined
 
   return createPortal(
     <div
@@ -274,7 +271,7 @@ export function IrisHireModal({
                     <strong className="text-tower-cream">
                       Level {nextFloor.id}
                     </strong>{' '}
-                    — share your link to climb.
+                    — share your link to level up.
                   </>
                 ) : (
                   <>
@@ -285,34 +282,30 @@ export function IrisHireModal({
               </p>
 
               <div className="grid grid-cols-3 gap-2">
-                <a
-                  href={xShareHref}
-                  aria-disabled={!inviteUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => trackEvent('share_click', { platform: 'twitter', source: 'iris_modal' })}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
+                <button
+                  type="button"
+                  onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'iris_modal' }); triggerShare('x') }}
+                  disabled={!inviteUrl || sharePending === 'x'}
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
                   }`}
                   aria-label="Share on X"
                 >
                   <XLogo />
-                  <span>X</span>
-                </a>
-                <a
-                  href={linkedinShareHref}
-                  aria-disabled={!inviteUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => trackEvent('share_click', { platform: 'linkedin', source: 'iris_modal' })}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition ${
+                  <span>{sharePending === 'x' ? '…' : 'X'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'iris_modal' }); triggerShare('linkedin') }}
+                  disabled={!inviteUrl || sharePending === 'linkedin'}
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
                   }`}
                   aria-label="Share on LinkedIn"
                 >
                   <LinkedInLogo />
-                  <span>LinkedIn</span>
-                </a>
+                  <span>{sharePending === 'linkedin' ? '…' : 'LinkedIn'}</span>
+                </button>
                 <button
                   onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'iris_modal' }); handleCopy() }}
                   disabled={!inviteUrl}

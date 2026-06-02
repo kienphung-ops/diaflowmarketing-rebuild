@@ -1751,6 +1751,7 @@ export default function TowerLanding(props: Props) {
           totalInvites={effective.totalInvites}
           trialMode={isTrial}
           floorsClimbed={celebrationFloorsClimbed}
+          rank={rank}
           onClose={() => {
             setCelebrationFloor(null)
             // After celebrating an actual level-up (not the initial-load
