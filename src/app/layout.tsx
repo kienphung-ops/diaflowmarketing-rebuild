@@ -39,7 +39,7 @@ async function resolveSiteUrl(): Promise<URL> {
 }
 
 const SITE_NAME = 'Diaflow Tower'
-const SITE_DESCRIPTION = 'Build your AI office. Invite friends to climb the tower.'
+const SITE_DESCRIPTION = 'Build your AI office. Invite friends to level up.'
 const OG_IMAGE = '/diaflow-logo.jpg'
 
 /**

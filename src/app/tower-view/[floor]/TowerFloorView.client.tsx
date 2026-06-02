@@ -100,7 +100,7 @@ export default function TowerFloorViewClient({
   // Per-state presentation for the info card + status line.
   const pill =
     state === 'passed'
-      ? { label: '✓ Climbed', cls: 'bg-white/5 text-tower-cream/60 border-white/10' }
+      ? { label: '✓ Reached', cls: 'bg-white/5 text-tower-cream/60 border-white/10' }
       : state === 'here'
         ? { label: '📍 You’re here', cls: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30' }
         : state === 'locked'
@@ -119,7 +119,7 @@ export default function TowerFloorViewClient({
           }
         : state === 'locked'
           ? { text: `${invitesAway} ${invitesAway === 1 ? 'invite' : 'invites'} away`, cls: 'text-purple-200' }
-          : { text: 'Save your team first to start climbing', cls: 'text-amber-300' }
+          : { text: 'Save your team first to start leveling up', cls: 'text-amber-300' }
 
   const cardBorder =
     state === 'here'
@@ -334,14 +334,14 @@ export default function TowerFloorViewClient({
           onClick={() => setSignupOpen(true)}
           className="hidden md:inline-flex fixed bottom-7 right-7 z-30 items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-300 to-tower-gold text-night-deep text-[14.5px] font-extrabold shadow-[0_14px_36px_rgba(168,117,255,0.4)] hover:from-amber-200 hover:to-tower-gold transition"
         >
-          <span aria-hidden>🔒</span> Save my team to climb →
+          <span aria-hidden>🔒</span> Save my team to level up →
         </button>
       ) : (
         <button
           onClick={() => setShareOpen(true)}
           className="hidden md:inline-flex fixed bottom-7 right-7 z-30 items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#b489ff] to-tower-gold text-night-deep text-[14.5px] font-extrabold shadow-[0_14px_36px_rgba(168,117,255,0.4)] hover:opacity-95 transition"
         >
-          <span aria-hidden>📣</span> Share to climb →
+          <span aria-hidden>📣</span> Share to level up →
         </button>
       )}
 

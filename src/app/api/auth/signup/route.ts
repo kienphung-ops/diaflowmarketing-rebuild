@@ -29,7 +29,7 @@ import {
 } from '@/lib/auth'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
-import { computeFloorForInvites } from '@/lib/floors'
+import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
             email,
             firstEmail: email,
             passwordHash,
-            ipAddress: ip,
+            //ipAddress: ip,
             country: country ?? null,
             referralCode,
             referredByCode: inviterCode,
@@ -179,7 +179,6 @@ export async function POST(req: NextRequest) {
         // through FloorItem.
         if (inviter && inviter.id !== u.id) {
           const newTotal = inviter.totalInvites + 1
-          const newFloor = computeFloorForInvites(newTotal)
           await tx.inviteEvent.create({
             data: {
               inviterUserId: inviter.id,
@@ -192,8 +191,11 @@ export async function POST(req: NextRequest) {
           })
           await tx.user.update({
             where: { id: inviter.id },
-            data: { totalInvites: newTotal, currentFloor: newFloor },
+            data: { totalInvites: newTotal },
           })
+          // Floor 2 is share-gated, so recompute from fresh progress
+          // (invites + share status) rather than invites alone.
+          await recomputeAndPersistFloor(tx, inviter.id)
           // Spin economy: a successful referral signup grants the
           // inviter +1 spin token. Granted immediately (no email-verify
           // gate) to match the floor-climb invite credit above.

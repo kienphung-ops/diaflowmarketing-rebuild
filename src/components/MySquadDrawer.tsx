@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+//import Link from 'next/link'
 import { useFloor, useFloorCount } from '@/lib/floorsConfigClient'
 import { trackEvent } from '@/lib/tracking'
 import { computeTeammateCount } from '@/lib/floors'
@@ -9,7 +9,7 @@ import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
 import { useOrigin } from '@/hooks/useOrigin'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
+import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 import type { InviterInfo } from '@/lib/inviter'
 
 /** Ordinal suffix for the "Nth teammate" label (1st, 2nd, 3rd, 4th…). */
@@ -178,8 +178,15 @@ export function MySquadDrawer({
   const currentFloorCfg = useFloor(currentFloor)
   const totalFloors = useFloorCount()
   const invitesToNext = nextFloor ? Math.max(0, nextFloor.invitesRequired - totalInvites) : 0
-  const progressPct = nextFloor
-    ? Math.min(
+  // The next floor can be unlocked by SHARING instead of inviting — see
+  // Floor.unlockType / computeFloorForProgress. When share-gated, the
+  // "N invites away" copy + the invite-based progress bar don't apply.
+  const nextIsShare = nextFloor?.unlockType === 'share'
+  const progressPct = !nextFloor
+    ? 100
+    : nextIsShare
+    ? 0
+    : Math.min(
         100,
         Math.round(
           ((totalInvites - (currentFloorCfg?.invitesRequired ?? 0)) /
@@ -187,7 +194,6 @@ export function MySquadDrawer({
             100
         )
       )
-    : 100
 
   // What the NEXT floor unlocks — a reward (product perk or decor) plus
   // the new teammate slot it opens. Shown as a small gold pill under the
@@ -213,6 +219,9 @@ export function MySquadDrawer({
       await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
+      // Copying counts as a share toward a share-gated next floor (e.g.
+      // F2). Server no-ops when the next floor isn't share-gated.
+      void creditShareUnlock('copy')
     } catch {
       /* ignore */
     }
@@ -233,7 +242,7 @@ export function MySquadDrawer({
    * the X / LinkedIn buttons below.
    */
   const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
+    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
     : 'just topped out my AI office at diaflow 🏆'
   const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
     inviteUrl,
@@ -473,7 +482,7 @@ export function MySquadDrawer({
                 Explore
               </div>
 
-              <Link
+              {/* <Link
                 // `?tour=1` forces the Tower Tour to open on arrival even
                 // if the user has already seen it once (the auto-open is
                 // otherwise gated by a localStorage "seen" flag). /tower
@@ -496,7 +505,7 @@ export function MySquadDrawer({
                 <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
                   ›
                 </span>
-              </Link>
+              </Link> */}
 
               <button
                 type="button"
@@ -508,10 +517,10 @@ export function MySquadDrawer({
                 </span>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="text-[12.5px] font-bold text-tower-cream leading-tight">
-                    See all 20 floor rewards
+                    See all 20 Level rewards
                   </div>
                   <div className="text-[10.5px] text-tower-cream/55 mt-0.5">
-                    Free beta at Floor 3
+                    Free beta at Level 3
                   </div>
                 </div>
                 <span className="text-tower-cream/40 text-base shrink-0" aria-hidden>
@@ -534,7 +543,7 @@ export function MySquadDrawer({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-widest text-tower-cream/50 mb-1">
-                Current floor
+                Current Level
               </div>
               <div className="flex items-baseline gap-2">
                 <div className="text-5xl font-bold leading-none tabular-nums">
@@ -576,10 +585,12 @@ export function MySquadDrawer({
             {nextFloor ? (
               <>
                 <span className="text-tower-cream/55">Next:</span>{' '}
-                <span className="font-bold text-tower-cream">Floor {nextFloor.id}</span>{' '}
+                <span className="font-bold text-tower-cream">Level {nextFloor.id}</span>{' '}
                 <span className="text-tower-cream/55">·</span>{' '}
                 <span className="font-semibold">
-                  {invitesToNext} {invitesToNext === 1 ? 'invite' : 'invites'} away
+                  {nextIsShare
+                    ? 'Share to unlock'
+                    : `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} away`}
                 </span>
               </>
             ) : (
@@ -621,7 +632,7 @@ export function MySquadDrawer({
               </span>
               {visiting.ownerName && (
                 <span className="text-amber-300/80 italic truncate max-w-[150px]">
-                  on {visiting.ownerName}&apos;s floor
+                  on {visiting.ownerName}&apos;s Level
                 </span>
               )}
             </div>
@@ -640,13 +651,15 @@ export function MySquadDrawer({
           <div className="flex items-baseline justify-between gap-2 mb-2.5">
             <h3 className="text-sm font-bold text-tower-cream">
               {nextFloor
-                ? `Share to reach Floor ${nextFloor.id}`
+                ? `Share to reach Level ${nextFloor.id}`
                 : 'Share your penthouse'}
             </h3>
             <span className="text-[11px] font-semibold text-purple-300 whitespace-nowrap">
               {nextFloor
-                ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} away`
-                : '👑 Top floor'}
+                ? nextIsShare
+                  ? 'Share to unlock'
+                  : `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} away`
+                : '👑 Max Level'}
             </span>
           </div>
           {/* Personal invite URL — text-field display with a small copy

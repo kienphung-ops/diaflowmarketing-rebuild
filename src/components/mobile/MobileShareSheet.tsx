@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
+import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 import { trackEvent } from '@/lib/tracking'
 
 /**
@@ -82,7 +82,7 @@ export function MobileShareSheet({
   // first time the sheet opens you'll get "rendered more hooks than
   // during the previous render".
   const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
+    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
     : 'just topped out my AI office at diaflow 🏆'
 
   // Shared share + first-share-spin claim flow. Same hook the desktop
@@ -113,6 +113,9 @@ export function MobileShareSheet({
     try {
       await navigator.clipboard.writeText(copyPayload)
       setCopied(true)
+      // Copy counts as a share toward a share-gated next floor (server
+      // no-ops when it isn't share-gated).
+      void creditShareUnlock('copy')
     } catch {
       /* ignore — older browsers without async clipboard */
     }
@@ -151,7 +154,7 @@ export function MobileShareSheet({
         <div className="px-5 pb-1 flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <h2 className="text-[18px] font-extrabold leading-tight">
-              {nextFloor ? `Share to reach Floor ${nextFloor.id}` : 'Share the tower'}
+              {nextFloor ? `Share to reach Level ${nextFloor.id}` : 'Share the tower'}
             </h2>
             <p className="text-[12.5px] text-tower-cream/70 leading-snug mt-1">
               <span aria-hidden>🎁 </span>

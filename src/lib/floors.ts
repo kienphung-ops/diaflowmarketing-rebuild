@@ -1,6 +1,12 @@
+/** How a floor is unlocked. "invite" = needs `invitesRequired` referrals
+ *  (default). "share" = needs the user to have shared at least once. */
+export type UnlockType = 'invite' | 'share'
+
 export interface FloorConfig {
   floor: number
   invitesRequired: number
+  /** Defaults to 'invite' when omitted. */
+  unlockType?: UnlockType
   unlockKey: string
   label: string
 }
@@ -9,7 +15,7 @@ export interface FloorConfig {
 // teammates allowed (in FLOOR_MAX_TEAMMATES below).
 export const FLOOR_CONFIG: FloorConfig[] = [
   { floor: 1, invitesRequired: 0, unlockKey: 'company_picture_frame', label: 'Company name picture frame' },
-  { floor: 2, invitesRequired: 1, unlockKey: 'floor_lamp', label: 'Floor lamp' },
+  { floor: 2, invitesRequired: 1, unlockType: 'share', unlockKey: 'floor_lamp', label: 'Floor lamp' },
   { floor: 3, invitesRequired: 2, unlockKey: 'basic_chair_desk', label: 'Basic chair + first desk' },
   { floor: 4, invitesRequired: 6, unlockKey: 'potted_plant', label: 'Potted plant' },
   { floor: 5, invitesRequired: 9, unlockKey: 'coffee_mug', label: 'Coffee mug on desk' },
@@ -30,6 +36,12 @@ export const FLOOR_CONFIG: FloorConfig[] = [
   { floor: 20, invitesRequired: 115, unlockKey: 'penthouse', label: 'Full penthouse' },
 ]
 
+/**
+ * Invite-only floor gate. Ignores `unlockType` and looks purely at invite
+ * thresholds. Used by the anonymous trial preview (lib/trial.ts), which
+ * has no notion of "has the user shared" — it just simulates invites to
+ * show the climb. Production progression uses `computeFloorForProgress`.
+ */
 export function computeFloorForInvites(totalInvites: number): number {
   let result = 1
   for (const cfg of FLOOR_CONFIG) {
@@ -37,6 +49,70 @@ export function computeFloorForInvites(totalInvites: number): number {
     else break
   }
   return result
+}
+
+export interface UnlockProgress {
+  totalInvites: number
+  hasShared: boolean
+}
+
+export interface FloorGate {
+  floor: number
+  invitesRequired: number
+  unlockType?: UnlockType
+}
+
+/**
+ * Requirement-aware floor gate (production). Computes the highest floor a
+ * user has unlocked from a list of gates (floor + invitesRequired +
+ * unlockType). Rules:
+ *
+ *   - 'invite' (default): reached when totalInvites >= invitesRequired.
+ *     Invite floors form a contiguous chain (thresholds increase), so we
+ *     stop at the first invite floor the user can't afford.
+ *   - 'share': reached ONLY by sharing. A share-gated floor does NOT
+ *     block higher invite floors — if the user's invites already qualify
+ *     them for a higher floor, the chain carries them past the share gate.
+ *
+ * Example (F2 = share, F3 needs 1 invite):
+ *   - shared, 0 invites      → F2
+ *   - not shared, 1 invite   → F3  (invites skip the share gate)
+ *   - not shared, 0 invites  → F1
+ *
+ * Pass DB-backed gates (see recomputeAndPersistFloor) so thresholds match
+ * what the UI shows; FLOOR_CONFIG is the static fallback.
+ */
+export function computeFloorFromGates(
+  gates: FloorGate[],
+  { totalInvites, hasShared }: UnlockProgress,
+): number {
+  let result = 1
+  for (const g of [...gates].sort((a, b) => a.floor - b.floor)) {
+    if (g.floor === 1) continue
+    if (g.unlockType === 'share') {
+      // Share gate: reached if shared, but never blocks the invite chain.
+      if (hasShared) result = Math.max(result, g.floor)
+      continue
+    }
+    if (totalInvites >= g.invitesRequired) {
+      result = Math.max(result, g.floor)
+    } else {
+      break
+    }
+  }
+  return result
+}
+
+/** Static-config convenience wrapper over `computeFloorFromGates`. */
+export function computeFloorForProgress(progress: UnlockProgress): number {
+  return computeFloorFromGates(
+    FLOOR_CONFIG.map(c => ({
+      floor: c.floor,
+      invitesRequired: c.invitesRequired,
+      unlockType: c.unlockType,
+    })),
+    progress,
+  )
 }
 
 export function getFloorConfig(floor: number): FloorConfig | undefined {

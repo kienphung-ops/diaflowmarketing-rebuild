@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin } from '@/lib/spin/useFirstShareSpin'
+import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 import { trackEvent } from '@/lib/tracking'
 
 interface Props {
@@ -68,7 +68,7 @@ export function ShareModal({
   // MUST be defined before the early returns below so the
   // useFirstShareSpin hook is called in the same order on every render.
   const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next floor 👀`
+    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
     : 'just topped out my AI office at diaflow 🏆'
 
   // Shared share + first-share-spin claim flow. The URL-building and
@@ -93,6 +93,9 @@ export function ShareModal({
     try {
       await navigator.clipboard.writeText(copyPayload)
       setCopied(true)
+      // Copy counts as a share toward a share-gated next floor (server
+      // no-ops when it isn't share-gated).
+      void creditShareUnlock('copy')
     } catch {
       /* ignore — older browsers without async clipboard */
     }
@@ -122,11 +125,11 @@ export function ShareModal({
 
         <div className="p-6">
           <h2 className="text-[19px] font-extrabold leading-tight pr-8 mb-1.5">
-            {nextFloor ? `Share to reach Floor ${nextFloor.id}` : 'Share the tower'}
+            {nextFloor ? `Share to reach Level ${nextFloor.id}` : 'Share the tower'}
           </h2>
           <p className="text-[13px] text-tower-cream/70 mb-4">
             {nextFloor
-              ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} to Floor ${nextFloor.id} · `
+              ? `${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} to Level ${nextFloor.id} · `
               : ''}
             <span className="text-amber-300 font-semibold">
               <span aria-hidden>🎁 </span>{reward}

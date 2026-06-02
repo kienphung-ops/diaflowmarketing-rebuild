@@ -136,7 +136,7 @@ export function MiaWelcomeBubble({
         <div className="text-[13.5px] leading-snug font-medium text-center">
           Welcome to your office.{' '}
           <span className="text-purple-300 font-semibold">
-            Ready for the tower tour?
+            Invite friends to level up!
           </span>
         </div>
 

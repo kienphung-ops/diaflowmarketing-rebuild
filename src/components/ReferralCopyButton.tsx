@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 
 interface Props {
   code: string
@@ -25,7 +26,7 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
     : 0
 
   const handleCopy = async () => {
-    const url = `${window.location.origin}/?ref=${code}`
+    const url = `${window.location.origin}/floor/${code}`
     // Route through buildShareCopyText so the header Copy button
     // pastes the same marketing-formatted string as the MySquad +
     // HowItWorks + Iris drawers ("built my AI office, N invites
@@ -36,6 +37,9 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
       await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
+      // Copy counts as a share toward a share-gated next floor (server
+      // no-ops when it isn't share-gated).
+      void creditShareUnlock('copy')
     } catch {
       // fall through silently
     }
@@ -44,7 +48,7 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
   return (
     <button
       onClick={handleCopy}
-      aria-label={copied ? 'Copied' : 'Share to climb'}
+      aria-label={copied ? 'Copied' : 'Share to level up'}
       className="px-2.5 md:px-3 py-1 md:py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-[10px] md:text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
     >
       {copied ? (
@@ -58,7 +62,7 @@ export function ReferralCopyButton({ code, currentFloor, totalInvites }: Props) 
               "Share to climb" label — the header is the only share
               entry point there. (Clicking still copies the link.) */}
           <span className="md:hidden">Invite</span>
-          <span className="hidden md:inline">Share to climb</span>
+          <span className="hidden md:inline">Share to level up</span>
         </>
       )}
     </button>

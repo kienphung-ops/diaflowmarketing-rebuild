@@ -44,6 +44,13 @@ interface Props {
    *  the user can see how many spins they have from any floor. Omit (or
    *  pass undefined) to hide the spin segment entirely. */
   spinTokens?: number
+  /** Desktop-only — opens the leaderboard / rank modal. When omitted,
+   *  the Rank button isn't rendered (e.g. /tower already surfaces a
+   *  standalone "Top 50" edge pill, so it doesn't pass this). */
+  onOpenRank?: () => void
+  /** Current leaderboard rank, shown in the Rank button label ("#7").
+   *  null/undefined → the button just reads "Rank". */
+  rank?: number | null
 }
 
 export function Header({
@@ -61,6 +68,7 @@ export function Header({
   attentionTower,
   onShareClimb,
   spinTokens,
+  onOpenRank,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -100,7 +108,7 @@ export function Header({
             "(trial)" suffix stays desktop-only since it's the bit
             that ran out of room first on small screens. */}
         <div className="hidden md:block text-xs text-tower-cream/80 bg-night-mid/60 px-3 py-1.5 rounded-md backdrop-blur-sm whitespace-nowrap">
-          Floor <span className="text-tower-gold font-semibold">{currentFloor}</span>
+          Level <span className="text-tower-gold font-semibold">{currentFloor}</span>
           <span className="mx-1.5 md:mx-2 opacity-40">·</span>
           <span className="text-tower-gold font-semibold">{totalInvites}</span>{' '}
           {totalInvites === 1 ? 'invite' : 'invites'}
@@ -116,12 +124,28 @@ export function Header({
           )}
         </div>
 
+        {/* Rank — desktop only. Opens the leaderboard modal. Sits next to
+            the stats pill so the user's standing is one click away without
+            hunting for the logo or a hidden affordance. Shows the live
+            rank ("#7") when known. Mobile reaches this via the bottom
+            nav's Rank slot, so this is md+ only. */}
+        {onOpenRank && (
+          <button
+            onClick={onOpenRank}
+            aria-label="Open leaderboard"
+            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-xs tracking-wide hover:bg-night-mid transition whitespace-nowrap"
+          >
+            <span aria-hidden>🏆</span>
+            Rank
+          </button>
+        )}
+
         {/* Tower toggle — desktop only. The header right slot on mobile
             is too narrow to fit Tower view alongside the stats pill +
             Claim/Copy CTA without everything shrinking to an unreadable
             10px. Mobile users reach the tower view via the bottom bar
             (and on /tower itself there's a back-arrow). */}
-        {onToggleTower && (
+        {false && onToggleTower && ( //tạm ẩn button tower
           <div className="relative hidden md:inline-flex">
             <button
               onClick={onToggleTower}
@@ -235,7 +259,7 @@ export function Header({
                   onClick={onShareClimb}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
                 >
-                  <span aria-hidden>📣</span> Share to climb
+                  <span aria-hidden>📣</span> Share to level up
                 </button>
               ) : (
                 <ReferralCopyButton

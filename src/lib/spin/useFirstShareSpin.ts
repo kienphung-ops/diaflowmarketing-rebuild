@@ -81,6 +81,30 @@ export function buildShareUrl(
   return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(inviteUrl)}`
 }
 
+/**
+ * Tell the server a share action happened so it can credit a SHARE-gated
+ * floor (e.g. F2). Fire-and-forget from any Copy button — the server
+ * no-ops unless the next floor actually requires a share, so it's safe to
+ * call unconditionally. Returns true when the floor was credited.
+ *
+ * Copy routes here (not through /api/spin/task) because copying counts
+ * for floor unlock but does NOT pay a spin token.
+ */
+export async function creditShareUnlock(source: 'x' | 'linkedin' | 'copy'): Promise<boolean> {
+  try {
+    const r = await fetch('/api/floor/share-unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source }),
+    })
+    if (!r.ok) return false
+    const j = (await r.json().catch(() => ({}))) as { credited?: boolean }
+    return j.credited === true
+  } catch {
+    return false
+  }
+}
+
 export function useFirstShareSpin({ inviteUrl, xText, onClaim }: Options): Result {
   const [pending, setPending] = useState<SharePlatform | null>(null)
 

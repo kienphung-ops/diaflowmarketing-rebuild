@@ -217,7 +217,7 @@ export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
           this summer — real AI workers that do the work for you, not just chat.
         </p>
         <p className="text-[14px] text-tower-cream/85 leading-relaxed mb-4">
-          Hire your starter team now. Climb the tower by inviting friends. <span className="font-semibold">Every teammate you earn is yours at launch.</span>
+          Hire your starter team now. Level up by inviting friends. <span className="font-semibold">Every teammate you earn is yours at launch.</span>
         </p>
         <form
           onSubmit={e => {
@@ -628,7 +628,7 @@ export function LeoBubble({ onContinue }: LeoProps) {
           onClick={onContinue}
           className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition"
         >
-          Let&apos;s climb →
+          Let&apos;s level up →
         </button>
       </div>
     </ModalShell>

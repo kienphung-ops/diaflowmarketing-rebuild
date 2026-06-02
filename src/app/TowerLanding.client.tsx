@@ -17,6 +17,7 @@ import {
   LeoBubble,
 } from '@/components/OnboardingBubble'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
+import { LeaderboardModal } from '@/components/LeaderboardModal'
 import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { MiaInfoCard } from '@/components/MiaInfoCard'
 import { LeoEmailDrawer } from '@/components/LeoEmailDrawer'
@@ -144,6 +145,9 @@ export default function TowerLanding(props: Props) {
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [activeNpcModal, setActiveNpcModal] = useState<'iris' | 'mia' | 'leo' | null>(null)
   const [squadOpen, setSquadOpen] = useState(false)
+  // Leaderboard / rank bottom-sheet — opened by the Rank slot on
+  // MobileBottomNav (right of the hero CTA).
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [editingTeammate, setEditingTeammate] = useState<ServerRecruit | null>(null)
   // The "Step 2" speech-bubble shown next to a recruited teammate the
   // user just clicked. Holds the same row shape as editingTeammate so
@@ -1250,6 +1254,10 @@ export default function TowerLanding(props: Props) {
         onShareClimb={props.signedIn ? () => setShareModalOpen(true) : undefined}
         // Spin token count in the desktop stats pill (signed-in only).
         spinTokens={props.signedIn ? spinTokens : undefined}
+        // Desktop Rank button (right of "Share to climb") → leaderboard
+        // modal. Signed-in only — anonymous trial users have no rank yet.
+        onOpenRank={props.signedIn ? () => setLeaderboardOpen(true) : undefined}
+        rank={rank}
       />
 
       {/* Mobile-only counter chip strip. Slides in directly below the
@@ -1477,6 +1485,8 @@ export default function TowerLanding(props: Props) {
             //   trial    → "Save my team"   → signup modal
             //   signed-in → "Invite to climb" → share sheet
             heroMode={props.signedIn ? 'invite' : 'save'}
+            onOpenRank={() => setLeaderboardOpen(true)}
+            rank={rank}
             onHero={() => {
               if (props.signedIn) setMobileShareOpen(true)
               else {
@@ -1497,6 +1507,12 @@ export default function TowerLanding(props: Props) {
             currentFloor={effective.currentFloor}
             totalInvites={effective.totalInvites}
             onSignupNudge={isTrial ? () => { trackEvent('signup_click', { source: 'mobile_share' }); setShowSignupModal(true) } : undefined}
+          />
+          <LeaderboardModal
+            open={leaderboardOpen}
+            onClose={() => setLeaderboardOpen(false)}
+            currentReferralCode={props.referralCode}
+            totalInvites={effective.totalInvites}
           />
         </>
       )}

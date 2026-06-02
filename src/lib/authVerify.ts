@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { computeFloorForInvites } from '@/lib/floors'
+import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { hashOtpForEmail, hashToken } from '@/lib/auth'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { TOKEN_TYPES } from '@/lib/authToken'
@@ -36,7 +36,6 @@ async function processReferralIfAny(userId: string, email: string): Promise<void
   if (!pending) return
 
   const newTotal = inviter.totalInvites + 1
-  const newFloor = computeFloorForInvites(newTotal)
 
   await prisma.$transaction(async tx => {
     await tx.inviteEvent.update({
@@ -45,8 +44,11 @@ async function processReferralIfAny(userId: string, email: string): Promise<void
     })
     await tx.user.update({
       where: { id: inviter.id },
-      data: { totalInvites: newTotal, currentFloor: newFloor },
+      data: { totalInvites: newTotal },
     })
+    // Recompute the floor from fresh progress (invites + share status).
+    // Floor 2 is share-gated, so invites alone may not advance the floor.
+    await recomputeAndPersistFloor(tx, inviter.id)
     // No per-user item rows anymore — items cascade from FloorItem
     // automatically when `currentFloor` changes. Teammates are also
     // user-managed via the bulk-add modal (slots open up based on

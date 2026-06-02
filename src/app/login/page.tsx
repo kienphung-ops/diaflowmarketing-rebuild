@@ -96,7 +96,7 @@ export default function LoginPage() {
               Welcome back
             </h1>
             <p className="text-[13px] text-tower-cream/65 mt-0.5">
-              Sign in to keep climbing your tower.
+              Sign in to keep leveling up.
             </p>
           </div>
         </div>

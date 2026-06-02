@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloorsConfig, useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 
 interface Props {
   open: boolean
@@ -80,7 +81,7 @@ export function HowItWorksModal({
 
   // ── Share payload (post-login footer) ──────────────────────────
   const xText = encodeURIComponent(
-    'just built my AI office at diaflow 🚀 climb the floors with me'
+    'just built my AI office at diaflow 🚀 level up with me'
   )
   const encodedUrl = inviteUrl ? encodeURIComponent(inviteUrl) : ''
   const xShareHref = inviteUrl
@@ -97,6 +98,7 @@ export function HowItWorksModal({
       await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
+      void creditShareUnlock('copy')
     } catch {
       /* ignore */
     }
@@ -111,7 +113,7 @@ export function HowItWorksModal({
       className="fixed inset-0 z-[80] flex items-end md:items-center justify-center md:p-5"
       role="dialog"
       aria-modal="true"
-      aria-label="Every floor, every unlock"
+      aria-label="Every Level, every unlock"
     >
       {/* Backdrop */}
       <div
@@ -139,14 +141,14 @@ export function HowItWorksModal({
         <header className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
           <div>
             <h2 className="text-[17px] md:text-lg font-extrabold leading-tight">
-              Every floor, every unlock
+              Every Level, every unlock
             </h2>
             <p className="text-[11.5px] md:text-xs text-tower-cream/55 mt-1.5 leading-relaxed">
-              Climb by inviting friends. Every floor unlocks an AI Teammate and
+              Level up by inviting friends. Every level unlocks an AI Teammate and
               new office gear. Real perks at{' '}
-              <span className="text-amber-300 font-semibold">Floor 3 (free beta)</span>{' '}
+              <span className="text-amber-300 font-semibold">Level 3 (free beta)</span>{' '}
               and{' '}
-              <span className="text-amber-300 font-semibold">Floor 7 (a month of Pro)</span>.{' '}
+              <span className="text-amber-300 font-semibold">Level 7 (a month of Pro)</span>.{' '}
               <span className="text-amber-300 font-semibold">
                 Whatever you earn is yours to keep when we launch.
               </span>
@@ -166,7 +168,7 @@ export function HowItWorksModal({
           className="grid items-center gap-2.5 px-5 py-2 bg-white/[0.02] border-b border-white/5 text-[9.5px] font-bold uppercase tracking-[0.06em] text-tower-cream/45 shrink-0"
           style={{ gridTemplateColumns: '36px 50px 1fr' }}
         >
-          <div className="text-center">Floor</div>
+          <div className="text-center">Level</div>
           <div className="text-center">Invites</div>
           <div>Rewards</div>
         </div>
@@ -224,9 +226,16 @@ export function HowItWorksModal({
                   )}
                 </div>
 
-                {/* Invites required — em-dash on floor 1 */}
-                <div className={`text-center text-[14px] font-extrabold leading-tight ${accentText}`}>
-                  {cfg.id === 1 ? '—' : cfg.invitesRequired}
+                {/* Invites required — em-dash on floor 1, "Share" on
+                    share-gated floors (unlocked by sharing, not invites). */}
+                <div className={`text-center font-extrabold leading-tight ${accentText}`}>
+                  {cfg.id === 1 ? (
+                    <span className="text-[14px]">—</span>
+                  ) : cfg.unlockType === 'share' ? (
+                    <span className="text-[11px]">Share</span>
+                  ) : (
+                    <span className="text-[14px]">{cfg.invitesRequired}</span>
+                  )}
                 </div>
 
                 {/* Reward description — hire-cap (bold), decor list
@@ -272,7 +281,7 @@ export function HowItWorksModal({
                   ⚠ Not saved yet
                 </div>
                 <div className="text-[13px] font-bold leading-tight">
-                  Save your team to start climbing.
+                  Save your team to start leveling up.
                 </div>
               </div>
               <button
@@ -290,7 +299,7 @@ export function HowItWorksModal({
               <div className="flex items-baseline justify-between mb-2">
                 <div className="text-[13px] font-bold">
                   {nextFloor
-                    ? `Share to reach Floor ${nextFloor.id}`
+                    ? `Share to reach Level ${nextFloor.id}`
                     : 'Share your office'}
                 </div>
                 <div className="text-[11px] text-purple-300 font-semibold">

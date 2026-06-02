@@ -22,6 +22,14 @@ export const runtime = 'nodejs'
 const TOKEN_TTL_MINUTES = 30
 
 function getOrigin(req: NextRequest): string {
+  // `NEXT_PUBLIC_SITE_URL` is the authoritative override — same
+  // rationale as the Google OAuth route. The reset link gets baked
+  // into an outbound email; if we ship a localhost URL here it
+  // lands in the user's inbox unclickable. The env-based override
+  // beats sniffing the request because it survives proxies that
+  // drop the Origin header.
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (fromEnv) return fromEnv
   const origin = req.headers.get('origin')
   if (origin) return origin
   const host = req.headers.get('host')

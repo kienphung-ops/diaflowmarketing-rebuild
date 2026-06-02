@@ -15,6 +15,9 @@ export interface FloorItemConfig {
 export interface FloorConfigEntry {
   id: number
   invitesRequired: number
+  /** How this floor unlocks. 'invite' (default) = needs invitesRequired
+   *  referrals; 'share' = needs the user to have shared at least once. */
+  unlockType: 'invite' | 'share'
   label: string
   /** INCLUSIVE of the 3 default NPCs (Iris/Mia/Leo). */
   maxTeammates: number

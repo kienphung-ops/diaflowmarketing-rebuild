@@ -35,6 +35,7 @@ export type { FloorConfigEntry, FloorItemConfig } from '@/lib/floorsConfigTypes'
 const FALLBACK: FloorConfigEntry[] = FLOOR_CONFIG.map(c => ({
   id: c.floor,
   invitesRequired: c.invitesRequired,
+  unlockType: c.unlockType ?? 'invite',
   label: c.label,
   maxTeammates: FLOOR_MAX_TEAMMATES[c.floor] ?? 4,
   productReward: null,

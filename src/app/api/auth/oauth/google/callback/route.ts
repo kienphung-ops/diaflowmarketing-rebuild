@@ -30,7 +30,7 @@ import {
   createSessionJwt,
   generateReferralCode,
 } from '@/lib/auth'
-import { computeFloorForInvites } from '@/lib/floors'
+import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
@@ -46,6 +46,26 @@ import {
 
 export const runtime = 'nodejs'
 
+/**
+ * Authoritative origin for redirects originated by this route.
+ *
+ * `req.nextUrl.origin` is what Next.js INFERS from the incoming
+ * request. Behind reverse proxies (nginx, Caddy, Traefik) it only
+ * resolves to the public hostname when the proxy is forwarding
+ * `X-Forwarded-Host` + `X-Forwarded-Proto` AND Next.js's request
+ * handler is configured to trust them. When either is missing, the
+ * inferred origin is the internal bind address (often
+ * `http://localhost:3000`), which then gets shipped to the browser
+ * as a Location header on the post-OAuth redirect — exactly the
+ * "Google sign-up succeeded but redirected to localhost" symptom.
+ *
+ * `NEXT_PUBLIC_SITE_URL` is the manual override and SHOULD always
+ * win when set: it's read fresh at runtime (this is server code),
+ * so a single env update + restart fixes the redirect without
+ * touching nginx or rebuilding. Only fall back to `req.nextUrl.origin`
+ * when the env is empty — useful for local dev where the env isn't
+ * configured but `localhost:3000` IS the correct origin.
+ */
 function originOf(req: NextRequest): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim()
   if (fromEnv) return fromEnv
@@ -55,7 +75,11 @@ function originOf(req: NextRequest): string {
 /** Helper — small wrapper that returns the user back to /login with
  *  an `oauth_error` query param so the page can render a toast. */
 function fail(req: NextRequest, code: string): NextResponse {
-  const url = new URL('/login', req.nextUrl.origin)
+  // Use `originOf()` (NOT `req.nextUrl.origin`) so error redirects
+  // land on the canonical site URL too — `req.nextUrl.origin` is
+  // unreliable behind reverse proxies, see the writeup on
+  // `originOf` above.
+  const url = new URL('/login', originOf(req))
   url.searchParams.set('oauth_error', code)
   const res = NextResponse.redirect(url)
   // Always blow away the state cookie on error so the next attempt
@@ -136,7 +160,12 @@ export async function GET(req: NextRequest) {
     // New accounts land back home with `?just_signed_up=1` so the
     // SaveSuccessModal pops up. Existing-user logins skip the param so
     // they don't see a congrats popup every sign-in.
-    const redirectUrl = new URL(isNew ? '/?just_signed_up=1' : '/', req.nextUrl.origin)
+    // Use `originOf(req)` so this redirect lands on the canonical
+    // domain (from NEXT_PUBLIC_SITE_URL) — without it, deployments
+    // behind a reverse proxy that doesn't forward X-Forwarded-Host
+    // bounce the user back to http://localhost:3000 instead of the
+    // public URL. Same fix applied to the `fail()` helper above.
+    const redirectUrl = new URL(isNew ? '/?just_signed_up=1' : '/', originOf(req))
     const res = NextResponse.redirect(redirectUrl)
     attachSessionCookie(res, jwt)
     // Burn the state cookie now that we've consumed it.
@@ -270,7 +299,6 @@ async function findOrCreateUserFromGoogle({
       // Inviter credit — same chain as email signup.
       if (inviter && inviter.id !== created.id) {
         const newTotal = inviter.totalInvites + 1
-        const newFloor = computeFloorForInvites(newTotal)
         await tx.inviteEvent.create({
           data: {
             inviterUserId: inviter.id,
@@ -283,8 +311,10 @@ async function findOrCreateUserFromGoogle({
         })
         await tx.user.update({
           where: { id: inviter.id },
-          data: { totalInvites: newTotal, currentFloor: newFloor },
+          data: { totalInvites: newTotal },
         })
+        // Floor 2 is share-gated — recompute from fresh progress.
+        await recomputeAndPersistFloor(tx, inviter.id)
         // Spin economy: +1 spin to the inviter for the referral signup.
         await grantReferralSpinTx(tx, inviter.id)
       }
