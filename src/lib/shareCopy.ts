@@ -4,7 +4,7 @@
  * Format (per product spec — note the em-dash has NO surrounding
  * spaces, the URL butts right up against it so it reads as one
  * compound clause):
- *   "built my AI office, <N> invites from the next floor—<url>"
+ *   "built my AI office, <N> invites from the next level—<url>"
  *
  * `N` is the number of invites the user still needs to unlock the next
  * floor. Singular ("invite") / plural ("invites") is selected so the
@@ -32,5 +32,5 @@ export function buildShareCopyText(
     return `just topped out my AI office at diaflow—${inviteUrl}`
   }
   const noun = invitesToNext === 1 ? 'invite' : 'invites'
-  return `built my AI office, ${invitesToNext} ${noun} from the next floor—${inviteUrl}`
+  return `built my AI office, ${invitesToNext} ${noun} from the next level—${inviteUrl}`
 }

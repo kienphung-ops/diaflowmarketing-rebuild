@@ -48,41 +48,44 @@ const FLOORS = [
   // `unlockItems` is now a Postgres text[] — one badge per array
   // entry. Floors that historically read "X + Y" become ['X', 'Y'].
   { id: 1,  invitesRequired: 0,   label: 'Company name picture frame',     maxTeammates: 3,  unlockItems: ['🖼 Company name picture frame', '1 desk'] },
-  { id: 2,  invitesRequired: 1,   label: 'Floor lamp + basic chair',       maxTeammates: 4,  unlockItems: ['💡 Floor lamp', 'Basic chair'] },
+  // F2 is unlocked by SHARING (any share button), not by invites — see
+  // `unlockType` + computeFloorForProgress. invitesRequired is kept for
+  // the anonymous trial preview / display fallback only.
+  { id: 2,  invitesRequired: 0,   unlockType: 'share', label: 'Floor lamp + basic chair',       maxTeammates: 4,  unlockItems: ['💡 Floor lamp', 'Basic chair'] },
   // F3: 2nd "basic chair + desk" pair. These are 2 SEPARATE items
   // (office_desk + basic_chair) now, not the retired composite.
-  { id: 3,  invitesRequired: 2,   label: 'Basic chair + desk',             maxTeammates: 5,  unlockItems: ['🪑 Basic chair + desk'], productReward: '🚀Free early beta' },
-  { id: 4,  invitesRequired: 4,   label: 'Potted plant',                    maxTeammates: 5,  unlockItems: ['🌿 Potted plant'] },
+  { id: 3,  invitesRequired: 1,   label: 'Basic chair + desk',             maxTeammates: 5,  unlockItems: ['🪑 Basic chair + desk'], productReward: '🚀Free early beta' },
+  { id: 4,  invitesRequired: 2,   label: 'Potted plant',                    maxTeammates: 5,  unlockItems: ['🌿 Potted plant'] },
   // F5: 3rd "basic chair + desk" pair (cap). From here on the user
   // has 3 office workstations.
-  { id: 5,  invitesRequired: 6,   label: 'Coffee mug + basic chair + desk', maxTeammates: 6,  unlockItems: ['☕ Coffee mug on desk', 'Basic chair + desk'] },
+  { id: 5,  invitesRequired: 3,   label: 'Coffee mug + basic chair + desk', maxTeammates: 6,  unlockItems: ['☕ Coffee mug on desk', 'Basic chair + desk'] },
   // F6: chair upgrade beat — ALL basic chairs become high-back
   // executive (giám đốc) chairs. Same workstation slots, plusher
   // seating. See ExecutiveChair mesh + the basic_chair → 0 /
   // executive_chair → 3 swap in ITEMS below.
-  { id: 6,  invitesRequired: 9,   label: 'Bookshelf + upgraded chairs',     maxTeammates: 6,  unlockItems: ['📚 Bookshelf', 'Upgraded extra chair'] },
-  { id: 7,  invitesRequired: 12,  label: 'Printer',             maxTeammates: 7,  unlockItems: ['🖨 Printer'],productReward: '🎁 1 month Pro free' },
-  { id: 8,  invitesRequired: 16,  label: 'Whiteboard with diagrams',        maxTeammates: 7,  unlockItems: ['📋 Whiteboard with diagrams'] },
-  { id: 9,  invitesRequired: 21,  label: 'Mini fridge',                     maxTeammates: 8,  unlockItems: ['🧃 Mini fridge'] },
+  { id: 6,  invitesRequired: 4,   label: 'Bookshelf + upgraded chairs',     maxTeammates: 6,  unlockItems: ['📚 Bookshelf', 'Upgraded extra chair'] },
+  { id: 7,  invitesRequired: 6,  label: 'Printer',             maxTeammates: 7,  unlockItems: ['🖨 Printer'],productReward: '🎁 1 month Pro free' },
+  { id: 8,  invitesRequired: 8,  label: 'Whiteboard with diagrams',        maxTeammates: 7,  unlockItems: ['📋 Whiteboard with diagrams'] },
+  { id: 9,  invitesRequired: 10,  label: 'Mini fridge',                     maxTeammates: 8,  unlockItems: ['🧃 Mini fridge'] },
   // F10 + F11 swapped vs the old seed — spec puts the couch first
   // (lounge area at slot-tier 8) and the trophy at the next tier (9).
-  { id: 10, invitesRequired: 27,  label: 'Couch / lounge area',             maxTeammates: 8,  unlockItems: ['🛋 Couch / lounge area'] },
-  { id: 11, invitesRequired: 34,  label: 'Trophy on shelf',                 maxTeammates: 9,  unlockItems: ['🏆 Trophy on shelf'], productReward:'🎁 2 months Pro free' },
-  { id: 12, invitesRequired: 42,  label: 'Upgraded dark wood desk',         maxTeammates: 9,  unlockItems: ['🪵 Upgraded dark wood desk'] },
-  { id: 13, invitesRequired: 51,  label: 'Neon sign on wall',               maxTeammates: 10, unlockItems: ['🌟 Neon sign on wall'] },
+  { id: 10, invitesRequired: 13,  label: 'Couch / lounge area',             maxTeammates: 8,  unlockItems: ['🛋 Couch / lounge area'] },
+  { id: 11, invitesRequired: 16,  label: 'Trophy on shelf',                 maxTeammates: 9,  unlockItems: ['🏆 Trophy on shelf'], productReward:'🎁 2 months Pro free' },
+  { id: 12, invitesRequired: 19,  label: 'Upgraded dark wood desk',         maxTeammates: 9,  unlockItems: ['🪵 Upgraded dark wood desk'] },
+  { id: 13, invitesRequired: 23,  label: 'Neon sign on wall',               maxTeammates: 10, unlockItems: ['🌟 Neon sign on wall'] },
   // 2-mo reward moved from F15 → F14 per spec; F15 no longer carries
   // a product reward.
-  { id: 14, invitesRequired: 61,  label: 'Arcade machine',                  maxTeammates: 10, unlockItems: ['🕹 Arcade machine'] },
-  { id: 15, invitesRequired: 72,  label: 'Floor-to-ceiling windows',        maxTeammates: 11, unlockItems: ['🪟 Floor-to-ceiling windows'], productReward: '🎁 3 months Pro free'},
+  { id: 14, invitesRequired: 27,  label: 'Arcade machine',                  maxTeammates: 10, unlockItems: ['🕹 Arcade machine'] },
+  { id: 15, invitesRequired: 31,  label: 'Floor-to-ceiling windows',        maxTeammates: 11, unlockItems: ['🪟 Floor-to-ceiling windows'], productReward: '🎁 3 months Pro free'},
   // F16 is now a tea-table beat (the simple round table). Living wall
   // moved one floor up to share F17 with the ping-pong table.
-  { id: 16, invitesRequired: 84,  label: 'Tea table',                       maxTeammates: 11, unlockItems: ['🍵 Tea table'] },
-  { id: 17, invitesRequired: 90,  label: 'Living wall + ping pong table',   maxTeammates: 12, unlockItems: ['🌿 Living wall', 'Ping pong table'] },
-  { id: 18, invitesRequired: 96,  label: 'Espresso machine + coffee area',  maxTeammates: 12, unlockItems: ['☕ Espresso machine', 'Coffee area'] },
+  { id: 16, invitesRequired: 36,  label: 'Tea table',                       maxTeammates: 11, unlockItems: ['🍵 Tea table'] },
+  { id: 17, invitesRequired: 41,  label: 'Living wall + ping pong table',   maxTeammates: 12, unlockItems: ['🌿 Living wall', 'Ping pong table'] },
+  { id: 18, invitesRequired: 46,  label: 'Espresso machine + coffee area',  maxTeammates: 12, unlockItems: ['☕ Espresso machine', 'Coffee area'] },
   // Rooftop terrace was replaced by the DJ stand — same z=19 slot,
   // different vibe.
-  { id: 19, invitesRequired: 102, label: 'DJ stand',                        maxTeammates: 13, unlockItems: ['🎵 DJ stand'] },
-  { id: 20, invitesRequired: 108, label: 'Full penthouse',                  maxTeammates: 14, unlockItems: ['👑 Full penthouse'], productReward: '🎁 4 months Pro free · ⭐ Featured' },
+  { id: 19, invitesRequired: 51, label: 'DJ stand',                        maxTeammates: 13, unlockItems: ['🎵 DJ stand'] },
+  { id: 20, invitesRequired: 56, label: 'Full penthouse',                  maxTeammates: 14, unlockItems: ['👑 Full penthouse'], productReward: '🎁 4 months Pro free · ⭐ Featured' },
 ]
 
 const MAX_FLOOR = 20
@@ -208,6 +211,7 @@ async function main() {
       create: {
         id: f.id,
         invitesRequired: f.invitesRequired,
+        unlockType: f.unlockType ?? 'invite',
         label: f.label,
         maxTeammates: f.maxTeammates,
         // Coerce `undefined` (field omitted in the FLOORS entry above)
@@ -222,6 +226,7 @@ async function main() {
       },
       update: {
         invitesRequired: f.invitesRequired,
+        unlockType: f.unlockType ?? 'invite',
         label: f.label,
         maxTeammates: f.maxTeammates,
         productReward: f.productReward ?? null,

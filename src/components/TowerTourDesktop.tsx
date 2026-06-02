@@ -142,7 +142,7 @@ export function TowerTourDesktop({
           </span>
         </h2>
         <p className="text-[14.5px] text-tower-cream/75 leading-relaxed mb-3">
-          Every invite gets you closer to the next floor. Each floor unlocks new
+          Every invite gets you closer to the next level. Each level unlocks new
           teammates and rewards.
         </p>
         <p className="text-[14.5px] text-tower-cream/80 leading-relaxed">

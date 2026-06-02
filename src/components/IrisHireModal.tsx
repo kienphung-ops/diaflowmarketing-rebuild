@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
+import { creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
@@ -129,6 +130,7 @@ export function IrisHireModal({
       await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
+      void creditShareUnlock('copy')
     } catch {
       /* ignore — older browsers without async clipboard */
     }
@@ -139,7 +141,7 @@ export function IrisHireModal({
   // everywhere it appears. See requirements/share-btn.md for the
   // canonical format.
   const xText = nextFloor
-    ? `just built my AI office at diaflow. unlocking floor ${nextFloor.id} next 👀`
+    ? `just built my AI office at diaflow. unlocking Level ${nextFloor.id} next 👀`
     : 'just topped out my AI office at diaflow 🏆'
   const encodedUrl = inviteUrl ? encodeURIComponent(inviteUrl) : ''
   const xShareHref = inviteUrl
@@ -270,7 +272,7 @@ export function IrisHireModal({
                   <>
                     Open up a new seat at{' '}
                     <strong className="text-tower-cream">
-                      Floor {nextFloor.id}
+                      Level {nextFloor.id}
                     </strong>{' '}
                     — share your link to climb.
                   </>

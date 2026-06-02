@@ -111,7 +111,7 @@ export function CelebrationModal({
 
         <div className="relative p-7 pb-5">
           <h2 className="text-3xl md:text-4xl font-bold text-center leading-tight">
-            You&apos;re on Floor <span className="text-tower-gold">{floor}</span>
+            You&apos;re on Level <span className="text-tower-gold">{floor}</span>
           </h2>
           <p className="mt-1 text-center text-sm text-tower-cream/70">
             Your office is filling up — here&apos;s what you just earned.
@@ -134,7 +134,7 @@ export function CelebrationModal({
             <div className="rounded-lg bg-night-deep/50 border border-white/5 px-2 py-3">
               <div className="text-base font-bold text-tower-gold">+{floorsClimbed}</div>
               <div className="text-[10px] uppercase tracking-wider text-tower-cream/50 mt-0.5">
-                Floors climbed
+                Levels climbed
               </div>
             </div>
             <div className="rounded-lg bg-night-deep/50 border border-white/5 px-2 py-3">
@@ -156,7 +156,7 @@ export function CelebrationModal({
               <div className="text-2xl shrink-0">📦</div>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-wider text-tower-cream/50">
-                  Next up — Floor {next.id}
+                  Next up — Level {next.id}
                 </div>
                 <div className="text-sm truncate">
                   <span className="text-tower-gold font-semibold">{invitesToNext}</span> more{' '}
@@ -166,7 +166,7 @@ export function CelebrationModal({
             </div>
           ) : (
             <div className="mt-4 rounded-lg bg-tower-gold/10 border border-tower-gold/30 px-3 py-2 text-sm text-center text-tower-gold">
-              You reached Floor {maxFloor} — penthouse unlocked. Featured at launch 🎉
+              You reached Level {maxFloor} — penthouse unlocked. Featured at launch 🎉
             </div>
           )}
 

@@ -432,6 +432,18 @@ export default function FloorVisitorClient(props: Props) {
         <div className="text-[11px] text-tower-cream/55 mt-2">
           Drag a teammate to poke them
         </div>
+        {/* Explicit back-to-office button — not every visitor realises
+            the header logo links home, so give them an obvious way out. */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsNavigating(true)
+            router.push('/')
+          }}
+          className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-100 hover:bg-purple-500/30 text-[12px] font-bold py-2 transition"
+        >
+          <span aria-hidden>←</span> {props.visitorSignedIn ? 'Back to my office' : 'Back to home'}
+        </button>
       </div>
 
       {/* The right-side "Squad / Poke a teammate" panel was removed on
@@ -508,6 +520,19 @@ export default function FloorVisitorClient(props: Props) {
             ⭐ {totalPokes} {totalPokes === 1 ? 'poke' : 'pokes'}
           </span>
         </div>
+        {/* Explicit back-to-office button — the header logo isn't an
+            obvious back-affordance for everyone. pointer-events-auto so
+            it's tappable even though the pill wrapper ignores pointers. */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsNavigating(true)
+            router.push('/')
+          }}
+          className="pointer-events-auto mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-500/25 border border-purple-400/45 text-purple-50 text-[11px] font-bold py-1.5 active:scale-[0.98] transition"
+        >
+          <span aria-hidden>←</span> {props.visitorSignedIn ? 'Back to my office' : 'Back to home'}
+        </button>
       </div>
 
       {/* MySquad — visitor's OWN squad, not the owner's. Right-edge

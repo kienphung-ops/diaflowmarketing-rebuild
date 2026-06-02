@@ -61,6 +61,7 @@ export async function getAllFloorsConfig(): Promise<FloorConfigEntry[]> {
     select: {
       id: true,
       invitesRequired: true,
+      unlockType: true,
       label: true,
       maxTeammates: true,
       productReward: true,
@@ -78,6 +79,7 @@ export async function getAllFloorsConfig(): Promise<FloorConfigEntry[]> {
   const data: FloorConfigEntry[] = rows.map(f => ({
     id: f.id,
     invitesRequired: f.invitesRequired,
+    unlockType: f.unlockType === 'share' ? 'share' : 'invite',
     label: f.label,
     maxTeammates: f.maxTeammates,
     productReward: f.productReward,

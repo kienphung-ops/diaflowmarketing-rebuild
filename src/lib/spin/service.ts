@@ -31,6 +31,7 @@ import {
   wedgeByKey,
   type SpinWedgeConfig,
 } from './wedgesApi'
+import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 
 // ── Shared shapes ───────────────────────────────────────────────────
 export interface SpinOutcome {
@@ -155,6 +156,11 @@ export async function completeSpinTask(userId: string, taskKey: string): Promise
         select: { spinTokens: true },
       })
       await tx.spinGrant.create({ data: { userId, source: 'task', amount: 1, taskKey } })
+      // A share task can unlock a share-gated floor (see lib/floors →
+      // unlockType). Recompute from fresh progress so the user's very
+      // first share bumps them past F2's share gate. No-op for users
+      // already above the gate (never demotes).
+      await recomputeAndPersistFloor(tx, userId)
       return { ok: true, tokens: updated.spinTokens } as const
     })
   } catch (err) {

@@ -52,7 +52,7 @@ export function MobileProgressPill({
         <div className="pointer-events-auto bg-tower-gold/15 border border-tower-gold/40 backdrop-blur-md rounded-2xl px-3.5 py-2.5 flex items-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
           <div className="flex-1 min-w-0">
             <div className="text-[9px] tracking-[0.08em] uppercase text-tower-gold/70 font-bold">
-              Top floor reached
+              You&apos;ve reached the top!
             </div>
             <div className="text-[12px] text-tower-cream font-semibold leading-tight truncate">
               👑 Penthouse unlocked — keep sharing to grow the tower
@@ -64,6 +64,10 @@ export function MobileProgressPill({
   }
 
   const invitesToNext = Math.max(0, nextFloor.invitesRequired - totalInvites)
+  // The next floor may be unlocked by SHARING instead of inviting — see
+  // Floor.unlockType / computeFloorForProgress. Swap the invite-count
+  // copy + badge for a share prompt when so.
+  const nextIsShare = nextFloor.unlockType === 'share'
   // First non-empty unlock-item string, falls back to the floor label.
   const reward =
     nextFloor.unlockItems?.find(s => s && s.trim().length > 0) ??
@@ -99,16 +103,22 @@ export function MobileProgressPill({
             {reward}
           </div>
           <div className="text-[10.5px] text-tower-cream/55 mt-0.5 truncate">
-            Floor {nextFloor.id} · {invitesToNext}{' '}
-            {invitesToNext === 1 ? 'invite' : 'invites'} away
+            {nextIsShare ? (
+              <>Level {nextFloor.id} · Share to unlock</>
+            ) : (
+              <>
+                Level {nextFloor.id} · {invitesToNext}{' '}
+                {invitesToNext === 1 ? 'invite' : 'invites'} away
+              </>
+            )}
           </div>
         </div>
 
-        {/* Invite count badge — purple-tinted pill on the right
-            matching the mockup. Mirrors the share-sheet's invite
-            counter colour. */}
+        {/* Right-side badge — invite count remaining, or a share glyph
+            when the next floor is share-gated. Mirrors the share-sheet's
+            purple counter colour. */}
         <div className="shrink-0 rounded-md bg-purple-500/15 px-2 py-1 text-[11px] font-extrabold text-purple-200 leading-none">
-          {invitesToNext}
+          {nextIsShare ? '↗' : invitesToNext}
         </div>
       </div>
     </div>
