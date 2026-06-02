@@ -304,7 +304,7 @@ export function SignupModal({ onClose }: Props) {
 
         <p className="mt-3 text-center text-[11px] text-tower-cream/45 leading-relaxed">
           By continuing, you agree to our{' '}
-          <Link href="/terms" className="text-tower-cream/65 underline-offset-2 hover:underline">
+          <Link href="https://docs.diaflow.io/compliance-center/general/terms-and-conditions" className="text-tower-cream/65 underline-offset-2 hover:underline">
             Terms &amp; Privacy Policy
           </Link>
           .
