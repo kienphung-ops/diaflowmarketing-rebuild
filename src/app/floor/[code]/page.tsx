@@ -19,7 +19,7 @@ export async function generateMetadata(
   if (!owner) return {}
 
   const teamName = owner.teamName?.trim() || 'A Diaflow team'
-  const title = `Join ${teamName} on Diaflow Tower`
+  const title = `Join ${teamName} on Diaflow teammate`
   const description = `${teamName} is on Level ${owner.currentFloor} — peek inside their AI office and help them level up.`
   const url = `/floor/${code}`
 
@@ -34,7 +34,7 @@ export async function generateMetadata(
     // shared previews.
     openGraph: {
       type: 'website',
-      siteName: 'Diaflow Tower',
+      siteName: 'Diaflow teammate',
       title,
       description,
       url,

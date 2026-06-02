@@ -10,6 +10,9 @@ interface Props {
   trialMode: boolean
   /** Number of floors climbed in this jump (defaults to 1). Shown in the +N badge. */
   floorsClimbed?: number
+  /** Real leaderboard rank (from /api/leaderboard). `null` while unknown.
+   *  Rendered as "50+" when outside the top 50 (rank > 50 or unknown). */
+  rank?: number | null
   onClose: () => void
   onOpenSignup?: () => void
 }
@@ -76,6 +79,7 @@ export function CelebrationModal({
   totalInvites,
   trialMode,
   floorsClimbed = 1,
+  rank,
   onClose,
   onOpenSignup,
 }: Props) {
@@ -86,7 +90,9 @@ export function CelebrationModal({
   const invitesToNext = next ? Math.max(0, next.invitesRequired - totalInvites) : 0
   const maxFloor = useFloorCount()
   const teammateSlots = current?.maxTeammates ?? 4
-  const rank = Math.max(1, 500 - totalInvites * 7)
+  // Real rank from the leaderboard. Outside the top 50 (or not yet
+  // loaded) shows "50+", matching the LeaderboardModal convention.
+  const rankLabel = rank != null && rank <= 50 ? `#${rank}` : '50+'
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -144,7 +150,7 @@ export function CelebrationModal({
               </div>
             </div>
             <div className="rounded-lg bg-night-deep/50 border border-white/5 px-2 py-3">
-              <div className="text-base font-bold text-tower-gold">#{rank}</div>
+              <div className="text-base font-bold text-tower-gold">{rankLabel}</div>
               <div className="text-[10px] uppercase tracking-wider text-tower-cream/50 mt-0.5">
                 New rank
               </div>
