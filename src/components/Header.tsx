@@ -259,7 +259,7 @@ export function Header({
                   onClick={onShareClimb}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
                 >
-                  <span aria-hidden>📣</span> Share to climb
+                  <span aria-hidden>📣</span> Share to level up
                 </button>
               ) : (
                 <ReferralCopyButton

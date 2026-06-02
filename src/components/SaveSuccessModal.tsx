@@ -185,7 +185,7 @@ export function SaveSuccessModal({
     <div className="rounded-xl bg-[#1B1A38] border border-[#2A2A4D] p-3.5 md:p-4 flex flex-col">
       <div className="flex justify-between items-baseline mb-2.5">
         <div className="text-[11px] uppercase tracking-[0.08em] text-tower-cream/55 font-semibold">
-          {nextFloor ? `Climb to level ${nextFloor.id}` : 'Penthouse reached'}
+          {nextFloor ? `Reach Level ${nextFloor.id}` : 'Penthouse reached'}
         </div>
         <div className="text-[12px] text-purple-300 font-semibold">
           {nextFloor

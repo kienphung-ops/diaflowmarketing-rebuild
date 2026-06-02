@@ -77,7 +77,7 @@ export default function HowItWorksClient() {
           </li>
           <li className="flex gap-2">
             <span className="text-tower-gold font-bold">3.</span>
-            <span>Climb 20 floors to earn free beta access + featured launch spot.</span>
+            <span>Reach Level 20 to earn free beta access + featured launch spot.</span>
           </li>
         </ol>
         <div className="mt-4 flex gap-2">

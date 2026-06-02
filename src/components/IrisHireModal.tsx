@@ -274,7 +274,7 @@ export function IrisHireModal({
                     <strong className="text-tower-cream">
                       Level {nextFloor.id}
                     </strong>{' '}
-                    — share your link to climb.
+                    — share your link to level up.
                   </>
                 ) : (
                   <>

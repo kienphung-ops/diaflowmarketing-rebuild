@@ -651,7 +651,7 @@ export function MySquadDrawer({
           <div className="flex items-baseline justify-between gap-2 mb-2.5">
             <h3 className="text-sm font-bold text-tower-cream">
               {nextFloor
-                ? `Share to reach Floor ${nextFloor.id}`
+                ? `Share to reach Level ${nextFloor.id}`
                 : 'Share your penthouse'}
             </h3>
             <span className="text-[11px] font-semibold text-purple-300 whitespace-nowrap">

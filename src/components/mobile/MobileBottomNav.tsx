@@ -191,7 +191,7 @@ function HeroBtn({
   mode: 'save' | 'invite'
   onClick: () => void
 }) {
-  const label = mode === 'save' ? 'Save my team' : 'Invite to climb'
+  const label = mode === 'save' ? 'Save my team' : 'Invite to level up'
   return (
     <button
       onClick={onClick}
