@@ -1275,26 +1275,37 @@ export function FloorItems({ currentFloor, positionOverrides, ghostItemKeys }: P
   const floorItems = useFloorItems(currentFloor)
   const nextFloorItems = useFloorItems(currentFloor + 1)
 
-  // itemKey → { unlocked, quantity }. Two passes:
-  //   1. CURRENT floor items → marked unlocked, render at full opacity.
-  //   2. NEXT floor items not on the current floor → marked preview,
-  //      render at LOCKED_OPACITY (the `M` helper handles the dim).
-  // The second pass `if (!info.has(it.key))` guard means items on
-  // both floors stay unlocked (current beats preview).
+  // itemKey → { unlockedQty, previewQty }.
+  //   unlockedQty: copies the CURRENT floor owns → full opacity.
+  //   previewQty:  EXTRA copies the NEXT floor adds → ghosted teaser.
+  //
+  // previewQty covers BOTH cases:
+  //   a) a brand-new item key on the next floor (unlockedQty 0), and
+  //   b) quantity GROWTH of an item already on this floor — e.g. F2 has
+  //      1 desk + 1 chair, F3 bumps each to 2, so the 2nd desk/chair
+  //      should preview as ghosted on F2. The old logic skipped any key
+  //      already present, so floors that only add quantity (F2→F3) showed
+  //      no preview at all. That was the "no ghosted items on Level 2" bug.
   const itemInfo = useMemo(() => {
-    const info = new Map<string, { unlocked: boolean; quantity: number }>()
+    const info = new Map<string, { unlockedQty: number; previewQty: number }>()
     for (const it of floorItems) {
-      info.set(it.key, { unlocked: true, quantity: it.quantity })
+      info.set(it.key, { unlockedQty: it.quantity, previewQty: 0 })
     }
     for (const it of nextFloorItems) {
-      if (info.has(it.key)) continue
-      info.set(it.key, { unlocked: false, quantity: it.quantity })
+      const cur = info.get(it.key)
+      if (!cur) {
+        info.set(it.key, { unlockedQty: 0, previewQty: it.quantity })
+      } else if (it.quantity > cur.unlockedQty) {
+        info.set(it.key, { ...cur, previewQty: it.quantity - cur.unlockedQty })
+      }
     }
-    // Override unlocked → false for any item the caller wants ghosted
-    // (tower-view floor preview, keys above the viewer's real floor).
+    // Tower-view floor preview: force EVERYTHING ghosted for keys the
+    // viewer hasn't earned yet (keys above their real floor).
     if (ghostItemKeys && ghostItemKeys.size > 0) {
       info.forEach((v, k) => {
-        if (ghostItemKeys.has(k)) info.set(k, { ...v, unlocked: false })
+        if (ghostItemKeys.has(k)) {
+          info.set(k, { unlockedQty: 0, previewQty: v.unlockedQty + v.previewQty })
+        }
       })
     }
     return info
@@ -1304,8 +1315,9 @@ export function FloorItems({ currentFloor, positionOverrides, ghostItemKeys }: P
     <group>
       {ITEMS.map(it => {
         const hit = itemInfo.get(it.key)
+        const total = hit ? hit.unlockedQty + hit.previewQty : 0
         // Not configured for this floor OR the next → don't render.
-        if (!hit || hit.quantity < 1) return null
+        if (!hit || total < 1) return null
         const offset = it.offsetStep ?? [1.8, 0, 0]
         // Per-instance position lookup with three-tier fallback:
         //   1. `${key}_${i}` override (multi-instance items get
@@ -1313,8 +1325,11 @@ export function FloorItems({ currentFloor, positionOverrides, ghostItemKeys }: P
         //   2. bare `${key}` override (single-instance items, or
         //      the 0-th copy when no per-instance override exists)
         //   3. defaultPosition + offsetStep × i (canonical behaviour)
+        // The first `unlockedQty` copies render unlocked; the remaining
+        // `previewQty` copies render ghosted as a next-floor teaser.
         const copies: ReactNode[] = []
-        for (let i = 0; i < hit.quantity; i++) {
+        for (let i = 0; i < total; i++) {
+          const unlocked = i < hit.unlockedQty
           const indexedKey = `${it.key}_${i}`
           const override = positionOverrides?.[indexedKey]
             ?? (i === 0 ? positionOverrides?.[it.key] : undefined)
@@ -1325,7 +1340,7 @@ export function FloorItems({ currentFloor, positionOverrides, ghostItemKeys }: P
           ]
           copies.push(
             <group key={`${it.key}-${i}`} position={pos}>
-              {it.render(hit.unlocked)}
+              {it.render(unlocked)}
             </group>,
           )
         }

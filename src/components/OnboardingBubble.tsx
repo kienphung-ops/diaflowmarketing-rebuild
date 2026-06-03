@@ -18,7 +18,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { resolveLeoVideo } from '@/lib/youtubeUrl'
+import { useLeoVideo } from '@/hooks/useLeoVideo'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 
@@ -538,11 +538,12 @@ interface LeoProps {
 }
 
 export function LeoBubble({ onContinue }: LeoProps) {
-  // Resolve Leo's intro video. With NEXT_PUBLIC_YOUTUBE_ID set we
-  // embed YouTube (clean-params per requirements/youtube_frame_rule.md);
-  // without it we fall back to the bundled MP4 in /public so the
-  // marketing surface still has a working video. See lib/youtubeUrl.ts.
-  const video = resolveLeoVideo(process.env.NEXT_PUBLIC_YOUTUBE_ID)
+  // Resolve Leo's intro video. The YouTube ID now comes from the
+  // app_config table (key `leo_youtube_id`) via /api/config/leo-video —
+  // not NEXT_PUBLIC_YOUTUBE_ID — so it's swappable live. Clean-params per
+  // requirements/youtube_frame_rule.md; blank/unset → bundled MP4
+  // fallback in /public so the surface always has a working video.
+  const video = useLeoVideo()
 
   return (
     <ModalShell onClose={onContinue} wide step={4} anchorSlug="leo">

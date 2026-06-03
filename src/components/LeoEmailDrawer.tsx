@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { resolveLeoVideo } from '@/lib/youtubeUrl'
+import { useLeoVideo } from '@/hooks/useLeoVideo'
 import { trackEvent } from '@/lib/tracking'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
@@ -46,11 +46,11 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
     { flipEdge: true, vCenter: true, gap: 28 },
   )
   const anchored = !!anchorSlug && isDesktop
-  // Same env-driven helper LeoBubble uses — keeps the two Leo modals
-  // in sync. Reads the BARE VIDEO ID from NEXT_PUBLIC_YOUTUBE_ID;
-  // when the env is blank we fall back to the bundled MP4 in /public
-  // so the modal still plays without any env config (see lib/youtubeUrl).
-  const video = resolveLeoVideo(process.env.NEXT_PUBLIC_YOUTUBE_ID)
+  // Same resolver LeoBubble uses — keeps the two Leo modals in sync.
+  // The YouTube ID now comes from the app_config table (key
+  // `leo_youtube_id`) via /api/config/leo-video, not an env var, so it
+  // can be swapped live. Blank/unset → bundled MP4 fallback in /public.
+  const video = useLeoVideo()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const hasTrackedVideo = useRef(false)
 
