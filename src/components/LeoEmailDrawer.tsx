@@ -41,9 +41,13 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
   // static `translate(...)` offset (otherwise the two transforms
   // stack and the card drifts off the character).
   const isDesktop = useIsDesktop()
+  // freeze: snapshot Leo's position when the drawer opens and keep it
+  // static. Leo keeps wandering / bobbing in the scene, but the video
+  // card no longer jitters along with him — otherwise the moving anchor
+  // made the embedded video hard to watch.
   const anchorRef = useAnchorPosition(
     open && isDesktop ? anchorSlug ?? null : null,
-    { flipEdge: true, vCenter: true, gap: 28 },
+    { flipEdge: true, vCenter: true, gap: 28, freeze: true },
   )
   const anchored = !!anchorSlug && isDesktop
   // Same resolver LeoBubble uses — keeps the two Leo modals in sync.

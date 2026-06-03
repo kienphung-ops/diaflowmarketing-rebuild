@@ -95,6 +95,12 @@ interface AnchorOpts {
   /** When true, vertically centre the card on the character pixel
    *  (translate up by half its height). */
   vCenter?: boolean
+  /** When true, SNAPSHOT the character's position once (at open) and
+   *  keep the card static there — it stops following the character's
+   *  per-frame wander / bob. Use for modals whose content would be hard
+   *  to interact with if the card jittered (e.g. Leo's video drawer).
+   *  The card still re-clamps on window resize. */
+  freeze?: boolean
 }
 
 export function useAnchorPosition(slug: string | null, opts?: AnchorOpts) {
@@ -106,49 +112,79 @@ export function useAnchorPosition(slug: string | null, opts?: AnchorOpts) {
   const gap = opts?.gap ?? 28
   const flipEdge = !!opts?.flipEdge
   const vCenter = !!opts?.vCenter
+  const freeze = !!opts?.freeze
 
   useEffect(() => {
     if (!slug) return
+
+    const MARGIN = 8 // min px gap from any viewport edge
+
+    // Shared placement: write `pos` onto the element, honouring
+    // flipEdge / vCenter / clamping. translate3d gets a compositor-only
+    // path on most browsers, avoiding layout thrash even at 60fps.
+    function apply(pos: AnchorPos | null) {
+      const el = elRef.current
+      if (!el || !pos) return
+      if (flipEdge) {
+        // Hook owns the full placement. Measure the rendered card so we
+        // know whether it fits to the right of the character.
+        const w = el.offsetWidth
+        const h = el.offsetHeight
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+
+        let x = pos.x + gap
+        if (x + w > vw - MARGIN) {
+          const leftX = pos.x - gap - w
+          x = leftX >= MARGIN ? leftX : Math.max(MARGIN, vw - MARGIN - w)
+        }
+        let y = vCenter ? pos.y - h / 2 : pos.y
+        y = Math.min(Math.max(y, MARGIN), vh - MARGIN - h)
+        el.style.transform = `translate3d(${x}px, ${y}px, 0)`
+      } else {
+        el.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`
+      }
+    }
+
+    // FREEZE: snapshot the character's position once and keep the card
+    // static there. The character keeps moving in the scene, but the
+    // card no longer follows its wander / bob — so video / interactive
+    // content stays still. Re-applies on resize so the clamp stays valid.
+    if (freeze) {
+      let captured = getAnchorPosition(slug)
+      let rafId = 0
+      let unsub: () => void = () => {}
+      // rAF so the card is laid out before flipEdge measures it.
+      const placeOnce = () => apply(captured)
+      if (captured) {
+        rafId = requestAnimationFrame(placeOnce)
+      } else {
+        // Position not registered yet (character still spawning) — grab
+        // the first sample, place once, then stop following.
+        unsub = subscribe(slug, pos => {
+          if (captured) return
+          captured = pos
+          rafId = requestAnimationFrame(placeOnce)
+          unsub()
+        })
+      }
+      const onResize = () => placeOnce()
+      window.addEventListener('resize', onResize)
+      return () => {
+        cancelAnimationFrame(rafId)
+        unsub()
+        window.removeEventListener('resize', onResize)
+      }
+    }
+
+    // LIVE (default): follow the character every frame.
     latestRef.current = getAnchorPosition(slug)
     const unsubscribe = subscribe(slug, pos => {
       latestRef.current = pos
     })
-
-    const MARGIN = 8 // min px gap from any viewport edge
-
     let rafId = 0
     function tick() {
-      const el = elRef.current
-      const pos = latestRef.current
-      if (el && pos) {
-        if (flipEdge) {
-          // Hook owns the full placement. Measure the rendered card so
-          // we know whether it fits to the right of the character.
-          const w = el.offsetWidth
-          const h = el.offsetHeight
-          const vw = window.innerWidth
-          const vh = window.innerHeight
-
-          // Prefer the right side; flip left when it would clip.
-          let x = pos.x + gap
-          if (x + w > vw - MARGIN) {
-            const leftX = pos.x - gap - w
-            // Only flip if the left side actually has more room;
-            // otherwise clamp on the right so we never push off-screen.
-            x = leftX >= MARGIN ? leftX : Math.max(MARGIN, vw - MARGIN - w)
-          }
-
-          let y = vCenter ? pos.y - h / 2 : pos.y
-          // Clamp vertically so the card never runs off top/bottom.
-          y = Math.min(Math.max(y, MARGIN), vh - MARGIN - h)
-
-          el.style.transform = `translate3d(${x}px, ${y}px, 0)`
-        } else {
-          // translate3d gets a compositor-only path on most browsers,
-          // avoiding layout thrash even at 60fps.
-          el.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`
-        }
-      }
+      apply(latestRef.current)
       rafId = requestAnimationFrame(tick)
     }
     rafId = requestAnimationFrame(tick)
@@ -157,7 +193,7 @@ export function useAnchorPosition(slug: string | null, opts?: AnchorOpts) {
       cancelAnimationFrame(rafId)
       unsubscribe()
     }
-  }, [slug, gap, flipEdge, vCenter])
+  }, [slug, gap, flipEdge, vCenter, freeze])
 
   return elRef
 }
