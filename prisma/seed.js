@@ -304,7 +304,7 @@ async function main() {
   //   - leo_youtube_id: Leo's intro-video YouTube ID (migrated off the
   //     old NEXT_PUBLIC_YOUTUBE_ID env var). Blank → /leo_video.mp4.
   const APP_CONFIG_DEFAULTS = [
-    { key: 'leo_youtube_id', value: 'loE-Hk8Bmh4' },
+    { key: 'leo_youtube_id', value: 'FngJf338Sbk' },
   ]
   for (const c of APP_CONFIG_DEFAULTS) {
     await prisma.appConfig.upsert({
