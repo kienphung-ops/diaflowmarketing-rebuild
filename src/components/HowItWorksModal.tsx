@@ -85,7 +85,7 @@ export function HowItWorksModal({
   )
   const encodedUrl = inviteUrl ? encodeURIComponent(inviteUrl) : ''
   const xShareHref = inviteUrl
-    ? `https://x.com/intent/tweet?text=${xText}&url=${encodedUrl}&hashtags=DiaflowTower`
+    ? `https://x.com/intent/tweet?text=${xText}&url=${encodedUrl}&hashtags=DiaflowOffice`
     : undefined
   const linkedinShareHref = inviteUrl
     ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`

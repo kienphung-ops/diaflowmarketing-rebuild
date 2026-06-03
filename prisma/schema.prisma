@@ -352,3 +352,17 @@ model AnonymousSpin {
   @@index([ipAddress])
   @@map("anonymous_spins")
 }
+
+// AppConfig — generic key/value store for app-wide settings (feature
+// flags, tunables, copy toggles, etc.). One row per setting. `value` is
+// JSONB, so it holds any JSON shape (bool, number, string, object, array)
+// natively — no manual parse/stringify. Read/write via lib/appConfig.ts
+// (cached).
+model AppConfig {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("app_config")
+}

@@ -297,6 +297,24 @@ async function main() {
   }
   console.log(`  ✓ ${SPIN_WEDGES.length} spin wedges`)
 
+  // ─── 4b. App config defaults ───────────────────────────────────────
+  // Generic key/value settings (app_config table). Seed DEFAULTS only —
+  // `update: {}` so a re-run never clobbers a value an admin changed
+  // live. `value` is JSONB; a bare string id is stored as a JSON string.
+  //   - leo_youtube_id: Leo's intro-video YouTube ID (migrated off the
+  //     old NEXT_PUBLIC_YOUTUBE_ID env var). Blank → /leo_video.mp4.
+  const APP_CONFIG_DEFAULTS = [
+    { key: 'leo_youtube_id', value: 'loE-Hk8Bmh4' },
+  ]
+  for (const c of APP_CONFIG_DEFAULTS) {
+    await prisma.appConfig.upsert({
+      where: { key: c.key },
+      create: { key: c.key, value: c.value },
+      update: {}, // never overwrite an admin-set value on reseed
+    })
+  }
+  console.log(`  ✓ ${APP_CONFIG_DEFAULTS.length} app config defaults`)
+
   // ─── 5. Bust the floors API cache ─────────────────────────────────
   // /api/floors sits behind a 3-tier cache (in-process memo → Redis →
   // DB). The in-process layer dies with this script naturally, but

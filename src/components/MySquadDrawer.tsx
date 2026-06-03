@@ -231,7 +231,7 @@ export function MySquadDrawer({
    * Marketing copy + share-intent URLs come from
    * requirements/share-btn.md and are built inside `useFirstShareSpin`:
    *
-   *   X        → https://x.com/intent/tweet?text=<text>&url=<inviteUrl>&hashtags=DiaflowTower
+   *   X        → https://x.com/intent/tweet?text=<text>&url=<inviteUrl>&hashtags=DiaflowOffice
    *   LinkedIn → https://www.linkedin.com/sharing/share-offsite/?url=<inviteUrl>
    *
    * The same hook ALSO posts to /api/spin/task after a 3 s dwell so the
