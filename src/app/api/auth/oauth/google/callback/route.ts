@@ -35,6 +35,7 @@ import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
 import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
+import { getCountry } from '@/lib/requestGeo'
 import {
   buildRedirectUri,
   exchangeCodeForGoogleProfile,
@@ -136,7 +137,6 @@ export async function GET(req: NextRequest) {
     const { id: userId, isNew } = await findOrCreateUserFromGoogle({
       profile,
       carryover: decoded,
-      ip: getClientIp(req),
       country: getCountry(req),
     })
 
@@ -196,12 +196,10 @@ export async function GET(req: NextRequest) {
 async function findOrCreateUserFromGoogle({
   profile,
   carryover,
-  ip,
   country,
 }: {
   profile: GoogleProfile
   carryover: OAuthStatePayload
-  ip?: string
   country?: string
 }): Promise<{ id: string; isNew: boolean }> {
   const normalisedEmail = profile.email.trim().toLowerCase()
@@ -267,7 +265,6 @@ async function findOrCreateUserFromGoogle({
           googleId: profile.sub,
           googleEmail: normalisedEmail,
           emailVerified: profile.email_verified ? now : null,
-          ipAddress: ip,
           country: country ?? null,
           referralCode,
           referredByCode: inviterCode,
@@ -304,7 +301,6 @@ async function findOrCreateUserFromGoogle({
             inviterUserId: inviter.id,
             invitedEmail: normalisedEmail,
             invitedUserId: created.id,
-            ipAddress: ip,
             userAgent: undefined,
             verified: true,
           },
@@ -346,12 +342,3 @@ async function findOrCreateUserFromGoogle({
   return { id: userId, isNew: true }
 }
 
-function getClientIp(req: NextRequest): string | undefined {
-  const xff = req.headers.get('x-forwarded-for')
-  if (xff) return xff.split(',')[0].trim()
-  return req.headers.get('x-real-ip') ?? undefined
-}
-
-function getCountry(req: NextRequest): string | undefined {
-  return req.headers.get('x-vercel-ip-country') ?? undefined
-}

@@ -9,6 +9,7 @@ import {
 import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
+import { getCountry } from '@/lib/requestGeo'
 
 const BCRYPT_ROUNDS = 10
 const MIN_PASSWORD_LEN = 6
@@ -17,10 +18,6 @@ function getClientIp(req: NextRequest): string | undefined {
   const xff = req.headers.get('x-forwarded-for')
   if (xff) return xff.split(',')[0].trim()
   return req.headers.get('x-real-ip') ?? undefined
-}
-
-function getCountry(req: NextRequest): string | undefined {
-  return req.headers.get('x-vercel-ip-country') ?? undefined
 }
 
 async function ensureUniqueReferralCode(): Promise<string> {
