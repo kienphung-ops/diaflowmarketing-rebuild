@@ -605,7 +605,6 @@ export function MySquadDrawer({
           {nextFloor && (
             <div className="mt-2 flex justify-center md:justify-start">
               <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-400/10 border border-amber-400/30 px-2.5 py-1 text-[11.5px] font-semibold text-amber-300">
-                <span aria-hidden>🎁</span>
                 <span>{nextRewardLabel}</span>
               </span>
             </div>
