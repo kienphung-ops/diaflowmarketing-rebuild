@@ -117,6 +117,21 @@ export default function FloorVisitorClient(props: Props) {
     router.prefetch('/tower')
     if (!props.visitorSignedIn) router.prefetch('/signup')
   }, [router, props.visitorSignedIn])
+
+  // Referral capture: any NOT-signed-in visitor who opens an invite link
+  // is treated as referred by that floor's owner. We persist the code to
+  // localStorage so it survives navigation (e.g. tapping the logo back to
+  // home) and a later return visit — signup reads it. LAST inviter wins
+  // (overwrite). Signed-in users are skipped (can't be re-referred); the
+  // code is cleared on successful signup/login (see signup + login flows).
+  useEffect(() => {
+    if (props.visitorSignedIn) return
+    try {
+      window.localStorage.setItem('diaflow_pending_ref', props.code.toUpperCase())
+    } catch {
+      /* ignore — private mode / storage disabled */
+    }
+  }, [props.code, props.visitorSignedIn])
   // Lifecycle AbortController — pokes (user-triggered fetches) reuse
   // this signal so they abort cleanly on navigation away. The polling
   // useEffect below uses its own per-effect AbortController instead.
