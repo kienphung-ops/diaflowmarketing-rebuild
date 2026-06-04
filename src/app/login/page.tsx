@@ -5,6 +5,8 @@ import { useState } from 'react'
 import { ForgotPasswordModal } from '@/components/ForgotPasswordModal'
 import { PasswordInput } from '@/components/PasswordInput'
 import { InlineSpinner } from '@/components/ViewTransitionOverlay'
+import { InAppBrowserNotice } from '@/components/InAppBrowserNotice'
+import { useIsInAppBrowser } from '@/hooks/useIsInAppBrowser'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -12,6 +14,9 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [forgotOpen, setForgotOpen] = useState(false)
+  // In social-media in-app browsers Google blocks OAuth — hide the
+  // button and show a "reopen in browser" notice instead.
+  const isInAppBrowser = useIsInAppBrowser()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -101,16 +106,22 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Google OAuth — first option, mirrors the signup flow. */}
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={busy}
-          className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/15 text-tower-cream font-semibold text-[14px] hover:bg-white/[0.1] disabled:opacity-60 disabled:cursor-not-allowed transition mb-4"
-        >
-          <GoogleGlyph />
-          <span>Continue with Google</span>
-        </button>
+        {/* Google OAuth — first option, mirrors the signup flow. Hidden
+            inside in-app browsers (Google blocks OAuth there); we show a
+            "open in browser" notice instead. */}
+        {isInAppBrowser ? (
+          <InAppBrowserNotice />
+        ) : (
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/15 text-tower-cream font-semibold text-[14px] hover:bg-white/[0.1] disabled:opacity-60 disabled:cursor-not-allowed transition mb-4"
+          >
+            <GoogleGlyph />
+            <span>Continue with Google</span>
+          </button>
+        )}
 
         <div className="flex items-center gap-2.5 my-3 text-[10.5px] font-bold uppercase tracking-[0.1em] text-tower-cream/40">
           <span className="flex-1 h-px bg-white/10" />
