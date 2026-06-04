@@ -6,6 +6,8 @@ import { clearTrialState, readTrialState } from '@/lib/trial'
 import { trackEvent } from '@/lib/tracking'
 import { PasswordInput } from './PasswordInput'
 import { InlineSpinner } from './ViewTransitionOverlay'
+import { InAppBrowserNotice } from './InAppBrowserNotice'
+import { useIsInAppBrowser } from '@/hooks/useIsInAppBrowser'
 
 interface Props {
   onClose: () => void
@@ -48,6 +50,9 @@ export function SignupModal({ onClose }: Props) {
   // defaults so the modal still renders coherently if the user opens
   // it before completing any onboarding (which shouldn't happen, but
   // worth covering — empty preview > broken layout).
+  // In social-media in-app browsers Google blocks OAuth — hide the
+  // Google button and show a "reopen in browser" notice instead.
+  const isInAppBrowser = useIsInAppBrowser()
   const trial = useMemo(() => readTrialState(), [])
   const previewTeamName = trial?.teamName?.trim() || 'your team'
   const previewFloor = trial?.currentFloor ?? 1
@@ -245,16 +250,22 @@ export function SignupModal({ onClose }: Props) {
           when AI Teammate ships this summer.
         </p>
 
-        {/* Google OAuth — primary alternative to email signup. */}
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={busy}
-          className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/15 text-tower-cream font-semibold text-[14px] hover:bg-white/[0.1] disabled:opacity-60 disabled:cursor-not-allowed transition mb-4"
-        >
-          <GoogleGlyph />
-          <span>Continue with Google</span>
-        </button>
+        {/* Google OAuth — primary alternative to email signup. Hidden
+            inside in-app browsers (Google blocks OAuth there); we show a
+            "open in browser" notice instead. */}
+        {isInAppBrowser ? (
+          <InAppBrowserNotice />
+        ) : (
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/15 text-tower-cream font-semibold text-[14px] hover:bg-white/[0.1] disabled:opacity-60 disabled:cursor-not-allowed transition mb-4"
+          >
+            <GoogleGlyph />
+            <span>Continue with Google</span>
+          </button>
+        )}
 
         {/* "OR USE EMAIL" divider */}
         <div className="flex items-center gap-2.5 my-3 text-[10.5px] font-bold uppercase tracking-[0.1em] text-tower-cream/40">
