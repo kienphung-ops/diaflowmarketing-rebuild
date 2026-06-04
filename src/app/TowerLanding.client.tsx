@@ -430,16 +430,21 @@ export default function TowerLanding(props: Props) {
     }
   }, [pushToast])
 
-  // Stash ?ref=CODE from URL.
+  // Referral capture / cleanup.
+  //   - Signed in (incl. just after email or Google login) → can't be
+  //     referred; drop any pending ref so it never leaks into a later flow.
+  //   - Anonymous → stash ?ref=CODE from the URL (LAST inviter wins). The
+  //     /floor/[code] visitor page also stashes the code directly.
   useEffect(() => {
-    const url = new URL(window.location.href)
-    const ref = url.searchParams.get('ref')
-    if (ref) {
-      try {
-        window.localStorage.setItem('diaflow_pending_ref', ref.toUpperCase())
-      } catch {
-        /* ignore */
+    try {
+      if (props.signedIn) {
+        window.localStorage.removeItem('diaflow_pending_ref')
+        return
       }
+      const ref = new URL(window.location.href).searchParams.get('ref')
+      if (ref) window.localStorage.setItem('diaflow_pending_ref', ref.toUpperCase())
+    } catch {
+      /* ignore */
     }
   }, [])
 

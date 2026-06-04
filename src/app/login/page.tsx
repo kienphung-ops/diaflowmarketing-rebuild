@@ -38,6 +38,13 @@ export default function LoginPage() {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error ?? 'Sign in failed')
+      // Logged in → can't be referred anymore; drop any pending ref code
+      // captured from an invite link so it doesn't leak into a later flow.
+      try {
+        window.localStorage.removeItem('diaflow_pending_ref')
+      } catch {
+        /* ignore */
+      }
       // FULL page reload so the server component re-runs with the
       // just-set session cookie. Matches the SignupModal post-submit.
       window.location.assign('/')
