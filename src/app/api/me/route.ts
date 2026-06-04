@@ -20,6 +20,7 @@ export async function GET() {
       referredAt: true,
       totalInvites: true,
       currentFloor: true,
+      country: true,
       teamName: true,
       teamPurpose: true,
       // Diaflow-derived role recommendation — surfaced to the client so

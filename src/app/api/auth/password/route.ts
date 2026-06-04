@@ -10,10 +10,12 @@ import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { grantReferralSpinTx, migrateAnonSpin } from '@/lib/spin/service'
 import { ANON_COOKIE, clearAnonCookie } from '@/lib/spin/anonCookie'
 import { getCountry } from '@/lib/requestGeo'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const BCRYPT_ROUNDS = 10
 const MIN_PASSWORD_LEN = 6
 
+// IP is used ONLY as a transient rate-limit key (Redis), never stored.
 function getClientIp(req: NextRequest): string | undefined {
   const xff = req.headers.get('x-forwarded-for')
   if (xff) return xff.split(',')[0].trim()
@@ -52,7 +54,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Password must be at least ${MIN_PASSWORD_LEN} characters` }, { status: 400 })
     }
 
+    // Anti-abuse: this endpoint both creates accounts AND verifies
+    // passwords (no email verification), so it's a brute-force + signup-
+    // spam vector. Throttle per-email (guess attempts on one account) and
+    // per-IP (mass account creation / distributed guessing). Mirrors the
+    // login + signup limits. IP is a transient Redis key, never stored.
     const ip = getClientIp(req)
+    const emailRL = await checkRateLimit({ key: `password-email:${email}`, limit: 5, windowSec: 900 })
+    if (!emailRL.allowed) {
+      return NextResponse.json(
+        { error: 'Too many attempts for this account. Try again in a few minutes.' },
+        { status: 429, headers: { 'Retry-After': String(emailRL.retryAfterSec) } },
+      )
+    }
+    if (ip) {
+      const ipRL = await checkRateLimit({ key: `password-ip:${ip}`, limit: 20, windowSec: 3600 })
+      if (!ipRL.allowed) {
+        return NextResponse.json(
+          { error: 'Too many requests from this connection. Try again later.' },
+          { status: 429, headers: { 'Retry-After': String(ipRL.retryAfterSec) } },
+        )
+      }
+    }
+
     const country = getCountry(req)
 
     const existing = await prisma.user.findUnique({ where: { email } })
@@ -97,7 +121,6 @@ export async function POST(req: NextRequest) {
         email,
         firstEmail: email,
         passwordHash,
-        ipAddress: ip,
         country: country ?? null,
         referralCode,
         referredByCode: inviterCode,
@@ -125,7 +148,6 @@ export async function POST(req: NextRequest) {
               inviterUserId: inviter.id,
               invitedEmail: email,
               invitedUserId: user.id,
-              ipAddress: ip,
               userAgent: req.headers.get('user-agent') ?? undefined,
               verified: true,
             },

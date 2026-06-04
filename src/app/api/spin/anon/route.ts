@@ -33,12 +33,6 @@ import { ANON_COOKIE } from '@/lib/spin/anonCookie'
 // spun" state (and the row stays migrate-able) — 90 days.
 const ANON_COOKIE_MAX_AGE = 60 * 60 * 24 * 90
 
-function getClientIp(req: NextRequest): string | undefined {
-  const xff = req.headers.get('x-forwarded-for')
-  if (xff) return xff.split(',')[0].trim()
-  return req.headers.get('x-real-ip') ?? undefined
-}
-
 export async function GET(req: NextRequest) {
   const cookieId = req.cookies.get(ANON_COOKIE)?.value
   // Wedges are returned on every response so the client can render the
@@ -91,7 +85,6 @@ export async function POST(req: NextRequest) {
     // bucket, and the AnonymousSpin.cookieId UNIQUE constraint
     // already enforces "1 free teaser spin per browser" as the
     // primary anti-abuse mechanism.
-    const ip = getClientIp(req)
     const rateKey = existingCookie || cookieId
     const rl = await checkRateLimit({
       key: `anon-spin-session:${rateKey}`,
@@ -115,7 +108,6 @@ export async function POST(req: NextRequest) {
     await prisma.anonymousSpin.create({
       data: {
         cookieId,
-        ipAddress: ip ?? null,
         wedge: headline.wedge,
         cashCents: headline.cashCents,
         teammateCount,

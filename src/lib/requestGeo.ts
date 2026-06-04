@@ -10,8 +10,7 @@ import type { NextRequest } from 'next/server'
  * Reading only the Vercel header was the bug that left every user's
  * country null in production. We read CloudFront first, then fall back to
  * Vercel / Cloudflare for portability. Returns `undefined` when unknown
- * (local dev, placeholder "XX"/"T1", or CloudFront not yet forwarding the
- * header).
+ * (local dev, placeholder "XX"/"T1", or CloudFront not forwarding it).
  *
  * INFRA NOTE (AWS): CloudFront only adds `CloudFront-Viewer-Country` when
  * the cache behavior's Origin Request Policy forwards CloudFront geo
@@ -28,13 +27,5 @@ export function getCountry(req: NextRequest): string | undefined {
     ''
   const v = raw.trim().toUpperCase()
   // "XX" (CloudFront) / "T1" (Tor, Cloudflare) are "unknown" placeholders.
-  if (v && v !== 'XX' && v !== 'T1') return v
-
-  // No usable country header → fall back to the viewer's IANA time zone
-  // (e.g. "Asia/Ho_Chi_Minh"), which still narrows down the region. We
-  // store it in the same `country` field. CloudFront sends this as
-  // `CloudFront-Viewer-Time-Zone` via the same managed Origin Request
-  // Policy that adds the country header (AllViewerAndCloudFrontHeaders).
-  const tz = h.get('cloudfront-viewer-time-zone')?.trim()
-  return tz || undefined
+  return v && v !== 'XX' && v !== 'T1' ? v : undefined
 }
