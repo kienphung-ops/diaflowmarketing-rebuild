@@ -4,6 +4,7 @@ import './globals.css'
 import { GoogleAnalytics } from '@/components/GoogleAnalytics'
 import { GoogleTagManager, GoogleTagManagerNoScript } from '@/components/GoogleTagManager'
 import { MicrosoftClarity } from '@/components/MicrosoftClarity'
+import { ChunkErrorReload } from '@/components/ChunkErrorReload'
 
 /**
  * Default site URL — used by Next.js's metadata API to resolve every
@@ -147,6 +148,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             immediately inside <body>. Renders an invisible iframe that
             fires the container even when JS is disabled. */}
         <GoogleTagManagerNoScript />
+        {/* Self-heals the "stale chunk 404" crash after a deploy by
+            reloading once when a /_next/static chunk fails to load. */}
+        <ChunkErrorReload />
         {children}
         {/* GTM head/body script — loaded after-interactive so it
             doesn't block first paint. Configured container = GTM-KDPNP5XB. */}
