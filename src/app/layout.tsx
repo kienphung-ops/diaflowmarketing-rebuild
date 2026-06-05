@@ -41,7 +41,7 @@ async function resolveSiteUrl(): Promise<URL> {
 
 const SITE_NAME = 'Diaflow teammate'
 const SITE_DESCRIPTION = 'Build your AI office. Invite friends to level up.'
-const OG_IMAGE = '/diaflow-logo.jpg'
+const OG_IMAGE = '/thumbnail.png'
 
 /**
  * Viewport — disables user scaling so mobile browsers can't double-tap
@@ -93,15 +93,14 @@ export async function generateMetadata(): Promise<Metadata> {
       url: '/',
       // Declared dimensions MUST match the actual file or LinkedIn /
       // Facebook reject the image silently (and then cache the "no
-      // image" verdict for ~7 days). `/diaflow-logo.jpg` is a square
-      // 2048×2048 bitmap. LinkedIn accepts square OG images — they
-      // just render letterboxed in the landscape preview slot, which
-      // is still better than no preview at all. If a proper 1200×627
-      // landscape asset gets added later, swap OG_IMAGE + dimensions.
-      images: [{ url: OG_IMAGE, width: 2048, height: 2048, alt: SITE_NAME }],
+      // image" verdict for ~7 days). `/thumbnail.png` is a landscape
+      // 2221×1211 bitmap — a proper wide hero for the OG/Twitter
+      // preview slot. `type` (og:image:type) makes FB render it more
+      // reliably. Keep these three in lockstep with the real file.
+      images: [{ url: OG_IMAGE, width: 2221, height: 1211, alt: SITE_NAME, type: 'image/png' }],
     },
     // Twitter / X — `summary_large_image` is the right card type for
-    // a 1200×627 hero, matching the OG image dimensions.
+    // the 2221×1211 landscape hero, matching the OG image dimensions.
     twitter: {
       card: 'summary_large_image',
       title: SITE_NAME,
