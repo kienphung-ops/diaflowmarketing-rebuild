@@ -16,6 +16,11 @@ interface Props {
   onClose: () => void
   /** Receives the array of new teammates to add (filtered out empty rows). */
   onAdd: (rows: DraftRow[]) => void
+  /** Roles the user's CURRENT teammates already have (default NPCs +
+   *  recruited). Any default suggestion matching one of these (case-
+   *  insensitive) is dropped — we never pre-fill or suggest a role the
+   *  user has already filled. */
+  existingRoles?: string[]
 }
 
 const DEFAULT_ROLE_SUGGESTIONS = [
@@ -32,14 +37,33 @@ const DEFAULT_ROLE_SUGGESTIONS = [
   'Marketing Strategist',
 ]
 
-export function BulkAddTeammatesModal({ open, slotsAvailable, currentFloor, onClose, onAdd }: Props) {
+export function BulkAddTeammatesModal({ open, slotsAvailable, currentFloor, onClose, onAdd, existingRoles = [] }: Props) {
+  // Stable signature of the roles already taken (case-insensitive). Used
+  // as the memo dep instead of the array itself so a new `existingRoles`
+  // array identity on each parent render doesn't reset the user's typed
+  // rows.
+  const takenKey = existingRoles
+    .map(r => r.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join('|')
+
+  // Default suggestions minus the roles the user already has a teammate
+  // for — so we don't pre-fill / suggest a duplicate role.
+  const availableRoles = useMemo(() => {
+    const taken = new Set(takenKey ? takenKey.split('|') : [])
+    return DEFAULT_ROLE_SUGGESTIONS.filter(r => !taken.has(r.toLowerCase()))
+  }, [takenKey])
+
   const initialRows = useMemo<DraftRow[]>(
     () =>
       Array.from({ length: Math.max(1, slotsAvailable) }, (_, i) => ({
         name: '',
-        role: DEFAULT_ROLE_SUGGESTIONS[i % DEFAULT_ROLE_SUGGESTIONS.length],
+        // Pre-fill with a not-yet-used suggestion; blank when every
+        // default role is already taken (user picks their own).
+        role: availableRoles.length > 0 ? availableRoles[i % availableRoles.length] : '',
       })),
-    [slotsAvailable]
+    [slotsAvailable, availableRoles]
   )
   const [rows, setRows] = useState<DraftRow[]>(initialRows)
 
@@ -144,7 +168,7 @@ export function BulkAddTeammatesModal({ open, slotsAvailable, currentFloor, onCl
         </div>
 
         <datalist id="role-suggestions">
-          {DEFAULT_ROLE_SUGGESTIONS.map(r => (
+          {availableRoles.map(r => (
             <option key={r} value={r} />
           ))}
         </datalist>

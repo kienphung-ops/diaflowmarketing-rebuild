@@ -121,3 +121,14 @@ export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
   if (step === 'leo') return 'done'
   return 'done'
 }
+
+/** Inverse of {@link nextOnboardingStep} — used by the "← Back" button
+ *  on each onboarding bubble. Iris is the first step, so it has no
+ *  predecessor and returns itself. */
+export function prevOnboardingStep(step: OnboardingStep): OnboardingStep {
+  if (step === 'done') return 'leo'
+  if (step === 'leo') return 'mia-info'
+  if (step === 'mia-info') return 'mia'
+  if (step === 'mia') return 'iris'
+  return 'iris'
+}
