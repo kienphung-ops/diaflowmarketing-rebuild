@@ -52,6 +52,7 @@ import { useMaxTeammates, useFloor } from '@/lib/floorsConfigClient'
 import {
   defaultTrialState,
   nextOnboardingStep,
+  prevOnboardingStep,
   readTrialState,
   saveTrialState,
   type TrialState,
@@ -697,16 +698,15 @@ export default function TowerLanding(props: Props) {
     },
     [trial]
   )
-  // X-close on Iris modal — advance without a team name. `trial.teamName`
-  // stays null and MiaBubble will fall back to "Your team".
-  // Iris onboarding gate — the team name is required to advance past
-  // this step. × / backdrop CLOSE the bubble but DO NOT advance the
-  // step (boss feedback: only a real submission counts). The bubble
-  // re-opens on the next page load because `trial.onboardingStep`
-  // hasn't moved, so a dismissed step isn't permanently skippable.
-  const handleIrisSkip = useCallback(() => {
-    setOnboardingModalVisible(false)
-  }, [])
+  // "← Back" on the onboarding bubbles (Mia / Mia-info / Leo). Steps the
+  // user one stage backwards. Reads the CURRENT step from `trial` so a
+  // single handler serves every bubble — Iris (the first step) has no
+  // Back button so it can never reach 'iris' → predecessor here. The
+  // mia-info / leo states keep any fetched recommendation in `trial`, so
+  // going back and forward doesn't lose the personalised role.
+  const handleOnboardingBack = useCallback(() => {
+    persist({ ...trial, onboardingStep: prevOnboardingStep(trial.onboardingStep) })
+  }, [trial])
 
   // True from the moment Mia's job submit fires until the Diaflow
   // upstream returns (or fails). Drives the "Hang on…" hint inside
@@ -778,14 +778,9 @@ export default function TowerLanding(props: Props) {
     },
     [trial]
   )
-  // Same gate as handleIrisSkip — × / backdrop close but don't
-  // advance past 'mia'. User must submit the job role to proceed.
-  const handleMiaSkip = useCallback(() => {
-    setOnboardingModalVisible(false)
-  }, [])
-
-  // Mia's intro card has no input — clicking "Meet your next teammate"
-  // (or the X close) advances to Leo. Same handler for both.
+  // Mia's intro card has no input — clicking "Meet the rest →" advances
+  // to Leo. (The card is non-dismissible; only the explicit CTA or the
+  // Back button move the step.)
   const handleMiaInfoNext = useCallback(() => {
     persist({ ...trial, onboardingStep: nextOnboardingStep('mia-info') })
   }, [trial])
@@ -1604,10 +1599,10 @@ export default function TowerLanding(props: Props) {
           centered cards (ModalShell), NOT bottom-anchored bubbles, so
           the previous `flex items-end` wrapper is gone. */}
       {isTrial && onboardingModalVisible && activeStep === 'iris' && (
-        <IrisBubble onSubmit={handleIrisSubmit} onSkip={handleIrisSkip} />
+        <IrisBubble onSubmit={handleIrisSubmit} />
       )}
       {isTrial && onboardingModalVisible && activeStep === 'mia' && (
-        <MiaBubble onSubmit={handleMiaSubmit} onSkip={handleMiaSkip} />
+        <MiaBubble onSubmit={handleMiaSubmit} onBack={handleOnboardingBack} />
       )}
       {isTrial && onboardingModalVisible && activeStep === 'mia-info' && (
         <MiaInfoBubble
@@ -1616,10 +1611,11 @@ export default function TowerLanding(props: Props) {
           loading={jobSummaryLoading}
           userRole={trial.teamPurpose}
           onNext={handleMiaInfoNext}
+          onBack={handleOnboardingBack}
         />
       )}
       {isTrial && onboardingModalVisible && activeStep === 'leo' && (
-        <LeoBubble onContinue={handleLeoDone} />
+        <LeoBubble onContinue={handleLeoDone} onBack={handleOnboardingBack} />
       )}
 
       <MySquadDrawer
@@ -1776,6 +1772,9 @@ export default function TowerLanding(props: Props) {
         open={bulkAddOpen}
         slotsAvailable={slotsAvailable}
         currentFloor={effective.currentFloor}
+        // Roles the user already has (NPCs + recruited) → drop matching
+        // default suggestions so we never pre-fill a duplicate role.
+        existingRoles={recruits.map(t => t.role)}
         onClose={() => setBulkAddOpen(false)}
         onAdd={handleBulkAdd}
       />

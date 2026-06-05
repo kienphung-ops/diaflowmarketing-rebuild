@@ -32,11 +32,30 @@ interface Props {
  * Google's consent screen. The callback route reconciles the trial
  * carryover the same way the email signup handler does.
  */
+// Account creation is gated behind finishing onboarding. While the trial
+// onboarding is still in progress (step ≠ 'done'), "Save my team" must NOT
+// create an account — only existing users may sign in (via the link
+// below). A new account is created only AFTER the user has met their AI
+// team. `readTrialState()` is the live source of the current step.
+const SIGNUP_BLOCKED_MSG =
+  'Finish meeting your AI team first — then you can save it. Already have an account? Sign in below.'
+
+function onboardingIncomplete(): boolean {
+  if (typeof window === 'undefined') return false
+  const step = readTrialState()?.onboardingStep
+  return !!step && step !== 'done'
+}
+
 export function SignupModal({ onClose }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Captured at open: is the trial onboarding finished? Account creation
+  // (Google + "Save my team") only renders when true. While onboarding is
+  // still in progress the modal shows a "Sign in" CTA instead — existing
+  // users can log in; new users must finish the intro before signing up.
+  const [onboardingDone] = useState(() => !onboardingIncomplete())
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -74,6 +93,12 @@ export function SignupModal({ onClose }: Props) {
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters')
+      return
+    }
+    // Block premature signup mid-onboarding — only existing users (via the
+    // Sign-in link) can proceed until the AI-team intro is finished.
+    if (onboardingIncomplete()) {
+      setError(SIGNUP_BLOCKED_MSG)
       return
     }
     setBusy(true)
@@ -146,6 +171,12 @@ export function SignupModal({ onClose }: Props) {
    * `start` route via a short-lived signed cookie.
    */
   function handleGoogleSignIn() {
+    // Same onboarding gate as the email path — Google sign-in also creates
+    // an account, so block it until onboarding is complete.
+    if (onboardingIncomplete()) {
+      setError(SIGNUP_BLOCKED_MSG)
+      return
+    }
     const ref =
       typeof window !== 'undefined'
         ? window.localStorage.getItem('diaflow_pending_ref') ?? ''
@@ -250,6 +281,11 @@ export function SignupModal({ onClose }: Props) {
           when AI Teammate ships this summer.
         </p>
 
+        {/* Onboarding gate: the account-creation UI (Google + email
+            "Save my team") only appears once the trial onboarding is
+            done. Before that, the modal offers SIGN IN instead. */}
+        {onboardingDone ? (
+        <>
         {/* Google OAuth — primary alternative to email signup. Hidden
             inside in-app browsers (Google blocks OAuth there); we show a
             "open in browser" notice instead. */}
@@ -312,6 +348,26 @@ export function SignupModal({ onClose }: Props) {
           </button>
           {error && <p className="text-xs text-red-300 mt-1">{error}</p>}
         </form>
+        </>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-tower-gold/40 bg-gradient-to-b from-tower-gold/15 to-tower-gold/[0.03] p-3">
+              <div className="text-[10px] uppercase tracking-[0.06em] font-extrabold text-tower-gold mb-1">
+                Finish the quick intro
+              </div>
+              <div className="text-[13px] font-bold leading-tight text-tower-cream">
+                Meet your AI team first — then you can save it. Already have an
+                account? Sign in below.
+              </div>
+            </div>
+            <Link
+              href="/login"
+              className="w-full px-4 py-3.5 rounded-xl bg-gradient-to-b from-purple-300 to-purple-400 text-night-deep font-extrabold text-[15px] shadow-[0_8px_24px_rgba(168,117,255,0.4)] hover:shadow-[0_12px_28px_rgba(168,117,255,0.5)] transition flex items-center justify-center"
+            >
+              Sign in →
+            </Link>
+          </div>
+        )}
 
         <p className="mt-3 text-center text-[11px] text-tower-cream/45 leading-relaxed">
           By continuing, you agree to our{' '}
