@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
+import { useShareActions } from '@/hooks/useShareActions'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 import { useBackdropDismissGuard } from '@/hooks/useBackdropDismissGuard'
@@ -68,7 +68,6 @@ export function IrisHireModal({
   open,
   onClose,
   currentFloor,
-  totalInvites,
   slotsAvailable,
   inviteUrl,
   signedIn,
@@ -76,7 +75,6 @@ export function IrisHireModal({
   onOpenSignup,
   anchorSlug,
 }: Props) {
-  const [copied, setCopied] = useState(false)
   // Anchor → character (typically 'iris'). When null we fall back to
   // the centered modal layout. See lib/anchorPositions.ts.
   // Live character-anchor only on desktop. On mobile we render as a
@@ -97,9 +95,6 @@ export function IrisHireModal({
   // we just don't bother (user can't go higher) and the share copy
   // shifts to a generic "keep growing your office" line.
   const nextFloor = useFloor(currentFloor + 1)
-  const invitesToNext = nextFloor
-    ? Math.max(0, nextFloor.invitesRequired - totalInvites)
-    : 0
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -116,37 +111,25 @@ export function IrisHireModal({
   // here. See useBackdropDismissGuard for the full writeup.
   const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
 
-  // Canonical X / LinkedIn share text. Defined before the early return
-  // because useFirstShareSpin is a hook and must run on every render.
-  const xText = nextFloor
-    ? `just built my AI office at diaflow. unlocking Level ${nextFloor.id} next 👀`
-    : 'just topped out my AI office at diaflow 🏆'
-  // Share through the SAME hook every other surface uses (ShareModal,
-  // MobileShareSheet, MySquadDrawer) so X / LinkedIn here also claim the
-  // first-share spin task → which credits a share-gated floor. Previously
-  // Iris used plain <a> links that skipped the claim, so sharing from Iris
-  // never leveled the user up.
-  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({ inviteUrl, xText })
+  // This surface's own tweet copy (overrides the hook's default).
+  // Defined before the early return so the hook below runs on every
+  // render (rules of hooks).
+  // Share/copy behaviour (copied flag, clipboard + share-gate credit,
+  // first-share spin claim, tracking) is centralised in useShareActions
+  // — the SAME flow every other surface uses, so X / LinkedIn / Copy
+  // here also claim the first-share spin task and credit a share-gated
+  // floor. (Iris used to use plain <a> links that skipped the claim.)
+  const { copied, sharePending, shareTo, copy } = useShareActions({
+    inviteUrl,
+    xText: null,
+    copyText: buildShareCopyText(inviteUrl),
+    source: 'iris_modal',
+  })
 
   if (!open) return null
   if (typeof document === 'undefined') return null
 
   const hasSlot = slotsAvailable > 0
-
-  async function handleCopy() {
-    if (!inviteUrl) return
-    // Same enriched payload as MySquadDrawer + HowItWorksModal — see
-    // buildShareCopyText for the canonical format.
-    const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
-    try {
-      await navigator.clipboard.writeText(payload)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-      void creditShareUnlock('copy')
-    } catch {
-      /* ignore — older browsers without async clipboard */
-    }
-  }
 
   return createPortal(
     <div
@@ -284,7 +267,7 @@ export function IrisHireModal({
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'iris_modal' }); triggerShare('x') }}
+                  onClick={() => shareTo('x')}
                   disabled={!inviteUrl || sharePending === 'x'}
                   className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
@@ -296,7 +279,7 @@ export function IrisHireModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'iris_modal' }); triggerShare('linkedin') }}
+                  onClick={() => shareTo('linkedin')}
                   disabled={!inviteUrl || sharePending === 'linkedin'}
                   className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed ${
                     !inviteUrl ? 'opacity-40 pointer-events-none' : ''
@@ -307,7 +290,7 @@ export function IrisHireModal({
                   <span>{sharePending === 'linkedin' ? '…' : 'LinkedIn'}</span>
                 </button>
                 <button
-                  onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'iris_modal' }); handleCopy() }}
+                  onClick={copy}
                   disabled={!inviteUrl}
                   className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Copy invite link"

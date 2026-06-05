@@ -77,20 +77,20 @@ export function Header({
           router (instant, no full reload). */}
       <Link
         href="/"
-        aria-label="Diaflow teammate — home"
+        aria-label="Diaflow AI Teammates — home"
         className="shrink-0 pointer-events-auto flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tower-gold/60"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md w-7 h-7 md:w-8 md:h-8" />
         {/* Brand text — "Diaflow" on mobile (where the right slot is
             now empty so the brand has room to breathe), full
-            "Diaflow teammate" wordmark on sm+ where the right slot
+            "Diaflow AI Teammates" wordmark on sm+ where the right slot
             carries the stats pill + CTAs. */}
         <span className="text-tower-cream font-bold tracking-wide sm:hidden">
-          Diaflow
+          Diaflow AI Teammates
         </span>
         <span className="hidden sm:block text-tower-cream font-bold tracking-wide">
-          Diaflow teammate
+          Diaflow AI Teammates
         </span>
       </Link>
 

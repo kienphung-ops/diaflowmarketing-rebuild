@@ -34,7 +34,7 @@ function wrapTemplate(innerHtml: string): string {
     <div style="max-width:480px;margin:0 auto;background:#1a1a2e;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:32px;">
       ${innerHtml}
       <p style="margin-top:24px;color:rgba(255,255,255,0.4);font-size:12px;line-height:1.5;">
-        — Diaflow teammate
+        — Diaflow AI Teammates
       </p>
     </div>
   </body>
@@ -83,7 +83,7 @@ export function buildVerifyEmailHtml({ otp }: { otp: string }): string {
   return `
     <h1 style="margin:0 0 12px;font-size:22px;color:#ffffff;">Verify your email</h1>
     <p style="margin:0 0 20px;color:rgba(255,255,255,0.7);font-size:14px;line-height:1.6;">
-      Enter this 6-digit code on Diaflow teammate to confirm your email address:
+      Enter this 6-digit code on Diaflow AI Teammates to confirm your email address:
     </p>
     <div style="font-family:'SF Mono',Menlo,monospace;font-size:28px;letter-spacing:6px;font-weight:700;color:#fbbf24;">${otp}</div>
     <p style="margin-top:24px;color:rgba(255,255,255,0.4);font-size:12px;line-height:1.5;">
@@ -96,7 +96,7 @@ export function buildPasswordResetHtml({ resetUrl }: { resetUrl: string }): stri
   return `
     <h1 style="margin:0 0 12px;font-size:22px;color:#ffffff;">Reset your password</h1>
     <p style="margin:0 0 20px;color:rgba(255,255,255,0.7);font-size:14px;line-height:1.6;">
-      Click the button below to set a new Diaflow teammate password.
+      Click the button below to set a new Diaflow AI Teammates password.
       The link is good for the next 30 minutes.
     </p>
     <a href="${resetUrl}"

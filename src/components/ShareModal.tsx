@@ -11,12 +11,11 @@
  * One source of truth for the copy payload lives in lib/shareCopy.ts.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
-import { trackEvent } from '@/lib/tracking'
+import { useShareActions } from '@/hooks/useShareActions'
 
 interface Props {
   open: boolean
@@ -40,13 +39,6 @@ export function ShareModal({
   totalInvites,
   onShareSpinClaimed,
 }: Props) {
-  const [copied, setCopied] = useState(false)
-  useEffect(() => {
-    if (!copied) return
-    const t = setTimeout(() => setCopied(false), 1500)
-    return () => clearTimeout(t)
-  }, [copied])
-
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -64,45 +56,27 @@ export function ShareModal({
     ? nextFloor.unlockItems?.find(s => s && s.trim().length > 0) ?? nextFloor.label
     : 'Penthouse — keep sharing'
 
-  // ── Share-intent payload — mirrors MobileShareSheet ──────────────
-  // MUST be defined before the early returns below so the
-  // useFirstShareSpin hook is called in the same order on every render.
-  // Floor 2 is share-gated (invitesRequired 0) → invitesToNext is 0 there,
-  // and "0 invites from unlocking" reads oddly. Show at least 1.
-  const teaserInvites = Math.max(1, invitesToNext)
-  const xText = nextFloor
-    ? `just built my AI office at diaflow. ${teaserInvites} ${teaserInvites === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
-    : 'just topped out my AI office at diaflow 🏆'
-
-  // Shared share + first-share-spin claim flow. The URL-building and
-  // dwell-then-POST-/api/spin/task plumbing lives in the hook so the
-  // mobile sheet + MySquadDrawer behave identically.
-  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+  // All share/copy behaviour (copied flag, clipboard + share-gate
+  // credit, first-share spin claim, tracking) lives in useShareActions
+  // so every surface stays in lockstep. We only feed it the content:
+  // the clipboard payload (xText: null → the hook's default tweet).
+  // Called before the early returns so the hooks inside run in the same
+  // order on every render.
+  const copyPayload = buildShareCopyText(inviteUrl)
+  const { copied, sharePending, shareTo, copy } = useShareActions({
     inviteUrl,
-    xText,
-    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+    xText: null,
+    copyText: copyPayload,
+    source: 'share_modal',
+    onShareSpinClaimed,
   })
 
   if (!open) return null
   if (typeof document === 'undefined') return null
 
-  const copyPayload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
   const displayUrl = inviteUrl
     ? inviteUrl.replace(/^https?:\/\//, '')
     : 'sign up to get your link'
-
-  async function handleCopy() {
-    if (!copyPayload) return
-    try {
-      await navigator.clipboard.writeText(copyPayload)
-      setCopied(true)
-      // Copy counts as a share toward a share-gated next floor (server
-      // no-ops when it isn't share-gated).
-      void creditShareUnlock('copy')
-    } catch {
-      /* ignore — older browsers without async clipboard */
-    }
-  }
 
   return createPortal(
     <div
@@ -148,7 +122,7 @@ export function ShareModal({
               {displayUrl}
             </span>
             <button
-              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'share_modal' }); handleCopy() }}
+              onClick={copy}
               disabled={!inviteUrl}
               className="shrink-0 rounded-md bg-tower-gold text-night-deep px-3 py-1.5 text-[11.5px] font-extrabold hover:bg-tower-gold/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
               aria-label="Copy invite link"
@@ -165,7 +139,7 @@ export function ShareModal({
               badgeBg="#000"
               badgeColor="#fff"
               disabled={!inviteUrl || sharePending !== null}
-              onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'share_modal' }); triggerShare('x') }}
+              onClick={() => shareTo('x')}
             />
             <ShareBtn
               label="LinkedIn"
@@ -173,7 +147,7 @@ export function ShareModal({
               badgeBg="#0a66c2"
               badgeColor="#fff"
               disabled={!inviteUrl || sharePending !== null}
-              onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'share_modal' }); triggerShare('linkedin') }}
+              onClick={() => shareTo('linkedin')}
             />
             <ShareBtn
               label={copied ? 'Copied' : 'Copy'}
@@ -181,7 +155,7 @@ export function ShareModal({
               badgeBg="rgba(168,117,255,0.2)"
               badgeColor="#c4a3ff"
               disabled={!inviteUrl}
-              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'share_modal' }); handleCopy() }}
+              onClick={copy}
             />
           </div>
         </div>
