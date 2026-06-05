@@ -32,5 +32,5 @@ export function buildShareCopyText(
     return `just topped out my AI office at diaflow—${inviteUrl}`
   }
   const noun = invitesToNext === 1 ? 'invite' : 'invites'
-  return `built my AI office, ${invitesToNext} ${noun} from the next level—${inviteUrl}`
+  return `built my AI office, ${invitesToNext} ${noun} from the next level — ${inviteUrl}`
 }

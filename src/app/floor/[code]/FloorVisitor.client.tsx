@@ -623,7 +623,24 @@ export default function FloorVisitorClient(props: Props) {
         }
         currentFloor={liveVisitorFloor}
         totalInvites={liveVisitorInvites}
-        onOpenSignup={!props.visitorSignedIn ? () => setSignupOpen(true) : undefined}
+        // A NEW visitor (no trial state) can't go straight into SignupModal
+        // — it expects an onboarding/trial snapshot they don't have. Send
+        // them through the SAME funnel as the bottom "Build your own
+        // office" CTA: navigate home with this room's ref code, which runs
+        // the Iris/Mia/Leo onboarding first, then signup.
+        onOpenSignup={
+          !props.visitorSignedIn
+            ? () => {
+                setIsNavigating(true)
+                router.push(`/?ref=${encodeURIComponent(props.code)}`)
+              }
+            : undefined
+        }
+        // Visitor has no trial team yet → frame the CTA as "build your
+        // own office" (matches the bottom CTA) instead of "save my team".
+        signupEyebrow="Like what you see?"
+        signupHint="Build your own AI office — free, takes 30 seconds."
+        signupLabel="Build your own office →"
       />
 
       {signupOpen && <SignupModal onClose={() => setSignupOpen(false)} />}

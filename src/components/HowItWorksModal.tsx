@@ -18,6 +18,13 @@ interface Props {
   /** Trial → Save CTA in the footer. When undefined the footer
    *  falls back to the share row (signed-in case). */
   onOpenSignup?: () => void
+  /** Pre-login CTA copy. Defaults frame it as "save your trial team"
+   *  (office page). On the visiting floor — where the viewer has no
+   *  trial team yet — pass the "build your own office" variant so the
+   *  copy matches the funnel (onboarding → signup). */
+  signupEyebrow?: string
+  signupHint?: string
+  signupLabel?: string
 }
 
 /**
@@ -60,6 +67,9 @@ export function HowItWorksModal({
   currentFloor = 1,
   totalInvites = 0,
   onOpenSignup,
+  signupEyebrow = '⚠ Not saved yet',
+  signupHint = 'Save your team to start leveling up.',
+  signupLabel = 'Save my team →',
 }: Props) {
   const [copied, setCopied] = useState(false)
   const floors = useFloorsConfig()
@@ -278,10 +288,10 @@ export function HowItWorksModal({
             <>
               <div className="rounded-xl  flex-col items-center justify-center  border border-tower-gold/40 bg-gradient-to-b from-tower-gold/15 to-tower-gold/[0.03] p-3 mb-3">
                 <div className="text-[10px] uppercase tracking-[0.06em] font-extrabold text-tower-gold mb-1">
-                  ⚠ Not saved yet
+                  {signupEyebrow}
                 </div>
                 <div className="text-[13px] font-bold leading-tight">
-                  Save your team to start leveling up.
+                  {signupHint}
                 </div>
               </div>
               <button
@@ -291,7 +301,7 @@ export function HowItWorksModal({
                 }}
                 className="w-full px-3 py-3 rounded-xl bg-tower-gold text-night-deep font-extrabold text-[14px] shadow-[0_6px_18px_rgba(251,191,36,0.4)] hover:bg-tower-gold/95 transition"
               >
-                Save my team →
+                {signupLabel}
               </button>
             </>
           ) : (
