@@ -19,17 +19,17 @@ export async function generateMetadata(
   if (!owner) return {}
 
   const teamName = owner.teamName?.trim() || 'A Diaflow team'
-  const title = `Join ${teamName} on Diaflow`
+  const title = `Visit ${teamName} office on Diaflow`
   const description = `${teamName} is building an AI office on Diaflow — now on Level ${owner.currentFloor}. Step inside their office, poke their AI teammates, and start building your own AI team in 30 seconds.`
   const url = `/floor/${code}`
   // Per-room share thumbnail — the actual office scene (not the logo) so
-  // the preview shows what the visitor is being invited into. 512×308
+  // the preview shows what the visitor is being invited into. 2221×1211
   // PNG in /public; dimensions MUST match the file or LinkedIn/Facebook
   // silently reject it (and cache the "no image" verdict ~7 days).
   const imageAlt = `${teamName}'s AI office on Diaflow`
   // `type` → og:image:type. Facebook (and others) render more reliably
   // when the MIME type is declared.
-  const ogImage = { url: '/thumbnail.png', width: 512, height: 308, alt: imageAlt, type: 'image/png' }
+  const ogImage = { url: '/thumbnail.png', width: 2221, height: 1211, alt: imageAlt, type: 'image/png' }
 
   return {
     title,
