@@ -227,7 +227,7 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
             // download until the user actually hits play.
             <video
               src={video.src}
-              title="Diaflow teammate intro"
+              title="Diaflow AI Teammates intro"
               controls
               playsInline
               preload="metadata"

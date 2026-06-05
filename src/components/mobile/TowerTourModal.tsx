@@ -350,7 +350,7 @@ export function TowerIllustration({ step, currentFloor }: { step: 1 | 2 | 3 | 4;
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/tower.png"
-          alt="Diaflow teammate"
+          alt="Diaflow AI Teammates"
           className="block select-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
           draggable={false}
           style={{

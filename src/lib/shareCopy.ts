@@ -24,13 +24,13 @@
  */
 export function buildShareCopyText(
   inviteUrl: string | null,
-  invitesToNext: number,
-  hasNextFloor: boolean,
+  //invitesToNext: number,
+  //hasNextFloor: boolean,
 ): string {
   if (!inviteUrl) return ''
-  if (!hasNextFloor) {
-    return `just topped out my AI office at diaflow—${inviteUrl}`
-  }
-  const noun = invitesToNext === 1 ? 'invite' : 'invites'
-  return `built my AI office, ${invitesToNext} ${noun} from the next level — ${inviteUrl}`
+  // if (!hasNextFloor) {
+  //   return `just topped out my AI office at diaflow—${inviteUrl}`
+  // }
+  //const noun = invitesToNext === 1 ? 'invite' : 'invites'
+  return `Be the first one hiring Diaflow AI Teammates:  ${inviteUrl}`
 }

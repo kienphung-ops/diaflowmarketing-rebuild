@@ -16,10 +16,15 @@ interface TrackingEvents {
   signup_click: { source: 'header' | 'iris' | 'mobile_share' | 'onboarding' | 'mobile_nav' }
   signup_complete: { method: 'email' | 'google' }
   discord_click: { source: 'squad_drawer' | 'how_it_works' }
-  share_click: { platform: 'twitter' | 'linkedin' | 'copy'; source: 'share_modal' | 'mobile_share' | 'iris_modal' | 'squad_drawer' }
+  share_click: { platform: 'twitter' | 'linkedin' | 'copy'; source: 'share_modal' | 'mobile_share' | 'iris_modal' | 'squad_drawer' | 'save_success' | 'how_it_works' }
   nav_click_tower_view: Record<string, never>
   nav_click_how_it_works: Record<string, never>
 }
+
+/** Allowed `source` labels for the `share_click` event — exported so
+ *  shared surfaces (useShareActions) can constrain their `source` prop
+ *  to exactly what the analytics catalogue accepts. */
+export type ShareClickSource = TrackingEvents['share_click']['source']
 
 /* ── Global type augmentation ───────────────────────────────────── */
 
