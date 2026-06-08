@@ -163,7 +163,8 @@ export default function WallClient() {
       <div className={styles.wrap}>
         <header className={styles.header}>
           <div className={styles.brand}>
-            <div className={styles.logo}>D</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className={styles.logo} src="/diaflow-logo.jpg" alt="Diaflow" width={30} height={30} />
             <div className={styles.name}>Diaflow <span>AI Teammates</span></div>
           </div>
           <div className={styles.headerRight}>
