@@ -67,9 +67,8 @@
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand .logo {
   width: 30px; height: 30px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--purple), var(--purple-strong));
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 900; font-size: 15px; color: #1a0f3d;
+  object-fit: cover;
+  display: block;
 }
 .brand .name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
 .brand .name span { color: var(--ink-faint); font-weight: 500; }
