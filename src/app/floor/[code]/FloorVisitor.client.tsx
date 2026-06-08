@@ -415,6 +415,10 @@ export default function FloorVisitorClient(props: Props) {
         // owner's ref code attached, so a duplicate top-right button
         // is just clutter.
         hideAuthCta
+        // Hide the visitor's OWN Level · invites · teammates pill while
+        // they're on someone else's floor — their stats aren't relevant
+        // here (the "Visiting <owner>" card carries the floor context).
+        hideStats
       />
 
       {/* Top-left card identifying who you're visiting + the owner's
