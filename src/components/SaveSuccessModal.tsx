@@ -98,13 +98,10 @@ export function SaveSuccessModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // This surface's own tweet copy (overrides the hook's default).
-  // Floor 2 is share-gated (invitesRequired 0) → invitesToNext is 0
-  // there, and "0 invites from unlocking" reads oddly, so show ≥ 1.
   // Share/copy behaviour (copied flag, clipboard + share-gate credit,
   // first-share spin claim, tracking) is centralised in useShareActions.
   // Called before the early returns so the hooks inside run in the same
-  // order on every render.
+  // order on every render. xText: null → the hook's default tweet.
   const { copied, sharePending, shareTo, copy } = useShareActions({
     inviteUrl,
     xText: null,

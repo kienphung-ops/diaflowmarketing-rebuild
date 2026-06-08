@@ -111,14 +111,13 @@ export function IrisHireModal({
   // here. See useBackdropDismissGuard for the full writeup.
   const backdropDismissHandlers = useBackdropDismissGuard(open, onClose)
 
-  // This surface's own tweet copy (overrides the hook's default).
-  // Defined before the early return so the hook below runs on every
-  // render (rules of hooks).
   // Share/copy behaviour (copied flag, clipboard + share-gate credit,
   // first-share spin claim, tracking) is centralised in useShareActions
   // — the SAME flow every other surface uses, so X / LinkedIn / Copy
   // here also claim the first-share spin task and credit a share-gated
   // floor. (Iris used to use plain <a> links that skipped the claim.)
+  // Called before the early returns so the hooks inside run in the same
+  // order on every render. xText: null → the hook's default tweet.
   const { copied, sharePending, shareTo, copy } = useShareActions({
     inviteUrl,
     xText: null,
