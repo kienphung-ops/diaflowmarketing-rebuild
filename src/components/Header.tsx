@@ -51,6 +51,10 @@ interface Props {
   /** Current leaderboard rank, shown in the Rank button label ("#7").
    *  null/undefined → the button just reads "Rank". */
   rank?: number | null
+  /** Hide the desktop stats pill (Level · invites · teammates · spins).
+   *  Used on the visiting-floor page so a visitor's OWN progress isn't
+   *  shown while they're looking at someone else's office. */
+  hideStats?: boolean
 }
 
 export function Header({
@@ -69,6 +73,7 @@ export function Header({
   onShareClimb,
   spinTokens,
   onOpenRank,
+  hideStats,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -107,6 +112,7 @@ export function Header({
             the info AND eat the limited 390px row width. The
             "(trial)" suffix stays desktop-only since it's the bit
             that ran out of room first on small screens. */}
+        {!hideStats && (
         <div className="hidden md:block text-xs text-tower-cream/80 bg-night-mid/60 px-3 py-1.5 rounded-md backdrop-blur-sm whitespace-nowrap">
           Level <span className="text-tower-gold font-semibold">{currentFloor}</span>
           <span className="mx-1.5 md:mx-2 opacity-40">·</span>
@@ -123,6 +129,7 @@ export function Header({
             </>
           )}
         </div>
+        )}
 
         {/* Rank — desktop only. Opens the leaderboard modal. Sits next to
             the stats pill so the user's standing is one click away without
