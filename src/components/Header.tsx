@@ -5,32 +5,15 @@ import { ReferralCopyButton } from './ReferralCopyButton'
 
 /* Shared style for the top-right desktop button cluster
    (Rank · Share to level up · My Squad). One purple-fill style for all
-   three per requirements/diaflow-topbar-cluster.html. Desktop-only —
-   mobile reaches these via MobileBottomNav. */
+   three, tuned to the app palette (`tower-gold` is the brand purple
+   #a855f7) so the cluster sits in tone with the rest of the header
+   instead of reading as a louder, lighter purple. Desktop-only — mobile
+   reaches these via MobileBottomNav. */
 const CLUSTER_BTN =
-  'hidden md:inline-flex items-center gap-1.5 h-[38px] px-4 rounded-[10px] ' +
-  'bg-[#b084ff] text-[#1a0f3d] text-sm font-bold whitespace-nowrap transition ' +
-  'hover:-translate-y-px hover:brightness-105 ' +
-  'shadow-[0_0_18px_rgba(176,132,255,0.35),0_4px_12px_rgba(176,132,255,0.22)]'
-
-/** 16px yellow (#ffcc33) line icon used inside the cluster buttons. */
-function ClusterGlyph({ children }: { children: React.ReactNode }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#ffcc33"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      {children}
-    </svg>
-  )
-}
+  'hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg ' +
+  'bg-tower-gold text-night-deep text-[13px] font-semibold whitespace-nowrap ' +
+  'transition hover:bg-tower-gold/90 hover:-translate-y-px ' +
+  'shadow-[0_4px_14px_rgba(168,85,247,0.28)]'
 
 interface Props {
   signedIn: boolean
@@ -170,9 +153,7 @@ export function Header({
             Mobile reaches this via the bottom nav's Rank slot. */}
         {onOpenRank && (
           <button onClick={onOpenRank} aria-label="Open leaderboard" className={CLUSTER_BTN}>
-            <ClusterGlyph>
-              <path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4zM7 4H4v2a3 3 0 0 0 3 3M17 4h3v2a3 3 0 0 0-3 3" />
-            </ClusterGlyph>
+            <span aria-hidden>🏆</span>
             Rank
           </button>
         )}
@@ -293,9 +274,7 @@ export function Header({
                 // — same surface the floor-preview "Share to climb" CTA
                 // uses. Falls back to copy-in-place when no handler.
                 <button onClick={onShareClimb} className={CLUSTER_BTN}>
-                  <ClusterGlyph>
-                    <path d="M12 19V5M5 12l7-7 7 7" />
-                  </ClusterGlyph>
+                  <span aria-hidden>📣</span>
                   Share to level up
                 </button>
               ) : (
@@ -330,10 +309,7 @@ export function Header({
             vertical sidebar tab). Opens the My Squad drawer. */}
         {onOpenSquad && (
           <button onClick={onOpenSquad} aria-label="Open My Squad" className={CLUSTER_BTN}>
-            <ClusterGlyph>
-              <rect x="8" y="2" width="8" height="4" rx="1" />
-              <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
-            </ClusterGlyph>
+            <span aria-hidden>📋</span>
             My Squad
           </button>
         )}
