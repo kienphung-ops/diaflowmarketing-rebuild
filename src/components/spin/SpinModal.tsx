@@ -425,7 +425,7 @@ export function SpinModal({
       // `x.com/intent/tweet` (NOT `twitter.com/intent/tweet`, which
       // redirects through x.com/i/flow/login and frequently lands
       // the popup at a login wall instead of the compose screen).
-      const xText = "I'm building my AI dream team on Diaflow Tower. Join me 👉"
+      const xText = "Be the first one hiring Diaflow AI Teammates: "
       const shareUrl = buildShareUrl(task.platform, inviteUrl, xText)
       window.open(shareUrl, '_blank', 'noopener,noreferrer,width=620,height=620')
       setPendingTask(task.key)

@@ -9,7 +9,7 @@ import { DISCORD_URL } from '@/lib/links'
 import { HowItWorksModal } from './HowItWorksModal'
 import { useOrigin } from '@/hooks/useOrigin'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
+import { useShareActions } from '@/hooks/useShareActions'
 import type { InviterInfo } from '@/lib/inviter'
 
 /** Ordinal suffix for the "Nth teammate" label (1st, 2nd, 3rd, 4th…). */
@@ -143,7 +143,6 @@ export function MySquadDrawer({
 }: Props) {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(teamName ?? '')
-  const [copied, setCopied] = useState(false)
   const [howItWorksOpen, setHowItWorksOpen] = useState(false)
   // Sign-out confirm gate — first click opens a small modal asking
   // "are you sure?". Avoids accidental logouts (the link sits right
@@ -208,46 +207,20 @@ export function MySquadDrawer({
       })()
     : ''
 
-  async function handleCopy() {
-    if (!inviteUrl) return
-    // Paste a marketing-formatted string ("built my AI office, N invites
-    // from the next floor — <url>") instead of the bare URL — see
-    // `buildShareCopyText` for the canonical format used across all
-    // three Copy buttons (this drawer + IrisHireModal + HowItWorksModal).
-    const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
-    try {
-      await navigator.clipboard.writeText(payload)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-      // Copying counts as a share toward a share-gated next floor (e.g.
-      // F2). Server no-ops when the next floor isn't share-gated.
-      void creditShareUnlock('copy')
-    } catch {
-      /* ignore */
-    }
-  }
 
-  /**
-   * Marketing copy + share-intent URLs come from
-   * requirements/share-btn.md and are built inside `useFirstShareSpin`:
-   *
-   *   X        → https://x.com/intent/tweet?text=<text>&url=<inviteUrl>&hashtags=DiaflowTower
-   *   LinkedIn → https://www.linkedin.com/sharing/share-offsite/?url=<inviteUrl>
-   *
-   * The same hook ALSO posts to /api/spin/task after a 3 s dwell so the
-   * user's first share — from this drawer or any other surface
-   * (desktop ShareModal, MobileShareSheet) — pays out the matching
-   * +1 spin task. The server's unique constraint keeps subsequent
-   * shares idempotent. `triggerShare(...)` is wired straight into
-   * the X / LinkedIn buttons below.
-   */
-  const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
-    : 'just topped out my AI office at diaflow 🏆'
-  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+  // All share/copy behaviour (copied flag, clipboard + share-gate
+  // credit, first-share spin claim, tracking) is centralised in
+  // useShareActions — `shareTo` / `copy` below wire straight into the
+  // X / LinkedIn / Copy buttons. The share-intent URLs + the 3 s
+  // dwell-then-/api/spin/task claim live in the hook's primitives
+  // (buildShareUrl / useFirstShareSpin), per requirements/share-btn.md.
+  // xText: null → the hook's default tweet.
+  const { copied, sharePending, shareTo, copy } = useShareActions({
     inviteUrl,
-    xText,
-    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+    xText: null,
+    copyText: buildShareCopyText(inviteUrl),
+    source: 'squad_drawer',
+    onShareSpinClaimed,
   })
 
 
@@ -602,7 +575,6 @@ export function MySquadDrawer({
           {nextFloor && (
             <div className="mt-2 flex justify-center md:justify-start">
               <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-400/10 border border-amber-400/30 px-2.5 py-1 text-[11.5px] font-semibold text-amber-300">
-                <span aria-hidden>🎁</span>
                 <span>{nextRewardLabel}</span>
               </span>
             </div>
@@ -672,7 +644,7 @@ export function MySquadDrawer({
                 {inviteUrl.replace(/^https?:\/\//, '')}
               </div>
               <button
-                onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'squad_drawer' }); handleCopy() }}
+                onClick={copy}
                 aria-label="Copy invite link"
                 title={copied ? 'Copied' : 'Copy link'}
                 className="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-md bg-night-deep/80 border border-white/10 text-tower-cream/80 hover:text-tower-cream hover:border-white/20 transition"
@@ -683,7 +655,7 @@ export function MySquadDrawer({
           )}
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'squad_drawer' }); triggerShare('x') }}
+              onClick={() => shareTo('x')}
               disabled={!inviteUrl || sharePending !== null}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on X"
@@ -692,7 +664,7 @@ export function MySquadDrawer({
               <span>X</span>
             </button>
             <button
-              onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'squad_drawer' }); triggerShare('linkedin') }}
+              onClick={() => shareTo('linkedin')}
               disabled={!inviteUrl || sharePending !== null}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Share on LinkedIn"
@@ -701,7 +673,7 @@ export function MySquadDrawer({
               <span>LinkedIn</span>
             </button>
             <button
-              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'squad_drawer' }); handleCopy() }}
+              onClick={copy}
               disabled={!inviteUrl}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-night-deep/80 border border-white/10 text-sm font-semibold hover:bg-night-deep hover:border-white/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Copy invite link"

@@ -51,8 +51,8 @@ export default async function TowerFloorPage({ params }: Params) {
 export async function generateMetadata({ params }: Params) {
   const preview = await getFloorPreview(params.floor)
   return {
-    title: `Floor ${preview.floor} — ${preview.floorLabel} | Diaflow Tower`,
-    description: `Preview Floor ${preview.floor} of the Diaflow Tower. Unlock at ${preview.invitesRequired} invites.`,
+    title: `Floor ${preview.floor} — ${preview.floorLabel} | Diaflow AI Teammates`,
+    description: `Preview Floor ${preview.floor} of the Diaflow AI Teammates. Unlock at ${preview.invitesRequired} invites.`,
   }
 }
 

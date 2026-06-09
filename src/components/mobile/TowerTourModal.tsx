@@ -265,7 +265,7 @@ export function TowerTourModal({
 }
 
 /**
- * Tower illustration — renders the canonical `/public/tower.png`
+ * Tower illustration — renders the canonical `/public/tower.avif`
  * bitmap (same asset used by /tower) and overlays per-step highlight
  * markers on top.
  *
@@ -284,7 +284,7 @@ export function TowerTourModal({
  */
 export function TowerIllustration({ step, currentFloor }: { step: 1 | 2 | 3 | 4; currentFloor: number }) {
   // Same calibration constants as components/TowerView.tsx — the
-  // /tower.png bitmap has Floor 1's label at ~90% from the top and
+  // /tower.avif bitmap has Floor 1's label at ~90% from the top and
   // Floor 20's at ~12%. The tower also tilts very slightly to the
   // right as it climbs, so left% slides from 50 → 54.
   const BOTTOM_TOP_PCT = 90
@@ -349,8 +349,8 @@ export function TowerIllustration({ step, currentFloor }: { step: 1 | 2 | 3 | 4;
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/tower.png"
-          alt="Diaflow Tower"
+          src="/tower.avif"
+          alt="Diaflow AI Teammates"
           className="block select-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
           draggable={false}
           style={{

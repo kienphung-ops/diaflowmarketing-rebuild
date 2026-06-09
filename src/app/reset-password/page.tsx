@@ -64,7 +64,7 @@ function ResetPasswordForm() {
       <div className="w-full max-w-sm bg-night-mid/80 backdrop-blur-md rounded-2xl border border-white/10 p-8 text-tower-cream">
         <div className="flex items-center gap-2 mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md" />
+          <img src="/diaflow-logo.webp" alt="Diaflow" width={32} height={32} className="rounded-md" />
           <h1 className="text-lg font-semibold tracking-wide">Reset password</h1>
         </div>
 

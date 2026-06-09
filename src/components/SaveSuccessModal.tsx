@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
+import { useShareActions } from '@/hooks/useShareActions'
 import { TeammatePortrait } from './TeammatePortrait'
 
 /**
@@ -85,7 +85,6 @@ export function SaveSuccessModal({
   inviteUrl,
   onShareSpinClaimed,
 }: Props) {
-  const [copied, setCopied] = useState(false)
   const invitesToNext = nextFloor
     ? Math.max(0, nextFloor.invitesRequired - totalInvites)
     : 0
@@ -99,46 +98,20 @@ export function SaveSuccessModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // Same first-share-spin flow as the drawer + desktop ShareModal +
-  // mobile share sheet. MUST live above the early returns below so the
-  // hook is called in the same order on every render — moving it down
-  // tripped React's "rendered more hooks than during the previous
-  // render" guard the first time `open` flipped from false → true.
-  const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${
-        invitesToNext === 1 ? 'invite' : 'invites'
-      } from unlocking the next level 👀`
-    : 'just topped out my AI office at diaflow 🏆'
-  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+  // Share/copy behaviour (copied flag, clipboard + share-gate credit,
+  // first-share spin claim, tracking) is centralised in useShareActions.
+  // Called before the early returns so the hooks inside run in the same
+  // order on every render. xText: null → the hook's default tweet.
+  const { copied, sharePending, shareTo, copy } = useShareActions({
     inviteUrl,
-    xText,
-    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+    xText: null,
+    copyText: buildShareCopyText(inviteUrl),
+    source: 'save_success',
+    onShareSpinClaimed,
   })
 
   if (!open) return null
   if (typeof document === 'undefined') return null
-
-  async function handleCopy() {
-    if (!inviteUrl) return
-    const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
-    try {
-      await navigator.clipboard.writeText(payload)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-      void creditShareUnlock('copy')
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function handleShare(network: 'x' | 'linkedin') {
-    if (!inviteUrl) return
-    if (network === 'x') {
-      triggerShare('x')
-    } else {
-      triggerShare('linkedin')
-    }
-  }
 
   const top3 = teammates.slice(0, 3)
   const displayUrl = inviteUrl
@@ -199,7 +172,7 @@ export function SaveSuccessModal({
           {displayUrl}
         </span>
         <button
-          onClick={handleCopy}
+          onClick={copy}
           aria-label="Copy invite link"
           title={copied ? 'Copied' : 'Copy link'}
           className="shrink-0 text-purple-300 hover:text-purple-200 transition w-6 h-6 inline-flex items-center justify-center"
@@ -210,7 +183,7 @@ export function SaveSuccessModal({
       {/* Share row */}
       <div className="grid grid-cols-3 gap-1.5 md:gap-2 mt-auto">
         <button
-          onClick={() => handleShare('x')}
+          onClick={() => shareTo('x')}
           disabled={!inviteUrl || sharePending !== null}
           className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-[9px] bg-[#15182E] border border-[#2A2A4D] text-[12.5px] text-tower-cream/90 hover:bg-[#1B1A38] transition disabled:opacity-50"
           aria-label="Share on X"
@@ -221,7 +194,7 @@ export function SaveSuccessModal({
           X
         </button>
         <button
-          onClick={() => handleShare('linkedin')}
+          onClick={() => shareTo('linkedin')}
           disabled={!inviteUrl || sharePending !== null}
           className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-[9px] bg-[#15182E] border border-[#2A2A4D] text-[12.5px] text-tower-cream/90 hover:bg-[#1B1A38] transition disabled:opacity-50"
           aria-label="Share on LinkedIn"
@@ -232,7 +205,7 @@ export function SaveSuccessModal({
           LinkedIn
         </button>
         <button
-          onClick={handleCopy}
+          onClick={copy}
           disabled={!inviteUrl}
           className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-[9px] bg-[#15182E] border border-[#2A2A4D] text-[12.5px] text-tower-cream/90 hover:bg-[#1B1A38] transition disabled:opacity-50"
           aria-label="Copy invite link"

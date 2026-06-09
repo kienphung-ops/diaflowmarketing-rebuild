@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { useFirstShareSpin, creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
-import { trackEvent } from '@/lib/tracking'
+import { useShareActions } from '@/hooks/useShareActions'
 
 /**
  * Bottom-sheet share surface for mobile, opened from the
@@ -20,9 +19,9 @@ import { trackEvent } from '@/lib/tracking'
  *                         inline Copy button.
  *   4. Share grid       — 3 equal-width buttons (X / LinkedIn / Copy).
  *
- * Share-intent URLs mirror MySquadDrawer.handleShare exactly so anything
- * that worked there works here. One source of truth for share text
- * lives in lib/shareCopy.ts.
+ * All share/copy behaviour is centralised in useShareActions, so this
+ * sheet behaves identically to every other share surface. Share text
+ * lives in lib/shareCopy.ts (copy) + the hook's default (tweet).
  *
  * Hidden on md+ — desktop users go through MySquadDrawer's share row.
  */
@@ -51,13 +50,6 @@ export function MobileShareSheet({
   onSignupNudge,
   onShareSpinClaimed,
 }: Props) {
-  const [copied, setCopied] = useState(false)
-  useEffect(() => {
-    if (!copied) return
-    const t = setTimeout(() => setCopied(false), 1500)
-    return () => clearTimeout(t)
-  }, [copied])
-
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -75,62 +67,31 @@ export function MobileShareSheet({
     ? nextFloor.unlockItems?.find(s => s && s.trim().length > 0) ?? nextFloor.label
     : 'Penthouse — keep sharing'
 
-  // ── Share-intent payload — mirrors MySquadDrawer.handleShare ────
-  // Defined ABOVE the early returns below so `useFirstShareSpin`
-  // is called in the same order on every render (React's rules of
-  // hooks). If you push the hook past `if (!open) return null` the
-  // first time the sheet opens you'll get "rendered more hooks than
-  // during the previous render".
-  const xText = nextFloor
-    ? `just built my AI office at diaflow. ${invitesToNext} ${invitesToNext === 1 ? 'invite' : 'invites'} from unlocking the next level 👀`
-    : 'just topped out my AI office at diaflow 🏆'
-
-  // Shared share + first-share-spin claim flow. Same hook the desktop
-  // ShareModal + MySquadDrawer use, so the very first share — from any
-  // surface — pays out the matching spin task.
-  const { share: triggerShare, pending: sharePending } = useFirstShareSpin({
+  // All share/copy behaviour (copied flag, clipboard + share-gate
+  // credit, first-share spin claim, tracking, and the trial-user signup
+  // nudge when there's no link yet) lives in useShareActions — the same
+  // hook every other surface uses, so the first share from anywhere pays
+  // out the matching spin task. Called before the early returns so the
+  // hooks inside run in the same order on every render. xText: null →
+  // the hook's default tweet.
+  const copyPayload = buildShareCopyText(inviteUrl)
+  const { copied, sharePending, shareTo, copy } = useShareActions({
     inviteUrl,
-    xText,
-    onClaim: (_, granted, tokens) => onShareSpinClaimed?.(granted, tokens),
+    xText: null,
+    copyText: copyPayload,
+    source: 'mobile_share',
+    onShareSpinClaimed,
+    onSignupNudge,
   })
 
   if (!open) return null
   if (typeof document === 'undefined') return null
-
-  const copyPayload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
 
   // Display-only version of the URL — strip the protocol so the pill
   // can show more of the meaningful path on narrow screens.
   const displayUrl = inviteUrl
     ? inviteUrl.replace(/^https?:\/\//, '')
     : 'sign up to get your link'
-
-  async function handleCopy() {
-    if (!copyPayload) {
-      onSignupNudge?.()
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(copyPayload)
-      setCopied(true)
-      // Copy counts as a share toward a share-gated next floor (server
-      // no-ops when it isn't share-gated).
-      void creditShareUnlock('copy')
-    } catch {
-      /* ignore — older browsers without async clipboard */
-    }
-  }
-
-  // Trial-user nudge funnel — when there's no inviteUrl yet, the
-  // X / LinkedIn buttons fall through to the signup CTA rather than
-  // calling the spin hook (which would silently no-op).
-  function handleShareClick(platform: 'x' | 'linkedin') {
-    if (!inviteUrl) {
-      onSignupNudge?.()
-      return
-    }
-    triggerShare(platform)
-  }
 
   return createPortal(
     <div
@@ -187,7 +148,7 @@ export function MobileShareSheet({
               {displayUrl}
             </div>
             <button
-              onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'mobile_share' }); handleCopy() }}
+              onClick={copy}
               disabled={!inviteUrl && !onSignupNudge}
               className="shrink-0 rounded-xl bg-tower-gold/15 border border-tower-gold/30 px-3.5 text-[12px] font-bold text-tower-gold hover:bg-tower-gold/25 disabled:opacity-50 disabled:cursor-not-allowed transition"
               aria-label="Copy invite link"
@@ -205,7 +166,7 @@ export function MobileShareSheet({
             badgeBg="#000"
             badgeColor="#fff"
             disabled={!inviteUrl || sharePending !== null}
-            onClick={() => { trackEvent('share_click', { platform: 'twitter', source: 'mobile_share' }); handleShareClick('x') }}
+            onClick={() => shareTo('x')}
           />
           <ShareBtn
             label="LinkedIn"
@@ -213,7 +174,7 @@ export function MobileShareSheet({
             badgeBg="#0a66c2"
             badgeColor="#fff"
             disabled={!inviteUrl || sharePending !== null}
-            onClick={() => { trackEvent('share_click', { platform: 'linkedin', source: 'mobile_share' }); handleShareClick('linkedin') }}
+            onClick={() => shareTo('linkedin')}
           />
           <ShareBtn
             label={copied ? 'Copied' : 'Copy'}
@@ -221,7 +182,7 @@ export function MobileShareSheet({
             badgeBg="rgba(255,255,255,0.08)"
             badgeColor="#f5f1e8"
             disabled={!inviteUrl && !onSignupNudge}
-            onClick={() => { trackEvent('share_click', { platform: 'copy', source: 'mobile_share' }); handleCopy() }}
+            onClick={copy}
           />
         </div>
 

@@ -262,7 +262,7 @@ export function Mobile2DScene({
             normal office wall).
           • F20  : the penthouse loses its solid back wall and the
             full span becomes floor-to-ceiling glass. We render the
-            same /window_images/6.png panorama the 3D scene uses as
+            same /window_images/6.avif panorama the 3D scene uses as
             the wall background and overlay a thin cool-blue glass
             tint so it reads as a window rather than a wallpaper.
             Matches Walls.tsx's `glassColor` / `glassOpacity`. */}

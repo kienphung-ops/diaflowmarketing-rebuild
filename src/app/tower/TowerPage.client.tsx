@@ -572,6 +572,7 @@ export default function TowerPageClient(props: Props) {
           totalInvites={effective.totalInvites}
           trialMode={false}
           floorsClimbed={celebrationFloorsClimbed}
+          rank={rank}
           onClose={() => setCelebrationFloor(null)}
         />
       )}
