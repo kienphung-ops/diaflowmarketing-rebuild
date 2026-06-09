@@ -3,6 +3,35 @@
 import Link from 'next/link'
 import { ReferralCopyButton } from './ReferralCopyButton'
 
+/* Shared style for the top-right desktop button cluster
+   (Rank · Share to level up · My Squad). One purple-fill style for all
+   three per requirements/diaflow-topbar-cluster.html. Desktop-only —
+   mobile reaches these via MobileBottomNav. */
+const CLUSTER_BTN =
+  'hidden md:inline-flex items-center gap-1.5 h-[38px] px-4 rounded-[10px] ' +
+  'bg-[#b084ff] text-[#1a0f3d] text-sm font-bold whitespace-nowrap transition ' +
+  'hover:-translate-y-px hover:brightness-105 ' +
+  'shadow-[0_0_18px_rgba(176,132,255,0.35),0_4px_12px_rgba(176,132,255,0.22)]'
+
+/** 16px yellow (#ffcc33) line icon used inside the cluster buttons. */
+function ClusterGlyph({ children }: { children: React.ReactNode }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffcc33"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  )
+}
+
 interface Props {
   signedIn: boolean
   currentFloor: number
@@ -55,6 +84,10 @@ interface Props {
    *  Used on the visiting-floor page so a visitor's OWN progress isn't
    *  shown while they're looking at someone else's office. */
   hideStats?: boolean
+  /** Desktop-only — opens the My Squad drawer. When set, a "My Squad"
+   *  button joins the top-right cluster (right of Share to level up),
+   *  replacing the old vertical sidebar tab. */
+  onOpenSquad?: () => void
 }
 
 export function Header({
@@ -74,6 +107,7 @@ export function Header({
   spinTokens,
   onOpenRank,
   hideStats,
+  onOpenSquad,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -131,18 +165,14 @@ export function Header({
         </div>
         )}
 
-        {/* Rank — desktop only. Opens the leaderboard modal. Sits next to
-            the stats pill so the user's standing is one click away without
-            hunting for the logo or a hidden affordance. Shows the live
-            rank ("#7") when known. Mobile reaches this via the bottom
-            nav's Rank slot, so this is md+ only. */}
+        {/* Rank — desktop only, first in the top-right cluster
+            (Rank · Share · My Squad). Routes to the /wall leaderboard.
+            Mobile reaches this via the bottom nav's Rank slot. */}
         {onOpenRank && (
-          <button
-            onClick={onOpenRank}
-            aria-label="Open leaderboard"
-            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-xs tracking-wide hover:bg-night-mid transition whitespace-nowrap"
-          >
-            <span aria-hidden>🏆</span>
+          <button onClick={onOpenRank} aria-label="Open leaderboard" className={CLUSTER_BTN}>
+            <ClusterGlyph>
+              <path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4zM7 4H4v2a3 3 0 0 0 3 3M17 4h3v2a3 3 0 0 0-3 3" />
+            </ClusterGlyph>
             Rank
           </button>
         )}
@@ -262,11 +292,11 @@ export function Header({
                 // Opens the centered ShareModal ("Share to reach Floor N")
                 // — same surface the floor-preview "Share to climb" CTA
                 // uses. Falls back to copy-in-place when no handler.
-                <button
-                  onClick={onShareClimb}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
-                >
-                  <span aria-hidden>📣</span> Share to level up
+                <button onClick={onShareClimb} className={CLUSTER_BTN}>
+                  <ClusterGlyph>
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </ClusterGlyph>
+                  Share to level up
                 </button>
               ) : (
                 <ReferralCopyButton
@@ -294,6 +324,18 @@ export function Header({
           >
             🔒 Save Your Team
           </Link>
+        )}
+
+        {/* My Squad — last in the top-right cluster (replaces the old
+            vertical sidebar tab). Opens the My Squad drawer. */}
+        {onOpenSquad && (
+          <button onClick={onOpenSquad} aria-label="Open My Squad" className={CLUSTER_BTN}>
+            <ClusterGlyph>
+              <rect x="8" y="2" width="8" height="4" rx="1" />
+              <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+            </ClusterGlyph>
+            My Squad
+          </button>
         )}
       </div>
     </header>

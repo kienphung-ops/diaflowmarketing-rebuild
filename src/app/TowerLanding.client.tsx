@@ -17,7 +17,6 @@ import {
   LeoBubble,
 } from '@/components/OnboardingBubble'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
-import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { MiaInfoCard } from '@/components/MiaInfoCard'
 import { LeoEmailDrawer } from '@/components/LeoEmailDrawer'
 import { TeammateEditModal } from '@/components/TeammateEditModal'
@@ -1257,6 +1256,9 @@ export default function TowerLanding(props: Props) {
         // wall has a "Your office" back link that needs a session.
         onOpenRank={props.signedIn ? () => router.push('/wall') : undefined}
         rank={rank}
+        // My Squad now lives in the top-right cluster (was the vertical
+        // sidebar tab). Same gate as the old floating button.
+        onOpenSquad={onboardingComplete ? () => setSquadOpen(true) : undefined}
       />
 
       {/* Mobile-only counter chip strip. Slides in directly below the
@@ -1396,7 +1398,6 @@ export default function TowerLanding(props: Props) {
         spinTeaser={!props.signedIn && !anonSpun}
       />
 
-      <MySquadFloatingButton visible={onboardingComplete} onClick={() => setSquadOpen(true)} />
 
       <SpinModal
         open={spinOpen}
