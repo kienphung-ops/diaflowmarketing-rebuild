@@ -41,7 +41,11 @@ async function resolveSiteUrl(): Promise<URL> {
 
 const SITE_NAME = 'Diaflow AI Teammates'
 const SITE_DESCRIPTION = 'Build your AI office. Invite friends to level up.'
-const OG_IMAGE = '/thumbnail.png'
+// Share/preview image. MUST be JPEG/PNG (NOT avif/webp): the X / Facebook
+// / LinkedIn link-preview crawlers don't decode avif, so an avif og:image
+// silently yields no thumbnail. The in-app assets can stay avif/webp —
+// only this crawler-facing image needs a broadly-supported format.
+const OG_IMAGE = '/thumbnail.jpg'
 
 /**
  * Viewport — disables user scaling so mobile browsers can't double-tap
@@ -78,10 +82,13 @@ export async function generateMetadata(): Promise<Metadata> {
     description: SITE_DESCRIPTION,
     icons: {
       icon: [
-        { url: '/diaflow-logo.jpg', type: 'image/jpeg' },
+        { url: '/diaflow-logo.webp', type: 'image/webp' },
       ],
-      shortcut: '/diaflow-logo.jpg',
-      apple: '/diaflow-logo.jpg',
+      shortcut: '/diaflow-logo.webp',
+      // apple-touch-icon (iOS "Add to Home Screen") must be PNG — iOS
+      // doesn't render a webp home-screen icon. 180×180 is the modern
+      // recommended size.
+      apple: '/diaflow-logo-180.png',
     },
     // Open Graph — Facebook / LinkedIn / Discord / iMessage etc. all
     // read these.
@@ -93,11 +100,11 @@ export async function generateMetadata(): Promise<Metadata> {
       url: '/',
       // Declared dimensions MUST match the actual file or LinkedIn /
       // Facebook reject the image silently (and then cache the "no
-      // image" verdict for ~7 days). `/thumbnail.png` is a landscape
+      // image" verdict for ~7 days). `/thumbnail.jpg` is a landscape
       // 2221×1211 bitmap — a proper wide hero for the OG/Twitter
       // preview slot. `type` (og:image:type) makes FB render it more
       // reliably. Keep these three in lockstep with the real file.
-      images: [{ url: OG_IMAGE, width: 2221, height: 1211, alt: SITE_NAME, type: 'image/png' }],
+      images: [{ url: OG_IMAGE, width: 2221, height: 1211, alt: SITE_NAME, type: 'image/jpeg' }],
     },
     // Twitter / X — `summary_large_image` is the right card type for
     // the 2221×1211 landscape hero, matching the OG image dimensions.
@@ -117,8 +124,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* ── Critical resource hints ─────────────────────────────────
             The 3D scene's two biggest texture loads are the floor-1
-            window scenery (`/window_images/1.png`, ~815 KB) and the
-            full tower image (`/tower.png`, ~923 KB). Both are loaded
+            window scenery (`/window_images/1.avif`, ~815 KB) and the
+            full tower image (`/tower.avif`, ~923 KB). Both are loaded
             by R3F's TextureLoader downstream of React hydration —
             without these preload hints, the browser doesn't start
             fetching them until the SceneCanvas chunk has parsed,
@@ -129,18 +136,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link
           rel="preload"
           as="image"
-          href="/window_images/1.png"
+          href="/window_images/1.avif"
           fetchPriority="high"
         />
         <link
           rel="preload"
           as="image"
-          href="/tower.png"
+          href="/tower.avif"
           fetchPriority="high"
         />
         {/* Logo — small but blocks the header chrome. Preload so the
             first paint has the branded mark instead of a placeholder. */}
-        <link rel="preload" as="image" href="/diaflow-logo.jpg" />
+        <link rel="preload" as="image" href="/diaflow-logo.webp" />
       </head>
       <body className="antialiased">
         {/* GTM noscript fallback — per Google's install spec must be

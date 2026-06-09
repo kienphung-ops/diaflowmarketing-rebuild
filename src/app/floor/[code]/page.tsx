@@ -24,12 +24,14 @@ export async function generateMetadata(
   const url = `/floor/${code}`
   // Per-room share thumbnail — the actual office scene (not the logo) so
   // the preview shows what the visitor is being invited into. 2221×1211
-  // PNG in /public; dimensions MUST match the file or LinkedIn/Facebook
+  // JPEG in /public; dimensions MUST match the file or LinkedIn/Facebook
   // silently reject it (and cache the "no image" verdict ~7 days).
+  // MUST be JPEG/PNG (NOT avif): X/FB/LinkedIn crawlers don't decode avif,
+  // so an avif og:image yields no preview thumbnail.
   const imageAlt = `${teamName}'s AI office on Diaflow`
   // `type` → og:image:type. Facebook (and others) render more reliably
   // when the MIME type is declared.
-  const ogImage = { url: '/thumbnail.png', width: 2221, height: 1211, alt: imageAlt, type: 'image/png' }
+  const ogImage = { url: '/thumbnail.jpg', width: 2221, height: 1211, alt: imageAlt, type: 'image/jpeg' }
 
   return {
     title,
@@ -55,7 +57,7 @@ export async function generateMetadata(
       card: 'summary_large_image', // big landscape preview on X
       title,
       description,
-      images: ['/thumbnail.png'],
+      images: ['/thumbnail.jpg'],
     },
     alternates: { canonical: url },
     // Facebook-specific: `fb:app_id` attributes the share to your FB app

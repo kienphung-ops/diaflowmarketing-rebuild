@@ -339,7 +339,7 @@ export const SPRITES: Record<string, (ctx: SpriteContext) => ReactNode> = {
 
   floor_ceiling_windows: ({ currentFloor }) => (
     // Window on the back wall — landscape scenery from
-    // /window_images/<N>.png, same banding the 3D scene uses. The
+    // /window_images/<N>.avif, same banding the 3D scene uses. The
     // dark mullion grid sits ON TOP of the photo so the panel still
     // reads as a window (not a flat picture). Mobile2DScene hides
     // this entire item at floor 20 (penthouse loses its

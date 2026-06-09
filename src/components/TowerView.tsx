@@ -3,7 +3,7 @@
 /**
  * TowerView — image-based "look at the whole tower" overlay.
  *
- * Renders `/public/tower.png` (an isometric night-time tower) full-screen
+ * Renders `/public/tower.avif` (an isometric night-time tower) full-screen
  * with a glowing "YOU" marker positioned at the user's current floor.
  *
  * Auth gating: the YOU marker (and the floor-specific info footer) only
@@ -35,7 +35,7 @@ interface TowerViewProps {
 const TOTAL_FLOORS = 20
 
 // ─── CALIBRATION — tweak after dropping in a new tower image ─────────────
-// tower.png contains exactly 20 visible floors with numeric labels on
+// tower.avif contains exactly 20 visible floors with numeric labels on
 // the right side. The wrapper around the image now matches its 768/1376
 // aspect ratio exactly (see <img> markup below), so positions in
 // percent map 1:1 onto the bitmap.
@@ -296,7 +296,7 @@ export function TowerView({
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/tower.png"
+            src="/tower.avif"
             alt="Diaflow AI Teammates"
             className="block select-none drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
             draggable={false}

@@ -6,7 +6,7 @@ import { TowerIllustration } from './mobile/TowerTourModal'
 
 /**
  * Desktop 4-step "Tower Tour" — the md+ counterpart to the mobile
- * TowerTourModal. Same four beats + the same `/tower.png` illustration
+ * TowerTourModal. Same four beats + the same `/tower.avif` illustration
  * (reused via the exported `TowerIllustration`), but laid out as a
  * centered modal: tower on the LEFT, copy panel on the RIGHT, with the
  * floor highlights shifting per step to direct the eye (mockup

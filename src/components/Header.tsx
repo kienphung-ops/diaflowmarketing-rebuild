@@ -103,7 +103,7 @@ export function Header({
         className="shrink-0 pointer-events-auto flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tower-gold/60"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md w-7 h-7 md:w-8 md:h-8" />
+        <img src="/diaflow-logo.webp" alt="Diaflow" width={32} height={32} className="rounded-md w-7 h-7 md:w-8 md:h-8" />
         {/* Brand text — "Diaflow" on mobile (where the right slot is
             now empty so the brand has room to breathe), full
             "Diaflow AI Teammates" wordmark on sm+ where the right slot
