@@ -56,7 +56,7 @@ export default function HowItWorksClient() {
         <div className="text-lg font-extrabold leading-tight">{DEMO_SQUAD_NAME}</div>
         <div className="text-xs text-tower-cream/50 mb-2">🏢 {DEMO_COMPANY}</div>
         <div className="inline-flex items-center gap-1 bg-purple-500/15 border border-purple-500/30 text-purple-300 px-3 py-1 rounded-full text-[11px] font-bold">
-          ▲ Floor {DEMO_CURRENT_FLOOR} · Diaflow teammate
+          ▲ Floor {DEMO_CURRENT_FLOOR} · Diaflow AI Teammates
         </div>
       </div>
 

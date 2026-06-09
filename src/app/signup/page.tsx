@@ -116,7 +116,7 @@ export default function SignupPage() {
         </div>
         <div className="flex items-center gap-2 mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md" />
+          <img src="/diaflow-logo.webp" alt="Diaflow" width={32} height={32} className="rounded-md" />
           <h1 className="text-lg font-semibold tracking-wide">Start your tower</h1>
         </div>
 

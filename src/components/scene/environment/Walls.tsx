@@ -52,12 +52,12 @@ const CompanyFrame = memo(function CompanyFrame({ companyName }: { companyName?:
  * Map a floor number to one of 6 reusable scenery images, so the client
  * only downloads up to 6 PNGs instead of 20.
  *
- *   Floor 1         → 1.png
- *   Floor 2 – 5     → 2.png
- *   Floor 6 – 10    → 3.png
- *   Floor 11 – 15   → 4.png
- *   Floor 16 – 19   → 5.png
- *   Floor 20        → 6.png  (penthouse night-sky panorama)
+ *   Floor 1         → 1.avif
+ *   Floor 2 – 5     → 2.avif
+ *   Floor 6 – 10    → 3.avif
+ *   Floor 11 – 15   → 4.avif
+ *   Floor 16 – 19   → 5.avif
+ *   Floor 20        → 6.avif  (penthouse night-sky panorama)
  */
 function floorToImageNumber(floor: number): number {
   if (floor <= 1) return 1
@@ -68,15 +68,15 @@ function floorToImageNumber(floor: number): number {
   return 6
 }
 
-/** Loads /window_images/<N>.png. Suspends until ready. */
+/** Loads /window_images/<N>.avif. Suspends until ready. */
 function FloorSceneryTexture({ floor }: { floor: number }) {
-  const url = `/window_images/${floorToImageNumber(floor)}.png`
+  const url = `/window_images/${floorToImageNumber(floor)}.avif`
   const texture = useTexture(url) as THREE.Texture
   texture.colorSpace = THREE.SRGBColorSpace
 
   // Standard cut-out window — texture fills the planeGeometry inside the
   // back-wall opening. Same treatment for all 20 floors; Floor 20 just maps
-  // to 6.png (penthouse night-sky panorama).
+  // to 6.avif (penthouse night-sky panorama).
   return (
     <mesh position={[3.5, 2.4, -5.32]}>
       <planeGeometry args={[3, 2.2]} />
@@ -191,7 +191,7 @@ export function Walls({ companyName, currentFloor, showWindow = true }: WallsPro
       {showWindow && (
         <>
           {isPenthouse ? (
-            // Penthouse: full-wall glass panorama with 6.png as the
+            // Penthouse: full-wall glass panorama with 6.avif as the
             // background. No cut-out window frame — the entire back is
             // glass so the scenery fills it edge-to-edge.
             <Suspense fallback={null}>
@@ -221,14 +221,14 @@ export function Walls({ companyName, currentFloor, showWindow = true }: WallsPro
 
 /** Floor-to-ceiling night-sky panorama for the penthouse (Floor 20).
  *
- * Renders 6.png on three separate planes — one behind each of the
+ * Renders 6.avif on three separate planes — one behind each of the
  * glass walls (back + both sides). The user, looking through any
  * direction, sees a continuous night sky outside the building. We
  * share a single Texture reference across the three meshes (drei's
  * useTexture deduplicates by URL) so memory cost is the same as the
  * old single-plane setup. */
 function FloorPanoramaTexture() {
-  const texture = useTexture('/window_images/6.png') as THREE.Texture
+  const texture = useTexture('/window_images/6.avif') as THREE.Texture
   texture.colorSpace = THREE.SRGBColorSpace
   return (
     <>

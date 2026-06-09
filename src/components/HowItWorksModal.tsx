@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloorsConfig, useFloor } from '@/lib/floorsConfigClient'
 import { buildShareCopyText } from '@/lib/shareCopy'
-import { creditShareUnlock } from '@/lib/spin/useFirstShareSpin'
+import { useShareActions } from '@/hooks/useShareActions'
 
 interface Props {
   open: boolean
@@ -18,6 +18,13 @@ interface Props {
   /** Trial → Save CTA in the footer. When undefined the footer
    *  falls back to the share row (signed-in case). */
   onOpenSignup?: () => void
+  /** Pre-login CTA copy. Defaults frame it as "save your trial team"
+   *  (office page). On the visiting floor — where the viewer has no
+   *  trial team yet — pass the "build your own office" variant so the
+   *  copy matches the funnel (onboarding → signup). */
+  signupEyebrow?: string
+  signupHint?: string
+  signupLabel?: string
 }
 
 /**
@@ -60,13 +67,26 @@ export function HowItWorksModal({
   currentFloor = 1,
   totalInvites = 0,
   onOpenSignup,
+  signupEyebrow = '⚠ Not saved yet',
+  signupHint = 'Save your team to start leveling up.',
+  signupLabel = 'Save my team →',
 }: Props) {
-  const [copied, setCopied] = useState(false)
   const floors = useFloorsConfig()
   const nextFloor = useFloor(currentFloor + 1)
   const invitesToNext = nextFloor
     ? Math.max(0, nextFloor.invitesRequired - totalInvites)
     : 0
+  // Share/copy behaviour (copied flag, clipboard + share-gate credit,
+  // intent-URL building, tracking) is centralised in useShareActions.
+  // This surface renders X / LinkedIn as <a> tags (xHref/linkedinHref)
+  // so those don't run the spin-claim dwell — only Copy does the
+  // clipboard + share-gate credit here.
+  const { copied, copy, xHref, linkedinHref } = useShareActions({
+    inviteUrl,
+    xText: null,
+    copyText: buildShareCopyText(inviteUrl),
+    source: 'how_it_works',
+  })
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -78,31 +98,6 @@ export function HowItWorksModal({
 
   if (!open) return null
   if (typeof document === 'undefined') return null
-
-  // ── Share payload (post-login footer) ──────────────────────────
-  const xText = encodeURIComponent(
-    'just built my AI office at diaflow 🚀 level up with me'
-  )
-  const encodedUrl = inviteUrl ? encodeURIComponent(inviteUrl) : ''
-  const xShareHref = inviteUrl
-    ? `https://x.com/intent/tweet?text=${xText}&url=${encodedUrl}&hashtags=DiaflowTower`
-    : undefined
-  const linkedinShareHref = inviteUrl
-    ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
-    : undefined
-
-  async function handleCopy() {
-    if (!inviteUrl) return
-    const payload = buildShareCopyText(inviteUrl, invitesToNext, !!nextFloor)
-    try {
-      await navigator.clipboard.writeText(payload)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-      void creditShareUnlock('copy')
-    } catch {
-      /* ignore */
-    }
-  }
 
   // Footer mode — pre-login if we don't have an invite URL AND the
   // caller wired onOpenSignup. Otherwise share row.
@@ -278,10 +273,10 @@ export function HowItWorksModal({
             <>
               <div className="rounded-xl  flex-col items-center justify-center  border border-tower-gold/40 bg-gradient-to-b from-tower-gold/15 to-tower-gold/[0.03] p-3 mb-3">
                 <div className="text-[10px] uppercase tracking-[0.06em] font-extrabold text-tower-gold mb-1">
-                  ⚠ Not saved yet
+                  {signupEyebrow}
                 </div>
                 <div className="text-[13px] font-bold leading-tight">
-                  Save your team to start leveling up.
+                  {signupHint}
                 </div>
               </div>
               <button
@@ -291,7 +286,7 @@ export function HowItWorksModal({
                 }}
                 className="w-full px-3 py-3 rounded-xl bg-tower-gold text-night-deep font-extrabold text-[14px] shadow-[0_6px_18px_rgba(251,191,36,0.4)] hover:bg-tower-gold/95 transition"
               >
-                Save my team →
+                {signupLabel}
               </button>
             </>
           ) : (
@@ -315,7 +310,7 @@ export function HowItWorksModal({
               )}
               <div className="grid grid-cols-3 gap-2">
                 <a
-                  href={xShareHref}
+                  href={xHref}
                   target="_blank"
                   rel="noreferrer"
                   aria-disabled={!inviteUrl}
@@ -330,7 +325,7 @@ export function HowItWorksModal({
                   X
                 </a>
                 <a
-                  href={linkedinShareHref}
+                  href={linkedinHref}
                   target="_blank"
                   rel="noreferrer"
                   aria-disabled={!inviteUrl}
@@ -345,7 +340,7 @@ export function HowItWorksModal({
                   LinkedIn
                 </a>
                 <button
-                  onClick={handleCopy}
+                  onClick={copy}
                   disabled={!inviteUrl}
                   className={
                     'flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-tower-cream bg-night-deep/80 border border-white/10 ' +

@@ -3,6 +3,18 @@
 import Link from 'next/link'
 import { ReferralCopyButton } from './ReferralCopyButton'
 
+/* Shared style for the top-right desktop button cluster
+   (Rank · Share to level up · My Squad). One purple-fill style for all
+   three, tuned to the app palette (`tower-gold` is the brand purple
+   #a855f7) so the cluster sits in tone with the rest of the header
+   instead of reading as a louder, lighter purple. Desktop-only — mobile
+   reaches these via MobileBottomNav. */
+const CLUSTER_BTN =
+  'hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg ' +
+  'bg-tower-gold text-night-deep text-[13px] font-semibold whitespace-nowrap ' +
+  'transition hover:bg-tower-gold/90 hover:-translate-y-px ' +
+  'shadow-[0_4px_14px_rgba(168,85,247,0.28)]'
+
 interface Props {
   signedIn: boolean
   currentFloor: number
@@ -51,6 +63,14 @@ interface Props {
   /** Current leaderboard rank, shown in the Rank button label ("#7").
    *  null/undefined → the button just reads "Rank". */
   rank?: number | null
+  /** Hide the desktop stats pill (Level · invites · teammates · spins).
+   *  Used on the visiting-floor page so a visitor's OWN progress isn't
+   *  shown while they're looking at someone else's office. */
+  hideStats?: boolean
+  /** Desktop-only — opens the My Squad drawer. When set, a "My Squad"
+   *  button joins the top-right cluster (right of Share to level up),
+   *  replacing the old vertical sidebar tab. */
+  onOpenSquad?: () => void
 }
 
 export function Header({
@@ -69,6 +89,8 @@ export function Header({
   onShareClimb,
   spinTokens,
   onOpenRank,
+  hideStats,
+  onOpenSquad,
 }: Props) {
   return (
     <header className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 pointer-events-none">
@@ -77,20 +99,20 @@ export function Header({
           router (instant, no full reload). */}
       <Link
         href="/"
-        aria-label="Diaflow teammate — home"
+        aria-label="Diaflow AI Teammates — home"
         className="shrink-0 pointer-events-auto flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tower-gold/60"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/diaflow-logo.jpg" alt="Diaflow" width={32} height={32} className="rounded-md w-7 h-7 md:w-8 md:h-8" />
+        <img src="/diaflow-logo.webp" alt="Diaflow" width={32} height={32} className="rounded-md w-7 h-7 md:w-8 md:h-8" />
         {/* Brand text — "Diaflow" on mobile (where the right slot is
             now empty so the brand has room to breathe), full
-            "Diaflow teammate" wordmark on sm+ where the right slot
+            "Diaflow AI Teammates" wordmark on sm+ where the right slot
             carries the stats pill + CTAs. */}
         <span className="text-tower-cream font-bold tracking-wide sm:hidden">
-          Diaflow
+          Diaflow AI Teammates
         </span>
         <span className="hidden sm:block text-tower-cream font-bold tracking-wide">
-          Diaflow teammate
+          Diaflow AI Teammates
         </span>
       </Link>
 
@@ -107,6 +129,7 @@ export function Header({
             the info AND eat the limited 390px row width. The
             "(trial)" suffix stays desktop-only since it's the bit
             that ran out of room first on small screens. */}
+        {!hideStats && (
         <div className="hidden md:block text-xs text-tower-cream/80 bg-night-mid/60 px-3 py-1.5 rounded-md backdrop-blur-sm whitespace-nowrap">
           Level <span className="text-tower-gold font-semibold">{currentFloor}</span>
           <span className="mx-1.5 md:mx-2 opacity-40">·</span>
@@ -123,18 +146,13 @@ export function Header({
             </>
           )}
         </div>
+        )}
 
-        {/* Rank — desktop only. Opens the leaderboard modal. Sits next to
-            the stats pill so the user's standing is one click away without
-            hunting for the logo or a hidden affordance. Shows the live
-            rank ("#7") when known. Mobile reaches this via the bottom
-            nav's Rank slot, so this is md+ only. */}
+        {/* Rank — desktop only, first in the top-right cluster
+            (Rank · Share · My Squad). Routes to the /wall leaderboard.
+            Mobile reaches this via the bottom nav's Rank slot. */}
         {onOpenRank && (
-          <button
-            onClick={onOpenRank}
-            aria-label="Open leaderboard"
-            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-night-mid/80 border border-tower-gold/40 text-tower-gold font-semibold text-xs tracking-wide hover:bg-night-mid transition whitespace-nowrap"
-          >
+          <button onClick={onOpenRank} aria-label="Open leaderboard" className={CLUSTER_BTN}>
             <span aria-hidden>🏆</span>
             Rank
           </button>
@@ -255,11 +273,9 @@ export function Header({
                 // Opens the centered ShareModal ("Share to reach Floor N")
                 // — same surface the floor-preview "Share to climb" CTA
                 // uses. Falls back to copy-in-place when no handler.
-                <button
-                  onClick={onShareClimb}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-tower-gold/90 text-night-deep font-semibold text-xs tracking-wide hover:bg-tower-gold transition whitespace-nowrap"
-                >
-                  <span aria-hidden>📣</span> Share to level up
+                <button onClick={onShareClimb} className={CLUSTER_BTN}>
+                  <span aria-hidden>📣</span>
+                  Share to level up
                 </button>
               ) : (
                 <ReferralCopyButton
@@ -287,6 +303,15 @@ export function Header({
           >
             🔒 Save Your Team
           </Link>
+        )}
+
+        {/* My Squad — last in the top-right cluster (replaces the old
+            vertical sidebar tab). Opens the My Squad drawer. */}
+        {onOpenSquad && (
+          <button onClick={onOpenSquad} aria-label="Open My Squad" className={CLUSTER_BTN}>
+            <span aria-hidden>📋</span>
+            My Squad
+          </button>
         )}
       </div>
     </header>

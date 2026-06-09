@@ -6,7 +6,7 @@ export function MobileFallback() {
   return (
     <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-start p-6 pt-12 gap-6">
       <div className="text-center mb-4">
-        <h1 className="text-white text-3xl font-bold tracking-tight">Diaflow teammate</h1>
+        <h1 className="text-white text-3xl font-bold tracking-tight">Diaflow AI Teammates</h1>
         <p className="text-white/50 text-sm mt-1">AI Teammates</p>
       </div>
       <p className="text-white/40 text-xs text-center max-w-xs">

@@ -18,7 +18,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { resolveLeoVideo } from '@/lib/youtubeUrl'
+import { useLeoVideo } from '@/hooks/useLeoVideo'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
 
@@ -29,6 +29,7 @@ import { useIsDesktop } from '@/hooks/useIsDesktop'
  */
 function ModalShell({
   onClose,
+  onBack,
   wide,
   statusPill,
   step,
@@ -36,7 +37,14 @@ function ModalShell({
   anchorSlug,
   children,
 }: {
-  onClose: () => void
+  /** Dismiss handler. When omitted the card is non-dismissible — no X
+   *  button is rendered and a backdrop tap does nothing. Used by the
+   *  onboarding steps (Iris / Mia) that the user must complete or step
+   *  back from, never silently close. */
+  onClose?: () => void
+  /** Go to the previous onboarding step. When set, a "← Back" button is
+   *  rendered top-left on both mobile and desktop. */
+  onBack?: () => void
   wide?: boolean
   /** Optional small pill rendered top-left (replaces the original
    *  unexplained green dot). Desktop-only — mobile mockup omits it
@@ -155,19 +163,41 @@ function ModalShell({
           </span>
         )}
 
+        {/* ← Back — top-left, both breakpoints. Returns to the previous
+            onboarding step. Only rendered when a handler is supplied
+            (the first step, Iris, has nowhere to go back to). */}
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-tower-cream/60 hover:text-tower-cream hover:bg-white/5 transition text-[12px] font-semibold"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+            Back
+          </button>
+        )}
+
         {/* × close — hidden on mobile (the mockup relies on grip-drag
-            / backdrop tap), shown on desktop where there's no grip. */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="hidden md:flex absolute top-3 right-3 p-1.5 rounded-md text-tower-cream/60 hover:text-tower-cream hover:bg-white/5 transition"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+            / backdrop tap), shown on desktop where there's no grip.
+            Only rendered when dismissible (onClose supplied); the
+            onboarding steps omit it so the modal can't be skipped. */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="hidden md:flex absolute top-3 right-3 p-1.5 rounded-md text-tower-cream/60 hover:text-tower-cream hover:bg-white/5 transition"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
 
         <div
           className={
@@ -190,14 +220,14 @@ function ModalShell({
 
 interface IrisProps {
   onSubmit: (companyName: string) => void
-  /** Skip this step (e.g. user closes the modal). Advances to Mia. */
-  onSkip: () => void
 }
 
-export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
+export function IrisBubble({ onSubmit }: IrisProps) {
   const [value, setValue] = useState('')
   return (
-    <ModalShell onClose={onSkip} step={1} anchorSlug="iris">
+    // Non-dismissible: first onboarding step. No onClose (can't skip) and
+    // no onBack (nothing precedes it).
+    <ModalShell step={1} anchorSlug="iris">
       {/* Alignment splits by breakpoint:
             mobile  → centered (matches the bottom-sheet onboarding)
             desktop → left-aligned bubble (matches the Option-B mockup),
@@ -267,14 +297,15 @@ export function IrisBubble({ onSubmit, onSkip }: IrisProps) {
 
 interface MiaProps {
   onSubmit: (jobRole: string) => void
-  /** Skip with no value (X close) — advances to mia-info. */
-  onSkip: () => void
+  /** Go back to the previous step (Iris). */
+  onBack: () => void
 }
 
-export function MiaBubble({ onSubmit, onSkip }: MiaProps) {
+export function MiaBubble({ onSubmit, onBack }: MiaProps) {
   const [value, setValue] = useState('')
   return (
-    <ModalShell onClose={onSkip} step={2} anchorSlug="mia">
+    // Non-dismissible: user must answer or step back. No onClose.
+    <ModalShell onBack={onBack} step={2} anchorSlug="mia">
       <div className="text-center">
         <div className="text-3xl mb-2" aria-hidden>💁</div>
         <h2 className="text-[22px] md:text-[24px] font-extrabold leading-tight tracking-tight mb-2">
@@ -334,9 +365,11 @@ interface MiaInfoProps {
   userRole?: string | null
   /** Advance to Leo step. */
   onNext: () => void
+  /** Go back to the previous step (Mia role question). */
+  onBack: () => void
 }
 
-export function MiaInfoBubble({ recommendedRole, reason, loading, userRole, onNext }: MiaInfoProps) {
+export function MiaInfoBubble({ recommendedRole, reason, loading, userRole, onNext, onBack }: MiaInfoProps) {
   // Render priority:
   //   1. loading  → spinner + "matching…" — Diaflow API in flight
   //   2. reason   → personalised heading + reason (whitespace-pre-line)
@@ -353,7 +386,10 @@ export function MiaInfoBubble({ recommendedRole, reason, loading, userRole, onNe
   // the generic "your" copy so the headline still parses.
   const headlineRole = (userRole ?? '').trim().slice(0, 40) || 'your'
   return (
-    <ModalShell onClose={onNext} step={showLoading ? 3 : 3} anchorSlug="mia">
+    // Non-dismissible: the explicit "Meet the rest →" button advances;
+    // backdrop / X are removed so the user can't skip Mia. Back returns
+    // to the role question.
+    <ModalShell onBack={onBack} step={3} anchorSlug="mia">
       <div>
         {/* Each branch owns its own avatar:
               loading      → ringed MorphAvatar (sells the morph)
@@ -535,17 +571,20 @@ interface LeoProps {
    *  click, or the "Got it" CTA). Advances `onboardingStep` to
    *  `done` so the office unlocks. */
   onContinue: () => void
+  /** Go back to the previous step (Mia's recommendation). */
+  onBack: () => void
 }
 
-export function LeoBubble({ onContinue }: LeoProps) {
-  // Resolve Leo's intro video. With NEXT_PUBLIC_YOUTUBE_ID set we
-  // embed YouTube (clean-params per requirements/youtube_frame_rule.md);
-  // without it we fall back to the bundled MP4 in /public so the
-  // marketing surface still has a working video. See lib/youtubeUrl.ts.
-  const video = resolveLeoVideo(process.env.NEXT_PUBLIC_YOUTUBE_ID)
+export function LeoBubble({ onContinue, onBack }: LeoProps) {
+  // Resolve Leo's intro video. The YouTube ID now comes from the
+  // app_config table (key `leo_youtube_id`) via /api/config/leo-video —
+  // not NEXT_PUBLIC_YOUTUBE_ID — so it's swappable live. Clean-params per
+  // requirements/youtube_frame_rule.md; blank/unset → bundled MP4
+  // fallback in /public so the surface always has a working video.
+  const video = useLeoVideo()
 
   return (
-    <ModalShell onClose={onContinue} wide step={4} anchorSlug="leo">
+    <ModalShell onClose={onContinue} onBack={onBack} wide step={4} anchorSlug="leo">
       <div>
         {/* 16:9 video well + purple glow underneath so the video
             doesn't look pasted onto the dark surface.

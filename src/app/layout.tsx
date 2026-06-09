@@ -4,6 +4,7 @@ import './globals.css'
 import { GoogleAnalytics } from '@/components/GoogleAnalytics'
 import { GoogleTagManager, GoogleTagManagerNoScript } from '@/components/GoogleTagManager'
 import { MicrosoftClarity } from '@/components/MicrosoftClarity'
+import { ChunkErrorReload } from '@/components/ChunkErrorReload'
 
 /**
  * Default site URL — used by Next.js's metadata API to resolve every
@@ -38,9 +39,13 @@ async function resolveSiteUrl(): Promise<URL> {
   return new URL('http://localhost:3000')
 }
 
-const SITE_NAME = 'Diaflow teammate'
+const SITE_NAME = 'Diaflow AI Teammates'
 const SITE_DESCRIPTION = 'Build your AI office. Invite friends to level up.'
-const OG_IMAGE = '/diaflow-logo.jpg'
+// Share/preview image. MUST be JPEG/PNG (NOT avif/webp): the X / Facebook
+// / LinkedIn link-preview crawlers don't decode avif, so an avif og:image
+// silently yields no thumbnail. The in-app assets can stay avif/webp —
+// only this crawler-facing image needs a broadly-supported format.
+const OG_IMAGE = '/thumbnail.jpg'
 
 /**
  * Viewport — disables user scaling so mobile browsers can't double-tap
@@ -77,10 +82,13 @@ export async function generateMetadata(): Promise<Metadata> {
     description: SITE_DESCRIPTION,
     icons: {
       icon: [
-        { url: '/diaflow-logo.jpg', type: 'image/jpeg' },
+        { url: '/diaflow-logo.webp', type: 'image/webp' },
       ],
-      shortcut: '/diaflow-logo.jpg',
-      apple: '/diaflow-logo.jpg',
+      shortcut: '/diaflow-logo.webp',
+      // apple-touch-icon (iOS "Add to Home Screen") must be PNG — iOS
+      // doesn't render a webp home-screen icon. 180×180 is the modern
+      // recommended size.
+      apple: '/diaflow-logo-180.png',
     },
     // Open Graph — Facebook / LinkedIn / Discord / iMessage etc. all
     // read these.
@@ -92,15 +100,14 @@ export async function generateMetadata(): Promise<Metadata> {
       url: '/',
       // Declared dimensions MUST match the actual file or LinkedIn /
       // Facebook reject the image silently (and then cache the "no
-      // image" verdict for ~7 days). `/diaflow-logo.jpg` is a square
-      // 2048×2048 bitmap. LinkedIn accepts square OG images — they
-      // just render letterboxed in the landscape preview slot, which
-      // is still better than no preview at all. If a proper 1200×627
-      // landscape asset gets added later, swap OG_IMAGE + dimensions.
-      images: [{ url: OG_IMAGE, width: 2048, height: 2048, alt: SITE_NAME }],
+      // image" verdict for ~7 days). `/thumbnail.jpg` is a landscape
+      // 2221×1211 bitmap — a proper wide hero for the OG/Twitter
+      // preview slot. `type` (og:image:type) makes FB render it more
+      // reliably. Keep these three in lockstep with the real file.
+      images: [{ url: OG_IMAGE, width: 2221, height: 1211, alt: SITE_NAME, type: 'image/jpeg' }],
     },
     // Twitter / X — `summary_large_image` is the right card type for
-    // a 1200×627 hero, matching the OG image dimensions.
+    // the 2221×1211 landscape hero, matching the OG image dimensions.
     twitter: {
       card: 'summary_large_image',
       title: SITE_NAME,
@@ -117,8 +124,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* ── Critical resource hints ─────────────────────────────────
             The 3D scene's two biggest texture loads are the floor-1
-            window scenery (`/window_images/1.png`, ~815 KB) and the
-            full tower image (`/tower.png`, ~923 KB). Both are loaded
+            window scenery (`/window_images/1.avif`, ~815 KB) and the
+            full tower image (`/tower.avif`, ~923 KB). Both are loaded
             by R3F's TextureLoader downstream of React hydration —
             without these preload hints, the browser doesn't start
             fetching them until the SceneCanvas chunk has parsed,
@@ -129,24 +136,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link
           rel="preload"
           as="image"
-          href="/window_images/1.png"
+          href="/window_images/1.avif"
           fetchPriority="high"
         />
         <link
           rel="preload"
           as="image"
-          href="/tower.png"
+          href="/tower.avif"
           fetchPriority="high"
         />
         {/* Logo — small but blocks the header chrome. Preload so the
             first paint has the branded mark instead of a placeholder. */}
-        <link rel="preload" as="image" href="/diaflow-logo.jpg" />
+        <link rel="preload" as="image" href="/diaflow-logo.webp" />
       </head>
       <body className="antialiased">
         {/* GTM noscript fallback — per Google's install spec must be
             immediately inside <body>. Renders an invisible iframe that
             fires the container even when JS is disabled. */}
         <GoogleTagManagerNoScript />
+        {/* Self-heals the "stale chunk 404" crash after a deploy by
+            reloading once when a /_next/static chunk fails to load. */}
+        <ChunkErrorReload />
         {children}
         {/* GTM head/body script — loaded after-interactive so it
             doesn't block first paint. Configured container = GTM-KDPNP5XB. */}

@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { resolveLeoVideo } from '@/lib/youtubeUrl'
+import { useLeoVideo } from '@/hooks/useLeoVideo'
 import { trackEvent } from '@/lib/tracking'
 import { useAnchorPosition } from '@/lib/anchorPositions'
 import { useIsDesktop } from '@/hooks/useIsDesktop'
@@ -41,16 +41,20 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
   // static `translate(...)` offset (otherwise the two transforms
   // stack and the card drifts off the character).
   const isDesktop = useIsDesktop()
+  // freeze: snapshot Leo's position when the drawer opens and keep it
+  // static. Leo keeps wandering / bobbing in the scene, but the video
+  // card no longer jitters along with him — otherwise the moving anchor
+  // made the embedded video hard to watch.
   const anchorRef = useAnchorPosition(
     open && isDesktop ? anchorSlug ?? null : null,
-    { flipEdge: true, vCenter: true, gap: 28 },
+    { flipEdge: true, vCenter: true, gap: 28, freeze: true },
   )
   const anchored = !!anchorSlug && isDesktop
-  // Same env-driven helper LeoBubble uses — keeps the two Leo modals
-  // in sync. Reads the BARE VIDEO ID from NEXT_PUBLIC_YOUTUBE_ID;
-  // when the env is blank we fall back to the bundled MP4 in /public
-  // so the modal still plays without any env config (see lib/youtubeUrl).
-  const video = resolveLeoVideo(process.env.NEXT_PUBLIC_YOUTUBE_ID)
+  // Same resolver LeoBubble uses — keeps the two Leo modals in sync.
+  // The YouTube ID now comes from the app_config table (key
+  // `leo_youtube_id`) via /api/config/leo-video, not an env var, so it
+  // can be swapped live. Blank/unset → bundled MP4 fallback in /public.
+  const video = useLeoVideo()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const hasTrackedVideo = useRef(false)
 
@@ -223,7 +227,7 @@ export function LeoEmailDrawer({ open, onClose, anchorSlug }: Props) {
             // download until the user actually hits play.
             <video
               src={video.src}
-              title="Diaflow teammate intro"
+              title="Diaflow AI Teammates intro"
               controls
               playsInline
               preload="metadata"

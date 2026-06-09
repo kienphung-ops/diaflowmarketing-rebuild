@@ -33,6 +33,7 @@ import { recomputeAndPersistFloor } from '@/lib/floorProgress'
 import { invalidateLeaderboard } from '@/lib/leaderboard'
 import { DEFAULT_TEAMMATES } from '@/lib/defaultTeammates'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { getCountry } from '@/lib/requestGeo'
 
 const BCRYPT_ROUNDS = 10
 const MIN_PASSWORD_LEN = 6
@@ -41,10 +42,6 @@ function getClientIp(req: NextRequest): string | undefined {
   const xff = req.headers.get('x-forwarded-for')
   if (xff) return xff.split(',')[0].trim()
   return req.headers.get('x-real-ip') ?? undefined
-}
-
-function getCountry(req: NextRequest): string | undefined {
-  return req.headers.get('x-vercel-ip-country') ?? undefined
 }
 
 export async function POST(req: NextRequest) {
@@ -134,7 +131,6 @@ export async function POST(req: NextRequest) {
             email,
             firstEmail: email,
             passwordHash,
-            //ipAddress: ip,
             country: country ?? null,
             referralCode,
             referredByCode: inviterCode,
@@ -184,7 +180,6 @@ export async function POST(req: NextRequest) {
               inviterUserId: inviter.id,
               invitedEmail: email,
               invitedUserId: u.id,
-              ipAddress: ip,
               userAgent,
               verified: true,
             },

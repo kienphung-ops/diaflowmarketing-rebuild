@@ -19,12 +19,12 @@ import { OfficeScene, type OnboardingStep, type RecruitedCharacter } from './Off
 // once across both paths.
 if (typeof window !== 'undefined') {
   useTexture.preload([
-    '/window_images/1.png',
-    '/window_images/2.png',
-    '/window_images/3.png',
-    '/window_images/4.png',
-    '/window_images/5.png',
-    '/window_images/6.png',
+    '/window_images/1.avif',
+    '/window_images/2.avif',
+    '/window_images/3.avif',
+    '/window_images/4.avif',
+    '/window_images/5.avif',
+    '/window_images/6.avif',
   ])
 }
 

@@ -17,8 +17,6 @@ import {
   LeoBubble,
 } from '@/components/OnboardingBubble'
 import { MySquadDrawer } from '@/components/MySquadDrawer'
-import { LeaderboardModal } from '@/components/LeaderboardModal'
-import { MySquadFloatingButton } from '@/components/MySquadFloatingButton'
 import { MiaInfoCard } from '@/components/MiaInfoCard'
 import { LeoEmailDrawer } from '@/components/LeoEmailDrawer'
 import { TeammateEditModal } from '@/components/TeammateEditModal'
@@ -52,6 +50,7 @@ import { useMaxTeammates, useFloor } from '@/lib/floorsConfigClient'
 import {
   defaultTrialState,
   nextOnboardingStep,
+  prevOnboardingStep,
   readTrialState,
   saveTrialState,
   type TrialState,
@@ -145,9 +144,6 @@ export default function TowerLanding(props: Props) {
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [activeNpcModal, setActiveNpcModal] = useState<'iris' | 'mia' | 'leo' | null>(null)
   const [squadOpen, setSquadOpen] = useState(false)
-  // Leaderboard / rank bottom-sheet — opened by the Rank slot on
-  // MobileBottomNav (right of the hero CTA).
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [editingTeammate, setEditingTeammate] = useState<ServerRecruit | null>(null)
   // The "Step 2" speech-bubble shown next to a recruited teammate the
   // user just clicked. Holds the same row shape as editingTeammate so
@@ -402,6 +398,8 @@ export default function TowerLanding(props: Props) {
   // is a single tap away.
   useEffect(() => {
     router.prefetch('/how-it-works')
+    // Rank button → /wall (signed-in users see it on desktop + mobile).
+    router.prefetch('/wall')
     if (props.signedIn) {
       router.prefetch('/tower')
     } else {
@@ -430,16 +428,21 @@ export default function TowerLanding(props: Props) {
     }
   }, [pushToast])
 
-  // Stash ?ref=CODE from URL.
+  // Referral capture / cleanup.
+  //   - Signed in (incl. just after email or Google login) → can't be
+  //     referred; drop any pending ref so it never leaks into a later flow.
+  //   - Anonymous → stash ?ref=CODE from the URL (LAST inviter wins). The
+  //     /floor/[code] visitor page also stashes the code directly.
   useEffect(() => {
-    const url = new URL(window.location.href)
-    const ref = url.searchParams.get('ref')
-    if (ref) {
-      try {
-        window.localStorage.setItem('diaflow_pending_ref', ref.toUpperCase())
-      } catch {
-        /* ignore */
+    try {
+      if (props.signedIn) {
+        window.localStorage.removeItem('diaflow_pending_ref')
+        return
       }
+      const ref = new URL(window.location.href).searchParams.get('ref')
+      if (ref) window.localStorage.setItem('diaflow_pending_ref', ref.toUpperCase())
+    } catch {
+      /* ignore */
     }
   }, [])
 
@@ -692,16 +695,15 @@ export default function TowerLanding(props: Props) {
     },
     [trial]
   )
-  // X-close on Iris modal — advance without a team name. `trial.teamName`
-  // stays null and MiaBubble will fall back to "Your team".
-  // Iris onboarding gate — the team name is required to advance past
-  // this step. × / backdrop CLOSE the bubble but DO NOT advance the
-  // step (boss feedback: only a real submission counts). The bubble
-  // re-opens on the next page load because `trial.onboardingStep`
-  // hasn't moved, so a dismissed step isn't permanently skippable.
-  const handleIrisSkip = useCallback(() => {
-    setOnboardingModalVisible(false)
-  }, [])
+  // "← Back" on the onboarding bubbles (Mia / Mia-info / Leo). Steps the
+  // user one stage backwards. Reads the CURRENT step from `trial` so a
+  // single handler serves every bubble — Iris (the first step) has no
+  // Back button so it can never reach 'iris' → predecessor here. The
+  // mia-info / leo states keep any fetched recommendation in `trial`, so
+  // going back and forward doesn't lose the personalised role.
+  const handleOnboardingBack = useCallback(() => {
+    persist({ ...trial, onboardingStep: prevOnboardingStep(trial.onboardingStep) })
+  }, [trial])
 
   // True from the moment Mia's job submit fires until the Diaflow
   // upstream returns (or fails). Drives the "Hang on…" hint inside
@@ -773,14 +775,9 @@ export default function TowerLanding(props: Props) {
     },
     [trial]
   )
-  // Same gate as handleIrisSkip — × / backdrop close but don't
-  // advance past 'mia'. User must submit the job role to proceed.
-  const handleMiaSkip = useCallback(() => {
-    setOnboardingModalVisible(false)
-  }, [])
-
-  // Mia's intro card has no input — clicking "Meet your next teammate"
-  // (or the X close) advances to Leo. Same handler for both.
+  // Mia's intro card has no input — clicking "Meet the rest →" advances
+  // to Leo. (The card is non-dismissible; only the explicit CTA or the
+  // Back button move the step.)
   const handleMiaInfoNext = useCallback(() => {
     persist({ ...trial, onboardingStep: nextOnboardingStep('mia-info') })
   }, [trial])
@@ -1254,10 +1251,14 @@ export default function TowerLanding(props: Props) {
         onShareClimb={props.signedIn ? () => setShareModalOpen(true) : undefined}
         // Spin token count in the desktop stats pill (signed-in only).
         spinTokens={props.signedIn ? spinTokens : undefined}
-        // Desktop Rank button (right of "Share to climb") → leaderboard
-        // modal. Signed-in only — anonymous trial users have no rank yet.
-        onOpenRank={props.signedIn ? () => setLeaderboardOpen(true) : undefined}
+        // Desktop Rank button (right of "Share to climb") → the public
+        // /wall page (was the leaderboard modal). Signed-in only — the
+        // wall has a "Your office" back link that needs a session.
+        onOpenRank={props.signedIn ? () => router.push('/wall') : undefined}
         rank={rank}
+        // My Squad now lives in the top-right cluster (was the vertical
+        // sidebar tab). Same gate as the old floating button.
+        onOpenSquad={onboardingComplete ? () => setSquadOpen(true) : undefined}
       />
 
       {/* Mobile-only counter chip strip. Slides in directly below the
@@ -1397,7 +1398,6 @@ export default function TowerLanding(props: Props) {
         spinTeaser={!props.signedIn && !anonSpun}
       />
 
-      <MySquadFloatingButton visible={onboardingComplete} onClick={() => setSquadOpen(true)} />
 
       <SpinModal
         open={spinOpen}
@@ -1485,7 +1485,7 @@ export default function TowerLanding(props: Props) {
             //   trial    → "Save my team"   → signup modal
             //   signed-in → "Invite to climb" → share sheet
             heroMode={props.signedIn ? 'invite' : 'save'}
-            onOpenRank={() => setLeaderboardOpen(true)}
+            onOpenRank={() => router.push('/wall')}
             rank={rank}
             onHero={() => {
               if (props.signedIn) setMobileShareOpen(true)
@@ -1507,12 +1507,6 @@ export default function TowerLanding(props: Props) {
             currentFloor={effective.currentFloor}
             totalInvites={effective.totalInvites}
             onSignupNudge={isTrial ? () => { trackEvent('signup_click', { source: 'mobile_share' }); setShowSignupModal(true) } : undefined}
-          />
-          <LeaderboardModal
-            open={leaderboardOpen}
-            onClose={() => setLeaderboardOpen(false)}
-            currentReferralCode={props.referralCode}
-            totalInvites={effective.totalInvites}
           />
         </>
       )}
@@ -1599,10 +1593,10 @@ export default function TowerLanding(props: Props) {
           centered cards (ModalShell), NOT bottom-anchored bubbles, so
           the previous `flex items-end` wrapper is gone. */}
       {isTrial && onboardingModalVisible && activeStep === 'iris' && (
-        <IrisBubble onSubmit={handleIrisSubmit} onSkip={handleIrisSkip} />
+        <IrisBubble onSubmit={handleIrisSubmit} />
       )}
       {isTrial && onboardingModalVisible && activeStep === 'mia' && (
-        <MiaBubble onSubmit={handleMiaSubmit} onSkip={handleMiaSkip} />
+        <MiaBubble onSubmit={handleMiaSubmit} onBack={handleOnboardingBack} />
       )}
       {isTrial && onboardingModalVisible && activeStep === 'mia-info' && (
         <MiaInfoBubble
@@ -1611,10 +1605,11 @@ export default function TowerLanding(props: Props) {
           loading={jobSummaryLoading}
           userRole={trial.teamPurpose}
           onNext={handleMiaInfoNext}
+          onBack={handleOnboardingBack}
         />
       )}
       {isTrial && onboardingModalVisible && activeStep === 'leo' && (
-        <LeoBubble onContinue={handleLeoDone} />
+        <LeoBubble onContinue={handleLeoDone} onBack={handleOnboardingBack} />
       )}
 
       <MySquadDrawer
@@ -1771,6 +1766,9 @@ export default function TowerLanding(props: Props) {
         open={bulkAddOpen}
         slotsAvailable={slotsAvailable}
         currentFloor={effective.currentFloor}
+        // Roles the user already has (NPCs + recruited) → drop matching
+        // default suggestions so we never pre-fill a duplicate role.
+        existingRoles={recruits.map(t => t.role)}
         onClose={() => setBulkAddOpen(false)}
         onAdd={handleBulkAdd}
       />

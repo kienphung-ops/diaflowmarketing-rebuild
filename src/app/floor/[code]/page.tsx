@@ -19,39 +19,55 @@ export async function generateMetadata(
   if (!owner) return {}
 
   const teamName = owner.teamName?.trim() || 'A Diaflow team'
-  const title = `Join ${teamName} on Diaflow teammate`
-  const description = `${teamName} is on Level ${owner.currentFloor} — peek inside their AI office and help them level up.`
+  const title = `Visit ${teamName} office on Diaflow`
+  const description = `${teamName} is building an AI office on Diaflow — now on Level ${owner.currentFloor}. Step inside their office, poke their AI teammates, and start building your own AI team in 30 seconds.`
   const url = `/floor/${code}`
+  // Per-room share thumbnail — the actual office scene (not the logo) so
+  // the preview shows what the visitor is being invited into. 2221×1211
+  // JPEG in /public; dimensions MUST match the file or LinkedIn/Facebook
+  // silently reject it (and cache the "no image" verdict ~7 days).
+  // MUST be JPEG/PNG (NOT avif): X/FB/LinkedIn crawlers don't decode avif,
+  // so an avif og:image yields no preview thumbnail.
+  const imageAlt = `${teamName}'s AI office on Diaflow`
+  // `type` → og:image:type. Facebook (and others) render more reliably
+  // when the MIME type is declared.
+  const ogImage = { url: '/thumbnail.jpg', width: 2221, height: 1211, alt: imageAlt, type: 'image/jpeg' }
 
   return {
     title,
     description,
     // Next.js's metadata merge is SHALLOW — defining `openGraph` or
     // `twitter` here REPLACES the root layout's whole block instead
-    // of patching individual fields. So we have to re-state the
-    // inherited fields (image, card type, siteName, type) alongside
-    // the per-room overrides, otherwise the image drops out of
-    // shared previews.
+    // of patching individual fields. So we re-state every inherited
+    // field (image, card type, siteName, type) alongside the per-room
+    // overrides, otherwise the image drops out of shared previews.
+    //
+    // openGraph covers Facebook, LinkedIn, Instagram (DM/threads link
+    // unfurl), Discord, iMessage, Zalo, etc.; `twitter` covers X.
     openGraph: {
       type: 'website',
-      siteName: 'Diaflow teammate',
+      siteName: 'Diaflow',
       title,
       description,
       url,
-      // Declared dimensions MUST match the actual file or LinkedIn /
-      // Facebook reject the image silently (and then cache the "no
-      // image" verdict for ~7 days). `/diaflow-logo.jpg` is square
-      // 2048×2048 — declaring it 1200×627 (landscape) was the bug
-      // that prevented the preview from rendering.
-      images: [{ url: '/diaflow-logo.jpg', width: 2048, height: 2048, alt: title }],
+      locale: 'en_US',
+      images: [ogImage],
     },
     twitter: {
-      card: 'summary_large_image',
+      card: 'summary_large_image', // big landscape preview on X
       title,
       description,
-      images: ['/diaflow-logo.jpg'],
+      images: ['/thumbnail.jpg'],
     },
     alternates: { canonical: url },
+    // Facebook-specific: `fb:app_id` attributes the share to your FB app
+    // (Insights / domain-claim controls). Core FB link preview already
+    // works from the Open Graph tags above — this just unlocks the
+    // extras. Emitted only when NEXT_PUBLIC_FB_APP_ID is set, so we never
+    // ship a bogus/hard-coded ID. Set the env to enable; no code change.
+    ...(process.env.NEXT_PUBLIC_FB_APP_ID
+      ? { other: { 'fb:app_id': process.env.NEXT_PUBLIC_FB_APP_ID } }
+      : {}),
   }
 }
 

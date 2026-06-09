@@ -117,6 +117,21 @@ export default function FloorVisitorClient(props: Props) {
     router.prefetch('/tower')
     if (!props.visitorSignedIn) router.prefetch('/signup')
   }, [router, props.visitorSignedIn])
+
+  // Referral capture: any NOT-signed-in visitor who opens an invite link
+  // is treated as referred by that floor's owner. We persist the code to
+  // localStorage so it survives navigation (e.g. tapping the logo back to
+  // home) and a later return visit — signup reads it. LAST inviter wins
+  // (overwrite). Signed-in users are skipped (can't be re-referred); the
+  // code is cleared on successful signup/login (see signup + login flows).
+  useEffect(() => {
+    if (props.visitorSignedIn) return
+    try {
+      window.localStorage.setItem('diaflow_pending_ref', props.code.toUpperCase())
+    } catch {
+      /* ignore — private mode / storage disabled */
+    }
+  }, [props.code, props.visitorSignedIn])
   // Lifecycle AbortController — pokes (user-triggered fetches) reuse
   // this signal so they abort cleanly on navigation away. The polling
   // useEffect below uses its own per-effect AbortController instead.
@@ -136,7 +151,7 @@ export default function FloorVisitorClient(props: Props) {
   const [squadOpen, setSquadOpen] = useState(false)
   const [signupOpen, setSignupOpen] = useState(false)
   const [emailVerifyOpen, setEmailVerifyOpen] = useState(false)
-  // "What is Diaflow teammate?" → opens the rewards/how-it-works modal.
+  // "What is Diaflow AI Teammates?" → opens the rewards/how-it-works modal.
   const [howItWorksOpen, setHowItWorksOpen] = useState(false)
   const origin = useOrigin()
   // Covers the visited floor with a spinner while /tower loads. See the
@@ -400,6 +415,10 @@ export default function FloorVisitorClient(props: Props) {
         // owner's ref code attached, so a duplicate top-right button
         // is just clutter.
         hideAuthCta
+        // Hide the visitor's OWN Level · invites · teammates pill while
+        // they're on someone else's floor — their stats aren't relevant
+        // here (the "Visiting <owner>" card carries the floor context).
+        hideStats
       />
 
       {/* Top-left card identifying who you're visiting + the owner's
@@ -575,7 +594,7 @@ export default function FloorVisitorClient(props: Props) {
         }}
       />
 
-      {/* "What is Diaflow teammate?" helper — bottom-left. Collapsed to a
+      {/* "What is Diaflow AI Teammates?" helper — bottom-left. Collapsed to a
           "?" circle; expands to the full label on hover (desktop). Tap
           opens the How-it-works / rewards modal. Lifted above the
           anonymous "Build your own office" bottom card on mobile so they
@@ -583,7 +602,7 @@ export default function FloorVisitorClient(props: Props) {
       <button
         type="button"
         onClick={() => setHowItWorksOpen(true)}
-        aria-label="What is Diaflow teammate?"
+        aria-label="What is Diaflow AI Teammates?"
         className={
           'group fixed left-4 z-30 flex items-center rounded-full bg-night-mid/90 border border-white/15 backdrop-blur-md text-tower-cream/80 hover:text-tower-cream shadow-lg transition-all ' +
           (props.visitorSignedIn ? 'bottom-4' : 'bottom-[6.5rem] md:bottom-4')
@@ -594,7 +613,7 @@ export default function FloorVisitorClient(props: Props) {
           ?
         </span>
         <span className="max-w-0 group-hover:max-w-[220px] overflow-hidden whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 text-[13px] font-semibold">
-          <span className="pr-4">What is Diaflow teammate?</span>
+          <span className="pr-4">What is Diaflow AI Teammates?</span>
         </span>
       </button>
 
@@ -608,7 +627,24 @@ export default function FloorVisitorClient(props: Props) {
         }
         currentFloor={liveVisitorFloor}
         totalInvites={liveVisitorInvites}
-        onOpenSignup={!props.visitorSignedIn ? () => setSignupOpen(true) : undefined}
+        // A NEW visitor (no trial state) can't go straight into SignupModal
+        // — it expects an onboarding/trial snapshot they don't have. Send
+        // them through the SAME funnel as the bottom "Build your own
+        // office" CTA: navigate home with this room's ref code, which runs
+        // the Iris/Mia/Leo onboarding first, then signup.
+        onOpenSignup={
+          !props.visitorSignedIn
+            ? () => {
+                setIsNavigating(true)
+                router.push(`/?ref=${encodeURIComponent(props.code)}`)
+              }
+            : undefined
+        }
+        // Visitor has no trial team yet → frame the CTA as "build your
+        // own office" (matches the bottom CTA) instead of "save my team".
+        signupEyebrow="Like what you see?"
+        signupHint="Build your own AI office — free, takes 30 seconds."
+        signupLabel="Build your own office →"
       />
 
       {signupOpen && <SignupModal onClose={() => setSignupOpen(false)} />}

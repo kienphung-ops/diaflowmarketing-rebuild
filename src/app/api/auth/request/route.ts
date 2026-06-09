@@ -9,7 +9,9 @@ import {
 } from '@/lib/auth'
 import { sendAuthEmail } from '@/lib/email'
 import { TOKEN_TYPES } from '@/lib/authToken'
+import { checkRateLimit } from '@/lib/rateLimit'
 
+// IP is used ONLY as a transient rate-limit key (Redis), never stored.
 function getClientIp(req: NextRequest): string | undefined {
   const xff = req.headers.get('x-forwarded-for')
   if (xff) return xff.split(',')[0].trim()
@@ -64,7 +66,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
     }
 
+    // Anti-abuse: this endpoint sends an email (magic link + OTP) on every
+    // call, so throttle BEFORE doing any work. Per-email stops flooding one
+    // inbox; per-IP stops one client blasting many addresses.
     const ip = getClientIp(req)
+    const emailRL = await checkRateLimit({ key: `magiclink-email:${email}`, limit: 3, windowSec: 900 })
+    if (!emailRL.allowed) {
+      return NextResponse.json(
+        { error: 'Too many sign-in emails for this address. Try again in a few minutes.' },
+        { status: 429, headers: { 'Retry-After': String(emailRL.retryAfterSec) } },
+      )
+    }
+    if (ip) {
+      const ipRL = await checkRateLimit({ key: `magiclink-ip:${ip}`, limit: 15, windowSec: 3600 })
+      if (!ipRL.allowed) {
+        return NextResponse.json(
+          { error: 'Too many requests from this connection. Try again later.' },
+          { status: 429, headers: { 'Retry-After': String(ipRL.retryAfterSec) } },
+        )
+      }
+    }
+
     const userAgent = req.headers.get('user-agent') ?? undefined
 
     let inviter = null as { id: string; referralCode: string } | null
@@ -94,7 +116,6 @@ export async function POST(req: NextRequest) {
           // link can never overwrite the original inviter.
           referredByCode: inviterCode,
           referredAt: inviterCode ? new Date() : null,
-          ipAddress: ip,
           teamName: trialTeamName || null,
           teamPurpose: trialTeamPurpose || null,
         },
@@ -112,7 +133,6 @@ export async function POST(req: NextRequest) {
           inviterUserId: inviter.id,
           invitedEmail: email,
           invitedUserId: user.id,
-          ipAddress: ip,
           userAgent,
           verified: false,
         },
@@ -126,8 +146,8 @@ export async function POST(req: NextRequest) {
 
     await prisma.authToken.createMany({
       data: [
-        { userId: user.id, type: TOKEN_TYPES.MAGIC_LINK, tokenHash: magic.hash, expiresAt, ipAddress: ip },
-        { userId: user.id, type: TOKEN_TYPES.OTP, tokenHash: otpHash, expiresAt, ipAddress: ip },
+        { userId: user.id, type: TOKEN_TYPES.MAGIC_LINK, tokenHash: magic.hash, expiresAt },
+        { userId: user.id, type: TOKEN_TYPES.OTP, tokenHash: otpHash, expiresAt},
       ],
     })
 

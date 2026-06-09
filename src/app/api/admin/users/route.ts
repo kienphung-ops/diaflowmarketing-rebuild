@@ -53,7 +53,6 @@ export async function GET(req: NextRequest) {
       firstEmail: true,
       emailVerified: true,
       country: true,
-      ipAddress: true,
       referralCode: true,
       referredByCode: true,
       referredAt: true,
